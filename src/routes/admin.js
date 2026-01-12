@@ -466,4 +466,122 @@ router.post('/profil/haslo', async (req, res) => {
     res.redirect('/admin/profil');
 });
 
+// GET /admin/ustawienia/email - Ustawienia email
+router.get('/ustawienia/email', async (req, res) => {
+    const config = require('../config');
+    const db = require('../utils/database');
+
+    // Pobierz logi emaili
+    const emailLogs = await db.query(`
+        SELECT * FROM logi_mail
+        ORDER BY utworzono DESC
+        LIMIT 50
+    `);
+
+    // Pobierz statystyki
+    const statsQuery = await db.query(`
+        SELECT
+            SUM(CASE WHEN status = 'wyslany' THEN 1 ELSE 0 END) as sent,
+            SUM(CASE WHEN status = 'blad' THEN 1 ELSE 0 END) as failed,
+            SUM(CASE WHEN status = 'oczekuje' THEN 1 ELSE 0 END) as pending
+        FROM logi_mail
+        WHERE utworzono >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    `);
+
+    const emailStats = statsQuery[0] || { sent: 0, failed: 0, pending: 0 };
+
+    res.render('admin/ustawienia-email', {
+        title: 'Ustawienia Email',
+        emailConfig: config.mail,
+        emailLogs,
+        emailStats,
+        helpers
+    });
+});
+
+// POST /admin/ustawienia/email/test - Wyślij testowy email
+router.post('/ustawienia/email/test', async (req, res) => {
+    const { test_email } = req.body;
+    const nodemailer = require('nodemailer');
+    const config = require('../config');
+    const db = require('../utils/database');
+
+    if (!test_email) {
+        req.flash('error', 'Podaj adres email');
+        return res.redirect('/admin/ustawienia/email');
+    }
+
+    try {
+        // Utwórz transporter
+        const transporter = nodemailer.createTransport({
+            host: config.mail.host,
+            port: config.mail.port,
+            secure: config.mail.port === 465,
+            auth: {
+                user: config.mail.user,
+                pass: config.mail.pass
+            }
+        });
+
+        // Wyslij testowy email
+        const info = await transporter.sendMail({
+            from: `"${config.mail.fromName}" <${config.mail.from}>`,
+            to: test_email,
+            subject: 'Test konfiguracji email - GraphFlow',
+            html: `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; margin: 0; padding: 20px; }
+                        .container { max-width: 500px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                        .header { background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: white; padding: 30px; text-align: center; }
+                        .content { padding: 30px; text-align: center; }
+                        .success-icon { width: 60px; height: 60px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+                        .footer { background: #f9fafb; padding: 20px; text-align: center; color: #6b7280; font-size: 12px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1 style="margin: 0;">GraphFlow</h1>
+                        </div>
+                        <div class="content">
+                            <div class="success-icon">
+                                <svg width="30" height="30" fill="none" stroke="#22c55e" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <h2 style="color: #22c55e; margin: 0 0 10px;">Konfiguracja dziala!</h2>
+                            <p style="color: #6b7280;">Twoja konfiguracja SMTP jest poprawna. Powiadomienia email beda wysylane automatycznie.</p>
+                        </div>
+                        <div class="footer">
+                            <p>Ten email zostal wyslany z panelu GraphFlow w celach testowych.</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `
+        });
+
+        // Zapisz log
+        await db.query(`
+            INSERT INTO logi_mail (odbiorca, temat, tresc, status, utworzono)
+            VALUES (?, ?, ?, 'wyslany', NOW())
+        `, [test_email, 'Test konfiguracji email - GraphFlow', 'Email testowy']);
+
+        req.flash('success', 'Testowy email zostal wyslany pomyslnie!');
+    } catch (error) {
+        // Zapisz log bledu
+        await db.query(`
+            INSERT INTO logi_mail (odbiorca, temat, tresc, status, blad_info, utworzono)
+            VALUES (?, ?, ?, 'blad', ?, NOW())
+        `, [test_email, 'Test konfiguracji email - GraphFlow', 'Email testowy', error.message]);
+
+        req.flash('error', `Blad wysylki: ${error.message}`);
+    }
+
+    res.redirect('/admin/ustawienia/email');
+});
+
 module.exports = router;
