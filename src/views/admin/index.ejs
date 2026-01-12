@@ -4,50 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= title %> | <%= appName || 'GraphFlow' %></title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
-    <style>
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
-        .animate-slide-up { animation: slideUp 0.5s ease-out; }
-        .animate-slide-in-right { animation: slideInRight 0.3s ease-out; }
-        .card-hover { transition: all 0.3s; }
-        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
-        .status-blue { background-color: #dbeafe; color: #1e40af; }
-        .status-yellow { background-color: #fef3c7; color: #92400e; }
-        .status-orange { background-color: #ffedd5; color: #9a3412; }
-        .status-purple { background-color: #f3e8ff; color: #6b21a8; }
-        .status-red { background-color: #fee2e2; color: #991b1b; }
-        .status-green { background-color: #dcfce7; color: #166534; }
-        .status-gray { background-color: #f3f4f6; color: #374151; }
-        .nav-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; color: #4b5563; border-radius: 0.75rem; transition: all 0.2s; }
-        .nav-link:hover { background-color: #f3f4f6; color: #111827; }
-        .nav-link.active { background: linear-gradient(to right, #eef2ff, #faf5ff); color: #4338ca; font-weight: 500; }
-        .dropdown-menu { position: absolute; right: 0; margin-top: 0.5rem; width: 14rem; background: white; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); padding: 0.5rem; opacity: 0; visibility: hidden; transform: scale(0.95); transition: all 0.2s; z-index: 50; }
-        .dropdown:hover .dropdown-menu, .dropdown:focus-within .dropdown-menu { opacity: 1; visibility: visible; transform: scale(1); }
-        .notification-dot { position: absolute; top: -0.25rem; right: -0.25rem; width: 1.25rem; height: 1.25rem; background: #ef4444; color: white; font-size: 0.75rem; font-weight: 700; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
-        .btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.625rem 1rem; background: linear-gradient(to right, #4f46e5, #7c3aed); color: white; font-weight: 500; border-radius: 0.75rem; transition: all 0.2s; }
-        .btn-primary:hover { background: linear-gradient(to right, #4338ca, #6d28d9); box-shadow: 0 10px 15px -3px rgb(79 70 229 / 0.3); }
-        .btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.625rem 1rem; background: white; color: #374151; font-weight: 500; border-radius: 0.75rem; border: 1px solid #e5e7eb; transition: all 0.2s; }
-        .btn-secondary:hover { background: #f9fafb; border-color: #d1d5db; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-    </style>
+    <%- include('../partials/_styles') %>
 </head>
 <body class="font-sans antialiased bg-slate-50 text-gray-900">
     <%- include('../partials/admin-nav') %>
@@ -55,14 +12,31 @@
     <main class="p-6 lg:p-8 animate-fade-in">
         <%- include('../partials/flash') %>
 
-        <!-- Header -->
-        <div class="mb-8">
-            <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p class="text-gray-500 mt-1">Przegląd aktywności i statystyk systemu</p>
+        <!-- Header with Quick Actions -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <p class="text-gray-500 mt-1">Przegląd aktywności i statystyk systemu</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <a href="/admin/ustawienia/email" class="btn-secondary text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Ustawienia
+                </a>
+                <a href="/admin/zlecenia" class="btn-primary text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Nowe zlecenie
+                </a>
+            </div>
         </div>
 
         <!-- Stats Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 card-hover">
                 <div class="flex items-center justify-between">
                     <div>
@@ -88,18 +62,22 @@
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 card-hover">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-medium text-gray-500">Aktywne zlecenia</p>
-                        <p class="text-3xl font-bold text-indigo-600 mt-2"><%= stats.aktywne %></p>
+                        <p class="text-sm font-medium text-gray-500">W realizacji</p>
+                        <p class="text-3xl font-bold text-amber-600 mt-2"><%= stats.statusy['w_realizacji'] || 0 %></p>
                     </div>
-                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <div class="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                     </div>
                 </div>
                 <div class="mt-4">
+                    <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                        <span>Postęp</span>
+                        <span><%= stats.wszystkie > 0 ? Math.round((stats.statusy['zakonczone'] || 0) / stats.wszystkie * 100) : 0 %>%</span>
+                    </div>
                     <div class="w-full bg-gray-100 rounded-full h-2">
-                        <div class="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all duration-500" style="width: <%= stats.wszystkie > 0 ? Math.round(stats.aktywne / stats.wszystkie * 100) : 0 %>%"></div>
+                        <div class="bg-gradient-to-r from-amber-500 to-orange-500 h-2 rounded-full transition-all duration-500" style="width: <%= stats.wszystkie > 0 ? Math.round((stats.statusy['zakonczone'] || 0) / stats.wszystkie * 100) : 0 %>%"></div>
                     </div>
                 </div>
             </div>
@@ -145,21 +123,92 @@
             </div>
         </div>
 
-        <!-- Status Overview -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 mb-8 overflow-hidden">
-            <div class="px-6 py-5 border-b border-gray-100">
-                <h2 class="text-lg font-semibold text-gray-900">Zlecenia wg statusu</h2>
-            </div>
-            <div class="p-6">
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
-                    <% Object.entries(STATUSY).forEach(function([key, val]) { %>
-                    <div class="text-center p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onclick="window.location='/admin/zlecenia?status=<%= key %>'">
-                        <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium status-<%= val.kolor %>">
-                            <%= val.nazwa %>
-                        </span>
-                        <div class="text-2xl font-bold text-gray-900 mt-3"><%= stats.statusy[key] || 0 %></div>
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+            <!-- Status Overview -->
+            <div class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-6 py-5 border-b border-gray-100">
+                    <h2 class="text-lg font-semibold text-gray-900">Zlecenia wg statusu</h2>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <% Object.entries(STATUSY).forEach(function([key, val]) { %>
+                        <a href="/admin/zlecenia?status=<%= key %>" class="text-center p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium status-<%= val.kolor %>">
+                                <%= val.nazwa %>
+                            </span>
+                            <div class="text-2xl font-bold text-gray-900 mt-3"><%= stats.statusy[key] || 0 %></div>
+                        </a>
+                        <% }); %>
                     </div>
-                    <% }); %>
+                </div>
+            </div>
+
+            <!-- Quick Actions & Info -->
+            <div class="space-y-6">
+                <!-- Progress for Clients -->
+                <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-indigo-200 text-sm">Realizacja zleceń</p>
+                            <p class="text-2xl font-bold"><%= stats.statusy['zakonczone'] || 0 %>/<%= stats.wszystkie %></p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-indigo-200">Ukończone</span>
+                                <span class="font-medium"><%= stats.wszystkie > 0 ? Math.round((stats.statusy['zakonczone'] || 0) / stats.wszystkie * 100) : 0 %>%</span>
+                            </div>
+                            <div class="w-full bg-white/20 rounded-full h-2">
+                                <div class="bg-white h-2 rounded-full" style="width: <%= stats.wszystkie > 0 ? Math.round((stats.statusy['zakonczone'] || 0) / stats.wszystkie * 100) : 0 %>%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-indigo-200">Oczekujące</span>
+                                <span class="font-medium"><%= (stats.statusy['oczekuje'] || 0) + (stats.statusy['do_akceptacji'] || 0) %></span>
+                            </div>
+                            <div class="w-full bg-white/20 rounded-full h-2">
+                                <div class="bg-amber-400 h-2 rounded-full" style="width: <%= stats.wszystkie > 0 ? Math.round(((stats.statusy['oczekuje'] || 0) + (stats.statusy['do_akceptacji'] || 0)) / stats.wszystkie * 100) : 0 %>%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Links -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="font-semibold text-gray-900 mb-4">Szybkie akcje</h3>
+                    <div class="space-y-2">
+                        <a href="/admin/firma/nowa" class="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                            <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                            </div>
+                            <span class="text-gray-700 font-medium">Dodaj firmę</span>
+                        </a>
+                        <a href="/admin/uzytkownik/nowy" class="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                            <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                </svg>
+                            </div>
+                            <span class="text-gray-700 font-medium">Dodaj użytkownika</span>
+                        </a>
+                        <a href="/admin/ustawienia/email" class="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                            <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <span class="text-gray-700 font-medium">Ustawienia email</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -240,27 +289,6 @@
     </main>
 </div>
 
-<script>
-    async function updateNotificationCount() {
-        try {
-            const response = await fetch('/api/powiadomienia/count');
-            const data = await response.json();
-            const badge = document.getElementById('notification-count');
-            if (badge && data.success) {
-                badge.textContent = data.count;
-                badge.style.display = data.count > 0 ? 'flex' : 'none';
-            }
-        } catch (e) {}
-    }
-    setInterval(updateNotificationCount, 30000);
-    updateNotificationCount();
-
-    function toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebar-overlay');
-        sidebar.classList.toggle('-translate-x-full');
-        overlay.classList.toggle('hidden');
-    }
-</script>
+<%- include('../partials/_scripts') %>
 </body>
 </html>
