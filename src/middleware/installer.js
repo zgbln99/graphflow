@@ -11,6 +11,16 @@ const ENV_PATH = path.join(__dirname, '../../.env');
 const INSTALLED_FLAG = path.join(__dirname, '../../.installed');
 
 /**
+ * Normalizuj host - zamień localhost na 127.0.0.1 aby uniknąć problemów z IPv6
+ */
+function normalizeHost(host) {
+    if (host === 'localhost' || host === '::1') {
+        return '127.0.0.1';
+    }
+    return host;
+}
+
+/**
  * Sprawdź czy aplikacja jest zainstalowana
  */
 function isInstalled() {
@@ -49,7 +59,7 @@ function blockIfInstalled(req, res, next) {
 async function testDatabaseConnection(config) {
     try {
         const connection = await mysql.createConnection({
-            host: config.host,
+            host: normalizeHost(config.host),
             port: config.port || 3306,
             user: config.user,
             password: config.password
@@ -67,7 +77,7 @@ async function testDatabaseConnection(config) {
 async function createDatabase(config) {
     try {
         const connection = await mysql.createConnection({
-            host: config.host,
+            host: normalizeHost(config.host),
             port: config.port || 3306,
             user: config.user,
             password: config.password
@@ -88,7 +98,7 @@ async function createDatabase(config) {
 async function createTables(config) {
     try {
         const connection = await mysql.createConnection({
-            host: config.host,
+            host: normalizeHost(config.host),
             port: config.port || 3306,
             user: config.user,
             password: config.password,
@@ -112,7 +122,7 @@ async function createTables(config) {
 async function createAdminAccount(config, admin) {
     try {
         const connection = await mysql.createConnection({
-            host: config.host,
+            host: normalizeHost(config.host),
             port: config.port || 3306,
             user: config.user,
             password: config.password,
@@ -139,7 +149,7 @@ async function createAdminAccount(config, admin) {
  */
 function saveEnvFile(config, app) {
     const envContent = `# Konfiguracja bazy danych
-DB_HOST=${config.host}
+DB_HOST=${normalizeHost(config.host)}
 DB_PORT=${config.port || 3306}
 DB_NAME=${config.database}
 DB_USER=${config.user}

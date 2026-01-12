@@ -5,13 +5,23 @@
 
 const mysql = require('mysql2/promise');
 
+/**
+ * Normalizuj host - zamień localhost na 127.0.0.1 aby uniknąć problemów z IPv6
+ */
+function normalizeHost(host) {
+    if (host === 'localhost' || host === '::1') {
+        return '127.0.0.1';
+    }
+    return host;
+}
+
 class Database {
     static instance = null;
     pool = null;
 
     constructor() {
         this.pool = mysql.createPool({
-            host: process.env.DB_HOST || 'localhost',
+            host: normalizeHost(process.env.DB_HOST || 'localhost'),
             user: process.env.DB_USER || 'root',
             password: process.env.DB_PASS || '',
             database: process.env.DB_NAME || 'panel_zlecen',
