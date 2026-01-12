@@ -1,0 +1,35 @@
+<script>
+    async function updateNotificationCount() {
+        try {
+            const response = await fetch('/api/powiadomienia/count');
+            const data = await response.json();
+            const badge = document.getElementById('notification-count');
+            if (badge && data.success) {
+                badge.textContent = data.count;
+                badge.style.display = data.count > 0 ? 'flex' : 'none';
+            }
+        } catch (e) {}
+    }
+    setInterval(updateNotificationCount, 30000);
+    updateNotificationCount();
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('hidden');
+    }
+
+    // Auto-dismiss flash messages
+    document.addEventListener('DOMContentLoaded', function() {
+        const flashMessages = document.querySelectorAll('.flash-message');
+        flashMessages.forEach((msg, index) => {
+            setTimeout(() => {
+                msg.style.transition = 'all 0.3s ease-out';
+                msg.style.opacity = '0';
+                msg.style.transform = 'translateX(100%)';
+                setTimeout(() => msg.remove(), 300);
+            }, 5000 + (index * 500));
+        });
+    });
+</script>
