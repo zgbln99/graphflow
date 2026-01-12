@@ -28,7 +28,7 @@ router.get('/', (req, res) => {
     res.render('install/welcome', {
         title: 'Instalacja',
         step: 1,
-        totalSteps: 4
+        totalSteps: 3
     });
 });
 
@@ -37,7 +37,7 @@ router.get('/database', (req, res) => {
     res.render('install/database', {
         title: 'Konfiguracja bazy danych',
         step: 2,
-        totalSteps: 4,
+        totalSteps: 3,
         config: req.session.dbConfig || {
             host: 'localhost',
             port: 3306,
@@ -67,7 +67,7 @@ router.post('/database', async (req, res) => {
         return res.render('install/database', {
             title: 'Konfiguracja bazy danych',
             step: 2,
-            totalSteps: 4,
+            totalSteps: 3,
             config,
             error: `Nie można połączyć z serwerem MySQL: ${connectionTest.message}`
         });
@@ -79,7 +79,7 @@ router.post('/database', async (req, res) => {
         return res.render('install/database', {
             title: 'Konfiguracja bazy danych',
             step: 2,
-            totalSteps: 4,
+            totalSteps: 3,
             config,
             error: `Nie można utworzyć bazy danych: ${dbCreation.message}`
         });
@@ -91,7 +91,7 @@ router.post('/database', async (req, res) => {
         return res.render('install/database', {
             title: 'Konfiguracja bazy danych',
             step: 2,
-            totalSteps: 4,
+            totalSteps: 3,
             config,
             error: `Nie można utworzyć tabel: ${tablesCreation.message}`
         });
@@ -113,7 +113,7 @@ router.get('/admin', (req, res) => {
     res.render('install/admin', {
         title: 'Konto administratora',
         step: 3,
-        totalSteps: 4,
+        totalSteps: 3,
         admin: req.session.adminData || {
             email: '',
             firstName: '',
@@ -138,7 +138,7 @@ router.post('/admin', async (req, res) => {
         return res.render('install/admin', {
             title: 'Konto administratora',
             step: 3,
-            totalSteps: 4,
+            totalSteps: 3,
             admin,
             error: 'Wszystkie pola są wymagane'
         });
@@ -148,7 +148,7 @@ router.post('/admin', async (req, res) => {
         return res.render('install/admin', {
             title: 'Konto administratora',
             step: 3,
-            totalSteps: 4,
+            totalSteps: 3,
             admin,
             error: 'Hasła nie są identyczne'
         });
@@ -158,7 +158,7 @@ router.post('/admin', async (req, res) => {
         return res.render('install/admin', {
             title: 'Konto administratora',
             step: 3,
-            totalSteps: 4,
+            totalSteps: 3,
             admin,
             error: 'Hasło musi mieć minimum 6 znaków'
         });
@@ -170,52 +170,18 @@ router.post('/admin', async (req, res) => {
         return res.render('install/admin', {
             title: 'Konto administratora',
             step: 3,
-            totalSteps: 4,
+            totalSteps: 3,
             admin,
             error: `Nie można utworzyć konta: ${result.message}`
         });
     }
 
-    req.session.adminData = admin;
-    req.session.adminCreated = true;
-
-    res.redirect('/install/app');
-});
-
-// GET /install/app - Konfiguracja aplikacji
-router.get('/app', (req, res) => {
-    if (!req.session.adminCreated) {
-        return res.redirect('/install/admin');
-    }
-
-    res.render('install/app', {
-        title: 'Konfiguracja aplikacji',
-        step: 4,
-        totalSteps: 4,
-        app: {
-            name: 'GraphFlow',
-            url: 'http://localhost:3000',
-            port: 3000
-        },
-        error: null
-    });
-});
-
-// POST /install/app - Zapisz konfigurację i zakończ
-router.post('/app', (req, res) => {
-    if (!req.session.adminCreated) {
-        return res.redirect('/install/admin');
-    }
-
-    const { name, url, port } = req.body;
-
+    // Zapisz plik .env z domyślnymi wartościami
     const appConfig = {
-        name: name || 'GraphFlow',
-        url: url || 'http://localhost:3000',
-        port: parseInt(port) || 3000
+        name: 'GraphFlow',
+        url: '', // Puste - aplikacja sama wykryje URL
+        port: process.env.PORT || 3000
     };
-
-    // Zapisz plik .env
     saveEnvFile(req.session.dbConfig, appConfig);
 
     // Oznacz jako zainstalowane
@@ -224,8 +190,6 @@ router.post('/app', (req, res) => {
     // Wyczyść sesję instalacyjną
     delete req.session.dbConfig;
     delete req.session.dbConfigured;
-    delete req.session.adminData;
-    delete req.session.adminCreated;
 
     res.redirect('/install/finish');
 });
@@ -234,8 +198,8 @@ router.post('/app', (req, res) => {
 router.get('/finish', (req, res) => {
     res.render('install/finish', {
         title: 'Instalacja zakończona',
-        step: 4,
-        totalSteps: 4
+        step: 3,
+        totalSteps: 3
     });
 });
 
