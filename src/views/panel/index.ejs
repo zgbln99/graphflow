@@ -3,84 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %> | <%= appName %></title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .status-blue { background-color: #dbeafe; color: #1e40af; }
-        .status-yellow { background-color: #fef3c7; color: #92400e; }
-        .status-orange { background-color: #ffedd5; color: #9a3412; }
-        .status-purple { background-color: #f3e8ff; color: #6b21a8; }
-        .status-red { background-color: #fee2e2; color: #991b1b; }
-        .status-green { background-color: #dcfce7; color: #166534; }
-        .status-gray { background-color: #f3f4f6; color: #374151; }
-    </style>
+    <title><%= title %> | <%= appName || 'GraphFlow' %></title>
+    <%- include('../partials/_styles') %>
 </head>
-<body class="bg-gray-100 min-h-screen">
-<div class="min-h-screen bg-gray-100">
+<body class="font-sans antialiased bg-slate-50 text-gray-900">
     <%- include('../partials/panel-nav') %>
 
-    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <h1 class="text-2xl font-bold text-gray-900 mb-6">Witaj, <%= user.imie %>!</h1>
-
+    <main class="p-6 lg:p-8 animate-fade-in">
         <%- include('../partials/flash') %>
 
-        <!-- Statystyki -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="text-sm font-medium text-gray-500">Wszystkie zlecenia</div>
-                <div class="text-3xl font-bold text-gray-900"><%= stats.wszystkie %></div>
+        <!-- Welcome Header -->
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold text-gray-900">Witaj, <%= user.imie %>!</h1>
+            <p class="text-gray-500 mt-1">Oto przegląd Twoich zleceń</p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Wszystkie zlecenia</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2"><%= stats.wszystkie %></p>
+                    </div>
+                    <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                    </div>
+                </div>
             </div>
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="text-sm font-medium text-gray-500">W realizacji</div>
-                <div class="text-3xl font-bold text-emerald-600"><%= stats.aktywne %></div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">W realizacji</p>
+                        <p class="text-3xl font-bold text-blue-600 mt-2"><%= stats.aktywne %></p>
+                    </div>
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <div class="w-full bg-gray-100 rounded-full h-2">
+                        <div class="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all duration-500" style="width: <%= stats.wszystkie > 0 ? Math.round(stats.aktywne / stats.wszystkie * 100) : 0 %>%"></div>
+                    </div>
+                </div>
             </div>
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="text-sm font-medium text-gray-500">Zakończone</div>
-                <div class="text-3xl font-bold text-gray-900"><%= stats.statusy.zakonczone || 0 %></div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Zakończone</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2"><%= stats.statusy.zakonczone || 0 %></p>
+                    </div>
+                    <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Szybkie akcje -->
-        <div class="bg-emerald-50 rounded-lg p-6 mb-8">
-            <h2 class="text-lg font-medium text-emerald-900 mb-4">Szybkie akcje</h2>
-            <a href="/panel/nowe-zlecenie" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">
-                + Złóż nowe zlecenie
-            </a>
+        <!-- Quick Action -->
+        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-6 mb-8 shadow-lg shadow-emerald-500/25">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div class="text-white">
+                    <h2 class="text-xl font-bold">Potrzebujesz nowego projektu graficznego?</h2>
+                    <p class="text-emerald-100 mt-1">Złóż nowe zlecenie i otrzymaj profesjonalną realizację</p>
+                </div>
+                <a href="/panel/nowe-zlecenie" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-emerald-700 font-semibold rounded-xl hover:bg-emerald-50 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Złóż nowe zlecenie
+                </a>
+            </div>
         </div>
 
-        <!-- Ostatnie zlecenia -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h2 class="text-lg font-medium text-gray-900">Ostatnie zlecenia</h2>
-                <a href="/panel/zlecenia" class="text-emerald-600 hover:text-emerald-800 text-sm">Zobacz wszystkie</a>
+        <!-- Recent Orders -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Twoje ostatnie zlecenia</h2>
+                    <p class="text-sm text-gray-500 mt-0.5">Śledź status swoich projektów</p>
+                </div>
+                <a href="/panel/zlecenia" class="btn-secondary text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                    Zobacz wszystkie
+                </a>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="w-full">
+                    <thead class="bg-gray-50/80">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Numer</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tytuł</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utworzono</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Numer</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Tytuł</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Utworzono</th>
+                            <th class="px-6 py-4"></th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody>
                         <% if (recentOrders && recentOrders.length > 0) { %>
-                            <% recentOrders.forEach(function(order) { %>
-                            <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/panel/zlecenie/<%= order.id %>'">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-emerald-600"><%= order.numer %></td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= helpers.truncate(order.tytul, 40) %></td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 py-1 text-xs rounded-full status-<%= helpers.statusColor(order.status) %>">
+                            <% recentOrders.forEach(function(order, index) { %>
+                            <tr class="border-b border-gray-100 hover:bg-gray-50/50 transition-colors cursor-pointer group animate-slide-up" style="animation-delay: <%= index * 50 %>ms" onclick="window.location='/panel/zlecenie/<%= order.id %>'">
+                                <td class="px-6 py-4">
+                                    <span class="font-semibold text-emerald-600"><%= order.numer %></span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="font-medium text-gray-900"><%= helpers.truncate(order.tytul, 40) %></span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium status-<%= helpers.statusColor(order.status) %>">
                                         <%= helpers.statusName(order.status) %>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= helpers.timeAgo(order.utworzono) %></td>
+                                <td class="px-6 py-4">
+                                    <span class="text-gray-500"><%= helpers.timeAgo(order.utworzono) %></span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <svg class="w-5 h-5 text-gray-300 group-hover:text-emerald-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </td>
                             </tr>
                             <% }); %>
                         <% } else { %>
                             <tr>
-                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">Brak zleceń</td>
+                                <td colspan="5" class="px-6 py-16 text-center">
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                                            <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                            </svg>
+                                        </div>
+                                        <p class="text-gray-600 font-medium text-lg">Brak zleceń</p>
+                                        <p class="text-gray-400 mt-1 mb-6">Złóż swoje pierwsze zlecenie</p>
+                                        <a href="/panel/nowe-zlecenie" class="btn-success">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            Złóż zlecenie
+                                        </a>
+                                    </div>
+                                </td>
                             </tr>
                         <% } %>
                     </tbody>
@@ -90,20 +162,6 @@
     </main>
 </div>
 
-<script>
-    async function updateNotificationCount() {
-        try {
-            const response = await fetch('/api/powiadomienia/count');
-            const data = await response.json();
-            const badge = document.getElementById('notification-count');
-            if (badge && data.success) {
-                badge.textContent = data.count;
-                badge.style.display = data.count > 0 ? 'inline-flex' : 'none';
-            }
-        } catch (e) {}
-    }
-    setInterval(updateNotificationCount, 30000);
-    updateNotificationCount();
-</script>
+<%- include('../partials/_scripts') %>
 </body>
 </html>
