@@ -1,0 +1,78 @@
+<%- include('../layouts/main', { body: `
+<div class="min-h-screen bg-gray-100">
+    ${include('../partials/admin-nav')}
+
+    <main class="max-w-3xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <h1 class="text-2xl font-bold text-gray-900 mb-6">Mój profil</h1>
+
+        ${include('../partials/flash')}
+
+        <div class="space-y-6">
+            <!-- Dane podstawowe -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-medium text-gray-900">Dane podstawowe</h2>
+                </div>
+                <form method="POST" action="/admin/profil" class="p-6 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Imię</label>
+                            <input type="text" name="imie" value="${user.imie}" required
+                                   class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Nazwisko</label>
+                            <input type="text" name="nazwisko" value="${user.nazwisko}" required
+                                   class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" value="${user.email}" disabled
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Telefon</label>
+                        <input type="tel" name="telefon" value="${user.telefon || ''}"
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                            Zapisz zmiany
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Zmiana hasła -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-medium text-gray-900">Zmiana hasła</h2>
+                </div>
+                <form method="POST" action="/admin/profil/haslo" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Obecne hasło</label>
+                        <input type="password" name="current_password" required
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Nowe hasło</label>
+                        <input type="password" name="new_password" required minlength="6"
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Powtórz nowe hasło</label>
+                        <input type="password" name="confirm_password" required minlength="6"
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                            Zmień hasło
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+</div>
+`}) %>

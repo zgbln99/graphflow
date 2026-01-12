@@ -1,0 +1,84 @@
+<%- include('../layouts/main', { body: `
+<div class="min-h-screen bg-gray-100">
+    ${include('../partials/admin-nav')}
+
+    <main class="max-w-3xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="mb-6">
+            <a href="/admin/firmy" class="text-indigo-600 hover:text-indigo-800 text-sm">← Powrót do listy</a>
+            <h1 class="text-2xl font-bold text-gray-900 mt-2">${firma ? 'Edycja firmy' : 'Nowa firma'}</h1>
+        </div>
+
+        ${include('../partials/flash')}
+
+        <div class="bg-white rounded-lg shadow">
+            <form method="POST" action="${firma ? '/admin/firma/' + firma.id : '/admin/firma/nowa'}" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nazwa *</label>
+                    <input type="text" name="nazwa" value="${firma ? firma.nazwa : ''}" required
+                           class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">NIP</label>
+                        <input type="text" name="nip" value="${firma ? firma.nip || '' : ''}"
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Telefon</label>
+                        <input type="tel" name="telefon" value="${firma ? firma.telefon || '' : ''}"
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email *</label>
+                    <input type="email" name="email" value="${firma ? firma.email : ''}" required
+                           class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Adres</label>
+                    <textarea name="adres" rows="2"
+                              class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">${firma ? firma.adres || '' : ''}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Notatki wewnętrzne</label>
+                    <textarea name="notatki_wewnetrzne" rows="2"
+                              class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">${firma ? firma.notatki_wewnetrzne || '' : ''}</textarea>
+                </div>
+                ${firma ? `
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" name="aktywna" value="1" ${firma.aktywna ? 'checked' : ''} class="mr-2">
+                        <span class="text-sm text-gray-700">Aktywna</span>
+                    </label>
+                </div>
+                ` : ''}
+                <div class="pt-4">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                        ${firma ? 'Zapisz zmiany' : 'Utwórz firmę'}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        ${firma && typeof users !== 'undefined' && users.length ? `
+        <div class="bg-white rounded-lg shadow mt-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Użytkownicy firmy</h2>
+            </div>
+            <div class="p-6">
+                <ul class="space-y-2">
+                    ${users.map(u => `
+                    <li class="flex justify-between items-center">
+                        <a href="/admin/uzytkownik/${u.id}" class="text-indigo-600 hover:text-indigo-800">
+                            ${u.imie} ${u.nazwisko}
+                        </a>
+                        <span class="text-sm text-gray-500">${u.email}</span>
+                    </li>
+                    `).join('')}
+                </ul>
+            </div>
+        </div>
+        ` : ''}
+    </main>
+</div>
+`}) %>

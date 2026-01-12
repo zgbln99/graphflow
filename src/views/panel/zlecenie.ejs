@@ -1,0 +1,148 @@
+<%- include('../layouts/main', { body: `
+<div class="min-h-screen bg-gray-100">
+    ${include('../partials/panel-nav')}
+
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <a href="/panel/zlecenia" class="text-emerald-600 hover:text-emerald-800 text-sm">← Powrót do listy</a>
+                <h1 class="text-2xl font-bold text-gray-900 mt-2">Zlecenie ${order.numer}</h1>
+            </div>
+            <span class="px-4 py-2 rounded-full status-${helpers.statusColor(order.status)}">
+                ${helpers.statusName(order.status)}
+            </span>
+        </div>
+
+        ${include('../partials/flash')}
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Główne info -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Szczegóły -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-medium text-gray-900">${order.tytul}</h2>
+                    </div>
+                    <div class="p-6">
+                        <div class="prose max-w-none">
+                            <p class="whitespace-pre-wrap">${order.opis || 'Brak opisu'}</p>
+                        </div>
+
+                        ${order.link_podglad || order.link_realizacja ? `
+                        <div class="mt-6 pt-6 border-t border-gray-200">
+                            <h3 class="text-sm font-medium text-gray-900 mb-3">Linki</h3>
+                            <div class="space-y-2">
+                                ${order.link_podglad ? `
+                                <a href="${order.link_podglad}" target="_blank" class="block text-emerald-600 hover:text-emerald-800">
+                                    Link do podglądu →
+                                </a>
+                                ` : ''}
+                                ${order.link_realizacja ? `
+                                <a href="${order.link_realizacja}" target="_blank" class="block text-emerald-600 hover:text-emerald-800">
+                                    Link do realizacji →
+                                </a>
+                                ` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <!-- Komentarze -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-medium text-gray-900">Wiadomości</h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        ${comments.length ? comments.map(c => `
+                        <div class="border rounded-lg p-4 bg-gray-50">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="font-medium text-gray-900">${c.imie} ${c.nazwisko}
+                                    ${['admin', 'pracownik'].includes(c.rola) ? '<span class="text-xs text-emerald-600 ml-2">Zespół</span>' : ''}
+                                </div>
+                                <div class="text-xs text-gray-500">${helpers.timeAgo(c.utworzono)}</div>
+                            </div>
+                            <div class="text-gray-700">${c.tresc}</div>
+                        </div>
+                        `).join('') : '<p class="text-gray-500">Brak wiadomości</p>'}
+
+                        <form method="POST" action="/panel/zlecenie/${order.id}/komentarz" class="mt-4">
+                            <textarea name="tresc" rows="3" placeholder="Napisz wiadomość..."
+                                      class="block w-full border border-gray-300 rounded-md px-3 py-2" required></textarea>
+                            <div class="flex justify-end mt-2">
+                                <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded-md text-sm hover:bg-emerald-700">
+                                    Wyślij wiadomość
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="space-y-6">
+                <!-- Info -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-medium text-gray-900">Szczegóły</h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <div class="text-xs text-gray-500">Priorytet</div>
+                            <span class="px-2 py-1 text-xs rounded-full status-${helpers.priorityColor(order.priorytet)}">
+                                ${helpers.priorityName(order.priorytet)}
+                            </span>
+                        </div>
+                        ${order.kategoria_nazwa ? `
+                        <div>
+                            <div class="text-xs text-gray-500">Kategoria</div>
+                            <div class="font-medium">${order.kategoria_nazwa}</div>
+                        </div>
+                        ` : ''}
+                        ${order.termin_realizacji ? `
+                        <div>
+                            <div class="text-xs text-gray-500">Termin</div>
+                            <div class="font-medium">${helpers.formatDate(order.termin_realizacji)}</div>
+                        </div>
+                        ` : ''}
+                        <div>
+                            <div class="text-xs text-gray-500">Utworzono</div>
+                            <div class="font-medium">${helpers.formatDatetime(order.utworzono)}</div>
+                        </div>
+                        ${order.zakonczono ? `
+                        <div>
+                            <div class="text-xs text-gray-500">Zakończono</div>
+                            <div class="font-medium">${helpers.formatDatetime(order.zakonczono)}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <!-- Historia -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-medium text-gray-900">Historia</h2>
+                    </div>
+                    <div class="p-6">
+                        ${history.length ? `
+                        <div class="space-y-4">
+                            ${history.map(h => `
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 h-2 w-2 mt-2 rounded-full bg-emerald-500"></div>
+                                <div class="ml-3">
+                                    <div class="text-sm text-gray-900">
+                                        ${h.status_poprzedni ? `${helpers.statusName(h.status_poprzedni)} → ` : ''}${helpers.statusName(h.status_nowy)}
+                                    </div>
+                                    <div class="text-xs text-gray-500">${helpers.timeAgo(h.utworzono)}</div>
+                                </div>
+                            </div>
+                            `).join('')}
+                        </div>
+                        ` : '<p class="text-gray-500 text-sm">Brak historii</p>'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+`}) %>

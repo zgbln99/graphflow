@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> | GraphFlow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/lucide-static@latest/font/lucide.min.css">
+    <style>
+        .status-blue { background-color: #dbeafe; color: #1e40af; }
+        .status-yellow { background-color: #fef3c7; color: #92400e; }
+        .status-orange { background-color: #ffedd5; color: #9a3412; }
+        .status-purple { background-color: #f3e8ff; color: #6b21a8; }
+        .status-red { background-color: #fee2e2; color: #991b1b; }
+        .status-green { background-color: #dcfce7; color: #166534; }
+        .status-gray { background-color: #f3f4f6; color: #374151; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <%- body %>
+
+    <script>
+        // Pobierz licznik powiadomień
+        async function updateNotificationCount() {
+            try {
+                const response = await fetch('/api/powiadomienia/count');
+                const data = await response.json();
+                const badge = document.getElementById('notification-count');
+                if (badge && data.success) {
+                    badge.textContent = data.count;
+                    badge.style.display = data.count > 0 ? 'inline-flex' : 'none';
+                }
+            } catch (e) {
+                console.error('Error fetching notifications:', e);
+            }
+        }
+
+        // Aktualizuj co 30 sekund
+        setInterval(updateNotificationCount, 30000);
+        updateNotificationCount();
+    </script>
+</body>
+</html>

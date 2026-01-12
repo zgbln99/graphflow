@@ -1,0 +1,98 @@
+<%- include('../layouts/main', { body: `
+<div class="min-h-screen bg-gray-100">
+    ${include('../partials/admin-nav')}
+
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">Użytkownicy</h1>
+            <a href="/admin/uzytkownik/nowy" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                + Nowy użytkownik
+            </a>
+        </div>
+
+        ${include('../partials/flash')}
+
+        <!-- Filtry -->
+        <div class="bg-white rounded-lg shadow mb-6 p-4">
+            <form method="GET" class="flex flex-wrap gap-4">
+                <div>
+                    <input type="text" name="szukaj" value="${filters.szukaj || ''}" placeholder="Szukaj..."
+                           class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <select name="rola" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="">Wszystkie role</option>
+                        <option value="admin" ${filters.rola === 'admin' ? 'selected' : ''}>Admin</option>
+                        <option value="pracownik" ${filters.rola === 'pracownik' ? 'selected' : ''}>Pracownik</option>
+                        <option value="klient" ${filters.rola === 'klient' ? 'selected' : ''}>Klient</option>
+                    </select>
+                </div>
+                <div>
+                    <select name="aktywny" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="">Wszyscy</option>
+                        <option value="1" ${filters.aktywny === 1 ? 'selected' : ''}>Aktywni</option>
+                        <option value="0" ${filters.aktywny === 0 ? 'selected' : ''}>Nieaktywni</option>
+                    </select>
+                </div>
+                <div>
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700">
+                        Filtruj
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tabela -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Użytkownik</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Firma</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rola</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zlecenia</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${users.length ? users.map(u => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <a href="/admin/uzytkownik/${u.id}" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                                ${u.imie} ${u.nazwisko}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${u.email}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${u.firma_nazwa || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full ${u.rola === 'admin' ? 'bg-purple-100 text-purple-800' : u.rola === 'pracownik' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
+                                ${u.rola === 'admin' ? 'Admin' : u.rola === 'pracownik' ? 'Pracownik' : 'Klient'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${u.liczba_zlecen}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full ${u.aktywny ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${u.aktywny ? 'Aktywny' : 'Nieaktywny'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <form method="POST" action="/admin/uzytkownik/${u.id}/toggle" class="inline">
+                                <button type="submit" class="text-gray-600 hover:text-gray-800">
+                                    ${u.aktywny ? 'Dezaktywuj' : 'Aktywuj'}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    `).join('') : `
+                    <tr>
+                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">Brak użytkowników</td>
+                    </tr>
+                    `}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+`}) %>

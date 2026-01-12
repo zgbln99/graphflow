@@ -1,0 +1,178 @@
+<%- include('../layouts/main', { body: `
+<div class="min-h-screen bg-gray-100">
+    ${include('../partials/admin-nav')}
+
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <a href="/admin/zlecenia" class="text-indigo-600 hover:text-indigo-800 text-sm">← Powrót do listy</a>
+                <h1 class="text-2xl font-bold text-gray-900 mt-2">Zlecenie ${order.numer}</h1>
+            </div>
+            <span class="px-4 py-2 rounded-full status-${helpers.statusColor(order.status)}">
+                ${helpers.statusName(order.status)}
+            </span>
+        </div>
+
+        ${include('../partials/flash')}
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Główne info -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Szczegóły -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-medium text-gray-900">Szczegóły zlecenia</h2>
+                    </div>
+                    <form method="POST" action="/admin/zlecenie/${order.id}">
+                        <div class="p-6 space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Tytuł</label>
+                                <input type="text" name="tytul" value="${order.tytul}"
+                                       class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Opis</label>
+                                <textarea name="opis" rows="4"
+                                          class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">${order.opis || ''}</textarea>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Status</label>
+                                    <select name="status" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                                        ${Object.entries(STATUSY).map(([key, val]) => `
+                                        <option value="${key}" ${order.status === key ? 'selected' : ''}>${val.nazwa}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Priorytet</label>
+                                    <select name="priorytet" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                                        ${Object.entries(PRIORYTETY).map(([key, val]) => `
+                                        <option value="${key}" ${order.priorytet === key ? 'selected' : ''}>${val.nazwa}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Kategoria</label>
+                                    <select name="kategoria_id" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                                        <option value="">Brak</option>
+                                        ${categories.map(cat => `
+                                        <option value="${cat.id}" ${order.kategoria_id == cat.id ? 'selected' : ''}>${cat.nazwa}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Termin realizacji</label>
+                                    <input type="date" name="termin_realizacji" value="${order.termin_realizacji ? order.termin_realizacji.toISOString().split('T')[0] : ''}"
+                                           class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Notatki wewnętrzne</label>
+                                <textarea name="notatki_wewnetrzne" rows="2"
+                                          class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">${order.notatki_wewnetrzne || ''}</textarea>
+                            </div>
+                        </div>
+                        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                                Zapisz zmiany
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Komentarze -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-medium text-gray-900">Komentarze</h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        ${comments.length ? comments.map(c => `
+                        <div class="border rounded-lg p-4 ${c.typ === 'wewnetrzny' ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50'}">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="font-medium text-gray-900">${c.imie} ${c.nazwisko}</div>
+                                <div class="text-xs text-gray-500">${helpers.timeAgo(c.utworzono)}</div>
+                            </div>
+                            <div class="text-gray-700">${c.tresc}</div>
+                            ${c.typ === 'wewnetrzny' ? '<div class="text-xs text-yellow-600 mt-2">Notatka wewnętrzna</div>' : ''}
+                        </div>
+                        `).join('') : '<p class="text-gray-500">Brak komentarzy</p>'}
+
+                        <form method="POST" action="/admin/zlecenie/${order.id}/komentarz" class="mt-4">
+                            <textarea name="tresc" rows="3" placeholder="Napisz komentarz..."
+                                      class="block w-full border border-gray-300 rounded-md px-3 py-2"></textarea>
+                            <div class="flex justify-between items-center mt-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="typ" value="wewnetrzny" class="mr-2">
+                                    <span class="text-sm text-gray-600">Notatka wewnętrzna</span>
+                                </label>
+                                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700">
+                                    Dodaj komentarz
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="space-y-6">
+                <!-- Info -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-medium text-gray-900">Informacje</h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <div class="text-xs text-gray-500">Firma</div>
+                            <div class="font-medium">${order.firma_nazwa || '-'}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-500">Autor</div>
+                            <div class="font-medium">${order.autor_imie} ${order.autor_nazwisko}</div>
+                            <div class="text-sm text-gray-500">${order.autor_email}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-500">Utworzono</div>
+                            <div class="font-medium">${helpers.formatDatetime(order.utworzono)}</div>
+                        </div>
+                        ${order.zakonczono ? `
+                        <div>
+                            <div class="text-xs text-gray-500">Zakończono</div>
+                            <div class="font-medium">${helpers.formatDatetime(order.zakonczono)}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <!-- Historia -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-lg font-medium text-gray-900">Historia</h2>
+                    </div>
+                    <div class="p-6">
+                        ${history.length ? `
+                        <div class="space-y-4">
+                            ${history.map(h => `
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 h-2 w-2 mt-2 rounded-full bg-indigo-500"></div>
+                                <div class="ml-3">
+                                    <div class="text-sm text-gray-900">
+                                        ${h.status_poprzedni ? `${helpers.statusName(h.status_poprzedni)} → ` : ''}${helpers.statusName(h.status_nowy)}
+                                    </div>
+                                    <div class="text-xs text-gray-500">${h.imie} ${h.nazwisko} · ${helpers.timeAgo(h.utworzono)}</div>
+                                    ${h.komentarz ? `<div class="text-xs text-gray-600 mt-1">${h.komentarz}</div>` : ''}
+                                </div>
+                            </div>
+                            `).join('')}
+                        </div>
+                        ` : '<p class="text-gray-500 text-sm">Brak historii</p>'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+`}) %>

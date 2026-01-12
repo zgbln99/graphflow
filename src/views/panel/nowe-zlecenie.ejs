@@ -1,0 +1,64 @@
+<%- include('../layouts/main', { body: `
+<div class="min-h-screen bg-gray-100">
+    ${include('../partials/panel-nav')}
+
+    <main class="max-w-3xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="mb-6">
+            <a href="/panel/zlecenia" class="text-emerald-600 hover:text-emerald-800 text-sm">← Powrót do listy</a>
+            <h1 class="text-2xl font-bold text-gray-900 mt-2">Nowe zlecenie</h1>
+        </div>
+
+        ${include('../partials/flash')}
+
+        <div class="bg-white rounded-lg shadow">
+            <form method="POST" action="/panel/nowe-zlecenie" class="p-6 space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Tytuł zlecenia *</label>
+                    <input type="text" name="tytul" required placeholder="Np. Logo dla nowej firmy"
+                           class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Opis zlecenia *</label>
+                    <textarea name="opis" rows="6" required
+                              placeholder="Opisz szczegółowo czego potrzebujesz. Im więcej informacji podasz, tym lepiej będziemy mogli zrealizować zlecenie."
+                              class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Kategoria</label>
+                        <select name="kategoria_id" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                            <option value="">Wybierz kategorię</option>
+                            ${categories.map(cat => `
+                            <option value="${cat.id}">${cat.nazwa}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Priorytet</label>
+                        <select name="priorytet" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                            ${Object.entries(PRIORYTETY).map(([key, val]) => `
+                            <option value="${key}" ${key === 'normalny' ? 'selected' : ''}>${val.nazwa}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Oczekiwany termin realizacji</label>
+                    <input type="date" name="termin_realizacji"
+                           class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    <p class="mt-1 text-sm text-gray-500">Opcjonalnie. Jeśli potrzebujesz realizacji na konkretną datę.</p>
+                </div>
+
+                <div class="pt-4 border-t border-gray-200">
+                    <button type="submit" class="w-full bg-emerald-600 text-white px-4 py-3 rounded-md hover:bg-emerald-700 font-medium">
+                        Złóż zlecenie
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+`}) %>

@@ -1,0 +1,85 @@
+<%- include('../layouts/main', { body: `
+<div class="min-h-screen bg-gray-100">
+    ${include('../partials/admin-nav')}
+
+    <main class="max-w-3xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="mb-6">
+            <a href="/admin/uzytkownicy" class="text-indigo-600 hover:text-indigo-800 text-sm">← Powrót do listy</a>
+            <h1 class="text-2xl font-bold text-gray-900 mt-2">${user ? 'Edycja użytkownika' : 'Nowy użytkownik'}</h1>
+        </div>
+
+        ${include('../partials/flash')}
+
+        <div class="bg-white rounded-lg shadow">
+            <form method="POST" action="${user ? '/admin/uzytkownik/' + user.id : '/admin/uzytkownik/nowy'}" class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Imię *</label>
+                        <input type="text" name="imie" value="${user ? user.imie : ''}" required
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Nazwisko *</label>
+                        <input type="text" name="nazwisko" value="${user ? user.nazwisko : ''}" required
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email *</label>
+                    <input type="email" name="email" value="${user ? user.email : ''}" required
+                           class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Hasło ${user ? '(pozostaw puste aby nie zmieniać)' : '*'}</label>
+                    <input type="password" name="haslo" ${user ? '' : 'required'} minlength="6"
+                           class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Telefon</label>
+                        <input type="tel" name="telefon" value="${user ? user.telefon || '' : ''}"
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Stanowisko</label>
+                        <input type="text" name="stanowisko" value="${user ? user.stanowisko || '' : ''}"
+                               class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Rola</label>
+                        <select name="rola" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                            <option value="klient" ${user && user.rola === 'klient' ? 'selected' : ''}>Klient</option>
+                            <option value="pracownik" ${user && user.rola === 'pracownik' ? 'selected' : ''}>Pracownik</option>
+                            <option value="admin" ${user && user.rola === 'admin' ? 'selected' : ''}>Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Firma</label>
+                        <select name="firma_id" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                            <option value="">Brak</option>
+                            ${firmy.map(f => `
+                            <option value="${f.id}" ${user && user.firma_id == f.id ? 'selected' : ''}>${f.nazwa}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+                ${user ? `
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" name="aktywny" value="1" ${user.aktywny ? 'checked' : ''} class="mr-2">
+                        <span class="text-sm text-gray-700">Aktywny</span>
+                    </label>
+                </div>
+                ` : ''}
+                <div class="pt-4">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                        ${user ? 'Zapisz zmiany' : 'Utwórz użytkownika'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+`}) %>

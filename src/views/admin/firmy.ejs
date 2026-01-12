@@ -1,0 +1,84 @@
+<%- include('../layouts/main', { body: `
+<div class="min-h-screen bg-gray-100">
+    ${include('../partials/admin-nav')}
+
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">Firmy</h1>
+            <a href="/admin/firma/nowa" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                + Nowa firma
+            </a>
+        </div>
+
+        ${include('../partials/flash')}
+
+        <!-- Filtry -->
+        <div class="bg-white rounded-lg shadow mb-6 p-4">
+            <form method="GET" class="flex flex-wrap gap-4">
+                <div>
+                    <input type="text" name="szukaj" value="${filters.szukaj || ''}" placeholder="Szukaj..."
+                           class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <select name="aktywna" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="">Wszystkie</option>
+                        <option value="1" ${filters.aktywna === 1 ? 'selected' : ''}>Aktywne</option>
+                        <option value="0" ${filters.aktywna === 0 ? 'selected' : ''}>Nieaktywne</option>
+                    </select>
+                </div>
+                <div>
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700">
+                        Filtruj
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tabela -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nazwa</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIP</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Użytkownicy</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zlecenia</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${firmy.length ? firmy.map(f => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <a href="/admin/firma/${f.id}" class="text-indigo-600 hover:text-indigo-800 font-medium">${f.nazwa}</a>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${f.nip || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${f.email}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${f.liczba_uzytkownikow}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${f.liczba_zlecen}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full ${f.aktywna ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${f.aktywna ? 'Aktywna' : 'Nieaktywna'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <form method="POST" action="/admin/firma/${f.id}/toggle" class="inline">
+                                <button type="submit" class="text-gray-600 hover:text-gray-800">
+                                    ${f.aktywna ? 'Dezaktywuj' : 'Aktywuj'}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    `).join('') : `
+                    <tr>
+                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">Brak firm</td>
+                    </tr>
+                    `}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+`}) %>
