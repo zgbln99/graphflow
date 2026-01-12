@@ -1,45 +1,143 @@
-<nav class="bg-emerald-700 text-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-            <div class="flex items-center">
-                <a href="/panel" class="font-bold text-xl">GraphFlow</a>
-                <div class="ml-10 flex items-baseline space-x-4">
-                    <a href="/panel" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-emerald-600">
-                        Panel
-                    </a>
-                    <a href="/panel/zlecenia" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-emerald-600">
-                        Moje zlecenia
-                    </a>
-                    <a href="/panel/nowe-zlecenie" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-emerald-600 bg-emerald-800">
-                        + Nowe zlecenie
-                    </a>
-                </div>
+<!-- Mobile sidebar overlay -->
+<div id="sidebar-overlay" class="hidden fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 lg:hidden" onclick="toggleSidebar()"></div>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-white border-r border-gray-200 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out z-50">
+    <div class="flex flex-col h-full">
+        <!-- Logo -->
+        <div class="flex items-center gap-3 px-6 py-5 border-b border-gray-100">
+            <div class="w-10 h-10 bg-gradient-to-br from-emerald-600 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
             </div>
-            <div class="flex items-center space-x-4">
-                <div class="relative">
-                    <button id="notification-btn" class="p-2 rounded-full hover:bg-emerald-600 relative">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        <span id="notification-count" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 items-center justify-center">0</span>
-                    </button>
-                </div>
-                <div class="relative group">
-                    <button class="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-emerald-600">
-                        <span><%= user ? user.imie + ' ' + user.nazwisko : 'Użytkownik' %></span>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block z-50">
-                        <a href="/panel/profil" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Mój profil</a>
-                        <% if (isStaff) { %>
-                        <a href="/admin" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Panel admina</a>
-                        <% } %>
-                        <a href="/logout" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Wyloguj się</a>
+            <div>
+                <h1 class="font-bold text-gray-900">GraphFlow</h1>
+                <p class="text-xs text-gray-500">Panel Klienta</p>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+            <a href="/panel" class="nav-link <%= typeof currentPath !== 'undefined' && currentPath === '/panel' ? 'active' : '' %>">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <span>Dashboard</span>
+            </a>
+
+            <a href="/panel/zlecenia" class="nav-link <%= typeof currentPath !== 'undefined' && currentPath.startsWith('/panel/zleceni') ? 'active' : '' %>">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                <span>Moje zlecenia</span>
+            </a>
+
+            <div class="pt-4">
+                <a href="/panel/nowe-zlecenie" class="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-medium rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transform hover:scale-[1.02] active:scale-[0.98]">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Nowe zlecenie</span>
+                </a>
+            </div>
+
+            <div class="pt-6 mt-6 border-t border-gray-100">
+                <p class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Pomoc</p>
+                <a href="#" class="nav-link">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Centrum pomocy</span>
+                </a>
+                <a href="mailto:pomoc@graphflow.pl" class="nav-link">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <span>Kontakt</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- User section -->
+        <div class="p-4 border-t border-gray-100">
+            <div class="dropdown relative">
+                <button class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
+                    <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center text-white font-semibold shadow-md">
+                        <%= user ? (user.imie.charAt(0) + user.nazwisko.charAt(0)).toUpperCase() : 'U' %>
                     </div>
+                    <div class="flex-1 text-left">
+                        <p class="text-sm font-medium text-gray-900"><%= user ? user.imie + ' ' + user.nazwisko : 'Użytkownik' %></p>
+                        <p class="text-xs text-gray-500"><%= user && user.firma_nazwa ? user.firma_nazwa : 'Klient' %></p>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                    </svg>
+                </button>
+                <div class="dropdown-menu bottom-full mb-2 left-0 right-0">
+                    <a href="/panel/profil" class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Mój profil
+                    </a>
+                    <% if (typeof isStaff !== 'undefined' && isStaff) { %>
+                    <a href="/admin" class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Panel admina
+                    </a>
+                    <% } %>
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <a href="/logout" class="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Wyloguj się
+                    </a>
                 </div>
             </div>
         </div>
     </div>
-</nav>
+</aside>
+
+<!-- Top bar -->
+<header class="fixed top-0 right-0 left-0 lg:left-72 h-16 bg-white/80 backdrop-blur-md border-b border-gray-200 z-30">
+    <div class="flex items-center justify-between h-full px-4 lg:px-8">
+        <!-- Mobile menu button -->
+        <button onclick="toggleSidebar()" class="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
+
+        <!-- Page title area -->
+        <div class="flex-1">
+            <h1 class="text-lg font-semibold text-gray-900 hidden lg:block"><%= typeof pageTitle !== 'undefined' ? pageTitle : '' %></h1>
+        </div>
+
+        <!-- Right side -->
+        <div class="flex items-center gap-2">
+            <!-- Notifications -->
+            <button class="relative p-2 rounded-xl hover:bg-gray-100 transition-colors group">
+                <svg class="w-6 h-6 text-gray-500 group-hover:text-gray-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <span id="notification-count" class="notification-dot hidden">0</span>
+            </button>
+
+            <!-- Quick add -->
+            <a href="/panel/nowe-zlecenie" class="hidden sm:flex btn-success text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Nowe zlecenie</span>
+            </a>
+        </div>
+    </div>
+</header>
+
+<!-- Main content wrapper -->
+<div class="lg:pl-72 pt-16">
