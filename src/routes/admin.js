@@ -471,28 +471,50 @@ router.get('/ustawienia/email', async (req, res) => {
     const config = require('../config');
     const db = require('../utils/database');
 
-    // Pobierz logi emaili
-    const emailLogs = await db.query(`
-        SELECT * FROM logi_mail
-        ORDER BY utworzono DESC
-        LIMIT 50
-    `);
+    let emailLogs = [];
+    let emailStats = { sent: 0, failed: 0, pending: 0 };
 
-    // Pobierz statystyki
-    const statsQuery = await db.query(`
-        SELECT
-            SUM(CASE WHEN status = 'wyslany' THEN 1 ELSE 0 END) as sent,
-            SUM(CASE WHEN status = 'blad' THEN 1 ELSE 0 END) as failed,
-            SUM(CASE WHEN status = 'oczekuje' THEN 1 ELSE 0 END) as pending
-        FROM logi_mail
-        WHERE utworzono >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    `);
+    try {
+        // Upewnij sie ze tabela istnieje
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS logi_mail (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                zlecenie_id INT,
+                odbiorca VARCHAR(255) NOT NULL,
+                temat VARCHAR(255) NOT NULL,
+                tresc TEXT,
+                status ENUM('wyslany', 'blad', 'oczekuje') DEFAULT 'oczekuje',
+                blad_info TEXT,
+                utworzono DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_status (status)
+            ) ENGINE=InnoDB
+        `);
 
-    const emailStats = statsQuery[0] || { sent: 0, failed: 0, pending: 0 };
+        // Pobierz logi emaili
+        emailLogs = await db.query(`
+            SELECT * FROM logi_mail
+            ORDER BY utworzono DESC
+            LIMIT 50
+        `);
+
+        // Pobierz statystyki
+        const statsQuery = await db.query(`
+            SELECT
+                SUM(CASE WHEN status = 'wyslany' THEN 1 ELSE 0 END) as sent,
+                SUM(CASE WHEN status = 'blad' THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN status = 'oczekuje' THEN 1 ELSE 0 END) as pending
+            FROM logi_mail
+            WHERE utworzono >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        `);
+
+        emailStats = statsQuery[0] || { sent: 0, failed: 0, pending: 0 };
+    } catch (error) {
+        console.error('Blad pobierania logow email:', error);
+    }
 
     res.render('admin/ustawienia-email', {
         title: 'Ustawienia Email',
-        emailConfig: config.mail,
+        emailConfig: config.mail || {},
         emailLogs,
         emailStats,
         helpers
