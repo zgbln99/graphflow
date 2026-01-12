@@ -14,134 +14,252 @@
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                     },
+                    colors: {
+                        primary: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            200: '#ddd6fe',
+                            300: '#c4b5fd',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                        }
+                    }
                 }
             }
         }
     </script>
     <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .auth-gradient {
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 50%, #4c1d95 100%);
         }
-        .glass {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+        .floating {
+            animation: floating 6s ease-in-out infinite;
         }
-        .input-focus:focus {
-            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        .floating-delayed {
+            animation: floating 6s ease-in-out infinite;
+            animation-delay: 2s;
+        }
+        .floating-slow {
+            animation: floating 8s ease-in-out infinite;
+            animation-delay: 4s;
+        }
+        @keyframes floating {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(3deg); }
+        }
+        .pattern-dots {
+            background-image: radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        input:focus {
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.4);
+        }
+        .card-shadow {
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
-<body class="font-sans antialiased">
-    <div class="min-h-screen gradient-bg flex items-center justify-center p-4">
-        <!-- Animated background shapes -->
-        <div class="absolute inset-0 overflow-hidden">
-            <div class="absolute -top-40 -right-40 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse"></div>
-            <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse" style="animation-delay: 1s;"></div>
-            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" style="animation-delay: 2s;"></div>
-        </div>
+<body class="font-sans antialiased bg-gray-50">
+    <div class="min-h-screen flex">
+        <!-- Left Side - Branding -->
+        <div class="hidden lg:flex lg:w-1/2 auth-gradient relative overflow-hidden">
+            <div class="pattern-dots absolute inset-0"></div>
 
-        <div class="relative w-full max-w-md">
-            <!-- Logo -->
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-xl mb-4">
-                    <svg class="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                    </svg>
-                </div>
-                <h1 class="text-3xl font-bold text-white"><%= appName %></h1>
-                <p class="text-indigo-200 mt-2">Panel Zleceń Graficznych</p>
+            <!-- Floating Elements -->
+            <div class="absolute inset-0 overflow-hidden">
+                <div class="floating absolute top-20 left-20 w-32 h-32 bg-white/10 rounded-3xl backdrop-blur-sm"></div>
+                <div class="floating-delayed absolute top-40 right-32 w-24 h-24 bg-white/10 rounded-2xl backdrop-blur-sm"></div>
+                <div class="floating-slow absolute bottom-32 left-40 w-20 h-20 bg-white/10 rounded-xl backdrop-blur-sm"></div>
+                <div class="floating absolute bottom-20 right-20 w-28 h-28 bg-white/10 rounded-3xl backdrop-blur-sm"></div>
             </div>
 
-            <!-- Login Form -->
-            <div class="glass rounded-2xl shadow-2xl p-8">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6">Zaloguj się</h2>
+            <div class="relative z-10 flex flex-col justify-center px-12 xl:px-20">
+                <!-- Logo -->
+                <div class="flex items-center gap-4 mb-12">
+                    <div class="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-xl">
+                        <svg class="w-8 h-8 text-primary-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-white"><%= appName %></h1>
+                        <p class="text-primary-200 text-sm">Panel Administracyjny</p>
+                    </div>
+                </div>
 
+                <!-- Main Content -->
+                <div class="max-w-md">
+                    <h2 class="text-4xl xl:text-5xl font-bold text-white leading-tight mb-6">
+                        Zarządzaj zleceniami graficznymi
+                    </h2>
+                    <p class="text-primary-200 text-lg leading-relaxed mb-10">
+                        Kompleksowy system do zarządzania projektami graficznymi, klientami i zespołem w jednym miejscu.
+                    </p>
+
+                    <!-- Features -->
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                </svg>
+                            </div>
+                            <span class="text-white font-medium">Organizacja projektow i zlecen</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
+                            <span class="text-white font-medium">Zarzadzanie klientami i firmami</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                            </div>
+                            <span class="text-white font-medium">Raporty i statystyki</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side - Login Form -->
+        <div class="flex-1 flex items-center justify-center p-6 sm:p-12">
+            <div class="w-full max-w-md">
+                <!-- Mobile Logo -->
+                <div class="lg:hidden flex items-center justify-center gap-3 mb-10">
+                    <div class="w-12 h-12 auth-gradient rounded-xl flex items-center justify-center">
+                        <svg class="w-7 h-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                        </svg>
+                    </div>
+                    <span class="text-xl font-bold text-gray-900"><%= appName %></span>
+                </div>
+
+                <!-- Welcome Text -->
+                <div class="mb-8">
+                    <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Witaj ponownie</h2>
+                    <p class="text-gray-500">Zaloguj sie do swojego konta</p>
+                </div>
+
+                <!-- Error Message -->
                 <% if (typeof error !== 'undefined' && error && error.length) { %>
-                <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
-                    <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span class="text-red-700 text-sm"><%= error[0] %></span>
+                <div class="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
+                    <div class="w-5 h-5 mt-0.5">
+                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-red-800 font-medium text-sm">Blad logowania</p>
+                        <p class="text-red-600 text-sm mt-0.5"><%= error[0] %></p>
+                    </div>
                 </div>
                 <% } %>
 
+                <!-- Success Message -->
                 <% if (typeof success !== 'undefined' && success && success.length) { %>
-                <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
-                    <svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span class="text-green-700 text-sm"><%= success[0] %></span>
+                <div class="mb-6 p-4 bg-green-50 border border-green-100 rounded-xl flex items-start gap-3">
+                    <div class="w-5 h-5 mt-0.5">
+                        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-green-800 font-medium text-sm">Sukces</p>
+                        <p class="text-green-600 text-sm mt-0.5"><%= success[0] %></p>
+                    </div>
                 </div>
                 <% } %>
 
+                <!-- Login Form -->
                 <form method="POST" action="/login" class="space-y-5">
                     <div>
                         <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Adres e-mail</label>
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                                </svg>
-                            </div>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                class="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 input-focus transition-all"
-                                placeholder="jan@firma.pl"
-                                required
-                            >
-                        </div>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all text-gray-900 placeholder-gray-400"
+                            placeholder="jan@firma.pl"
+                            required
+                        >
                     </div>
 
                     <div>
-                        <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Hasło</label>
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                            </div>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                class="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 input-focus transition-all"
-                                placeholder="••••••••"
-                                required
-                            >
-                        </div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Haslo</label>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all text-gray-900 placeholder-gray-400"
+                            placeholder="Wprowadz haslo"
+                            required
+                        >
                     </div>
 
                     <div class="flex items-center justify-between">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" name="remember" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                            <span class="text-sm text-gray-600">Zapamiętaj mnie</span>
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" name="remember" class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 focus:ring-offset-0">
+                            <span class="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">Zapamietaj mnie</span>
                         </label>
-                        <a href="/forgot-password" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">Zapomniałeś hasła?</a>
+                        <a href="/forgot-password" class="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors">Nie pamietasz hasla?</a>
                     </div>
 
                     <button
                         type="submit"
-                        class="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transform transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                        class="w-full py-3.5 px-4 btn-primary text-white font-semibold rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                     >
-                        Zaloguj się
+                        Zaloguj sie
                     </button>
                 </form>
 
-                <div class="mt-6 text-center">
+                <!-- Divider -->
+                <div class="relative my-8">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-200"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-4 bg-gray-50 text-gray-500">Potrzebujesz pomocy?</span>
+                    </div>
+                </div>
+
+                <!-- Contact -->
+                <div class="text-center">
                     <p class="text-sm text-gray-500">
-                        Potrzebujesz konta?
-                        <a href="mailto:kontakt@graphflow.pl" class="text-indigo-600 hover:text-indigo-700 font-medium">Skontaktuj się z nami</a>
+                        Skontaktuj sie z administratorem
+                    </p>
+                    <a href="mailto:kontakt@graphflow.pl" class="inline-flex items-center gap-2 mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        kontakt@graphflow.pl
+                    </a>
+                </div>
+
+                <!-- Footer -->
+                <div class="mt-12 text-center">
+                    <p class="text-xs text-gray-400">
+                        &copy; <%= new Date().getFullYear() %> <%= appName %>. Wszystkie prawa zastrzezone.
                     </p>
                 </div>
-            </div>
-
-            <!-- Footer -->
-            <div class="mt-8 text-center">
-                <p class="text-indigo-200 text-sm">
-                    &copy; <%= new Date().getFullYear() %> <%= appName %>. Wszystkie prawa zastrzeżone.
-                </p>
             </div>
         </div>
     </div>
