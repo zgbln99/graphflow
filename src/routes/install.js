@@ -14,8 +14,14 @@ const {
     markAsInstalled
 } = require('../middleware/installer');
 
-// Wszystkie routes instalatora blokowane po instalacji
-router.use(blockIfInstalled);
+// Blokuj dostęp do instalatora po instalacji (oprócz strony końcowej)
+router.use((req, res, next) => {
+    // Pozwól na dostęp do strony finish nawet po instalacji
+    if (req.path === '/finish') {
+        return next();
+    }
+    return blockIfInstalled(req, res, next);
+});
 
 // GET /install - Strona powitalna
 router.get('/', (req, res) => {

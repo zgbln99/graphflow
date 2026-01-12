@@ -70,6 +70,20 @@ app.use('/install', installRoutes);
 // Sprawdź czy zainstalowano przed dalszymi routes
 app.use(requireInstallation);
 
+// Obsługa sytuacji gdy aplikacja została zainstalowana po uruchomieniu serwera
+const { isInstalled: checkInstalledNow } = require('./middleware/installer');
+app.use((req, res, next) => {
+    // Jeśli app nie była zainstalowana przy starcie, ale jest teraz
+    // to znaczy że instalacja właśnie się zakończyła
+    if (!isInstalled && checkInstalledNow() && !req.path.startsWith('/install')) {
+        return res.render('restart-required', {
+            title: 'Wymagany restart',
+            appName: 'GraphFlow'
+        });
+    }
+    next();
+});
+
 // Załaduj główne routes tylko jeśli zainstalowano
 if (isInstalled) {
     const config = require('./config');
