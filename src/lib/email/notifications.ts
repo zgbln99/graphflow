@@ -210,7 +210,7 @@ export async function sendDeadlineReminders(): Promise<void> {
 }
 
 /**
- * Wysyła powiadomienie o zmianie statusu projektu
+ * Wysyła powiadomienie o zmianie statusu projektu (z opcjonalnym podglądem)
  */
 export async function notifyProjectStatusChanged(
   project: Project & { status: { name: string } },
@@ -223,6 +223,29 @@ export async function notifyProjectStatusChanged(
     },
   })
 
+  // Pobierz podgląd projektu jeśli istnieje
+  const previewFile = await prisma.projectFile.findFirst({
+    where: {
+      projectId: project.id,
+      isPreview: true,
+    },
+  })
+
+  // Przygotuj załącznik z podglądem
+  let attachments: Array<{ filename: string; path: string; cid?: string }> = []
+  let previewCid: string | undefined
+
+  if (previewFile) {
+    const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads'
+    const filePath = `${UPLOAD_DIR}/${project.id}/${previewFile.storedName}`
+    previewCid = 'project-preview'
+    attachments = [{
+      filename: previewFile.filename,
+      path: filePath,
+      cid: previewCid,
+    }]
+  }
+
   for (const user of clientUsers) {
     const emailData = projectStatusChangedEmail({
       projectNumber: project.number,
@@ -231,6 +254,7 @@ export async function notifyProjectStatusChanged(
       recipientName: user.name,
       oldStatus: oldStatusName,
       newStatus: project.status.name,
+      previewCid,
     })
 
     await sendEmail({
@@ -239,6 +263,7 @@ export async function notifyProjectStatusChanged(
       html: emailData.html,
       text: emailData.text,
       projectId: project.id,
+      attachments,
     })
   }
 }

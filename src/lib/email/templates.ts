@@ -27,6 +27,7 @@ interface ProjectEmailData {
   projectId: string
   recipientName?: string
   submittedByName?: string  // Imię i nazwisko zgłaszającego
+  previewCid?: string       // Content-ID dla osadzonego podglądu
 }
 
 function getBaseTemplate(content: string): string {
@@ -340,6 +341,13 @@ export function projectStatusChangedEmail(
   const projectUrl = `${APP_URL}/panel/projects/${data.projectId}`
   const subject = `[${data.projectNumber}] Zmiana statusu projektu: ${data.newStatus}`
 
+  const previewSection = data.previewCid ? `
+    <div style="margin: 24px 0; text-align: center;">
+      <p style="margin: 0 0 12px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">PODGLĄD PROJEKTU</p>
+      <img src="cid:${data.previewCid}" alt="Podgląd projektu" style="max-width: 100%; max-height: 400px; border-radius: 8px; border: 1px solid ${COLORS.athensGray};" />
+    </div>
+  ` : ''
+
   const html = getBaseTemplate(`
     <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Zmiana statusu projektu</h1>
     <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Status Twojego projektu został zaktualizowany</p>
@@ -361,6 +369,8 @@ export function projectStatusChangedEmail(
         <strong style="color: ${COLORS.toryBlue};">${data.newStatus}</strong>
       </p>
     `)}
+
+    ${previewSection}
 
     <div style="text-align: center; margin: 28px 0;">
       ${getButton('Zobacz projekt', projectUrl)}

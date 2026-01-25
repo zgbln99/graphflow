@@ -11,6 +11,14 @@ const transporter = nodemailer.createTransport({
   },
 })
 
+interface EmailAttachment {
+  filename: string
+  content?: Buffer
+  path?: string
+  contentType?: string
+  cid?: string // Content-ID dla osadzania w HTML
+}
+
 interface SendEmailOptions {
   to: string | string[]
   subject: string
@@ -19,6 +27,7 @@ interface SendEmailOptions {
   replyTo?: string
   ticketId?: string
   projectId?: string
+  attachments?: EmailAttachment[]
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
@@ -33,6 +42,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
       text: options.text,
       html: options.html,
       replyTo: options.replyTo || fromEmail,
+      attachments: options.attachments,
     })
 
     // Loguj wysłany email
