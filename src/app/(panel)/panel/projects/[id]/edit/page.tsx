@@ -17,11 +17,11 @@ export default async function EditProjectPage({
 
   const { id } = await params
 
-  const [project, clients, statuses, tags] = await Promise.all([
+  const [project, clients, statuses, tags, templates] = await Promise.all([
     prisma.project.findUnique({
       where: { id },
       include: {
-        tags: true,
+        tags: { select: { id: true } },
       },
     }),
     prisma.clientAccount.findMany({
@@ -33,6 +33,10 @@ export default async function EditProjectPage({
       orderBy: { order: 'asc' },
     }),
     prisma.projectTag.findMany({
+      orderBy: { name: 'asc' },
+    }),
+    prisma.timelineTemplate.findMany({
+      include: { stages: { select: { name: true, order: true }, orderBy: { order: 'asc' } } },
       orderBy: { name: 'asc' },
     }),
   ])
@@ -52,13 +56,11 @@ export default async function EditProjectPage({
       <div className="card p-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Edytuj projekt</h1>
         <ProjectForm
-          project={{
-            ...project,
-            tagIds: project.tags.map((t) => t.id),
-          }}
+          project={project}
           clients={clients}
           statuses={statuses}
           tags={tags}
+          templates={templates}
         />
       </div>
     </div>
