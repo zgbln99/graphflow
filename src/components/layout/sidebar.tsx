@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   FolderKanban,
@@ -71,10 +72,14 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
         {/* Logo */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
           <Link href="/panel" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <FolderKanban className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-bold text-gray-900 dark:text-white">GraphFlow</span>
+            <Image
+              src="/logo.png"
+              alt="GraphFlow"
+              width={140}
+              height={32}
+              className="h-8 w-auto"
+              priority
+            />
           </Link>
           <button
             onClick={onClose}
