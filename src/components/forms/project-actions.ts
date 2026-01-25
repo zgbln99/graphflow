@@ -384,6 +384,35 @@ export async function updateProjectAction(projectId: string, formData: FormData)
     // Wyślij powiadomienie o zmianie statusu
     if (statusChanged && newStatus) {
       await notifyProjectStatusChanged(project, currentProject.status.name)
+
+      // Pobierz użytkowników klienta i wyślij realtime notification
+      const clientAccount = await prisma.clientAccount.findUnique({
+        where: { id: currentProject.clientAccountId },
+        include: { users: { where: { isActive: true }, select: { id: true } } },
+      })
+
+      if (clientAccount && clientAccount.users.length > 0) {
+        const clientUserIds = clientAccount.users.map(u => u.id)
+
+        await prisma.notification.createMany({
+          data: clientUserIds.map(userId => ({
+            type: 'STATUS_CHANGED',
+            title: 'Zmiana statusu projektu',
+            message: `Status projektu ${currentProject.number} zmieniono na: ${newStatus.name}`,
+            link: `/panel/projects/${projectId}`,
+            userId,
+            projectId,
+          })),
+        })
+
+        notifyUsers(clientUserIds, {
+          type: 'status_changed',
+          projectId,
+          projectNumber: currentProject.number,
+          oldStatus: currentProject.status.name,
+          newStatus: newStatus.name,
+        })
+      }
     }
 
     return { success: true, projectId: project.id }
@@ -402,7 +431,10 @@ export async function updateProjectStatusAction(projectId: string, statusId: str
   try {
     const currentProject = await prisma.project.findUnique({
       where: { id: projectId },
-      include: { status: true },
+      include: {
+        status: true,
+        clientAccount: { include: { users: { where: { isActive: true }, select: { id: true } } } },
+      },
     })
 
     if (!currentProject) {
@@ -433,6 +465,30 @@ export async function updateProjectStatusAction(projectId: string, statusId: str
     })
 
     await notifyProjectStatusChanged(project, currentProject.status.name)
+
+    // Utwórz powiadomienie w bazie i wyślij realtime notification do użytkowników klienta
+    const clientUserIds = currentProject.clientAccount.users.map(u => u.id)
+
+    if (clientUserIds.length > 0) {
+      await prisma.notification.createMany({
+        data: clientUserIds.map(userId => ({
+          type: 'STATUS_CHANGED',
+          title: 'Zmiana statusu projektu',
+          message: `Status projektu ${currentProject.number} zmieniono na: ${newStatus.name}`,
+          link: `/panel/projects/${projectId}`,
+          userId,
+          projectId,
+        })),
+      })
+
+      notifyUsers(clientUserIds, {
+        type: 'status_changed',
+        projectId,
+        projectNumber: currentProject.number,
+        oldStatus: currentProject.status.name,
+        newStatus: newStatus.name,
+      })
+    }
 
     return { success: true }
   } catch (error) {
