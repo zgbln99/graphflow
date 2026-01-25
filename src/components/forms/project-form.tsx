@@ -23,7 +23,7 @@ interface ProjectFormProps {
     localPath: string | null
     dropboxPath: string | null
     dropboxLink: string | null
-    notifyEmail: string | null
+    notifyEmail?: string | null
     tags: { id: string }[]
   }
 }
