@@ -7,13 +7,14 @@ import {
   Calendar,
   Clock,
   Folder,
-  Copy,
-  ExternalLink,
-  Plus,
   MessageSquare,
   StickyNote,
-  Ticket,
   Edit,
+  Link2,
+  Lock,
+  DollarSign,
+  User,
+  CheckCircle,
 } from 'lucide-react'
 import { formatDate, formatDateTime, formatRelativeTime } from '@/lib/utils'
 import { Timeline } from '@/components/project/timeline'
@@ -21,6 +22,7 @@ import { CommentsList } from '@/components/comments/comments-list'
 import { NotesList } from '@/components/notes/notes-list'
 import { FileLocationsList } from '@/components/project/file-locations'
 import { ProjectStatusSelect } from '@/components/project/project-status-select'
+import { AcceptProjectButton } from '@/components/project/accept-project-button'
 
 export default async function ProjectDetailPage({
   params,
@@ -45,18 +47,12 @@ export default async function ProjectDetailPage({
           },
         },
       },
+      createdBy: {
+        select: { id: true, name: true, email: true },
+      },
       tags: true,
       timelineStages: {
         orderBy: { order: 'asc' },
-      },
-      tickets: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        include: {
-          createdBy: {
-            select: { name: true },
-          },
-        },
       },
       comments: {
         where: isAdmin ? {} : { visibility: 'PUBLIC' },
@@ -93,6 +89,9 @@ export default async function ProjectDetailPage({
     orderBy: { order: 'asc' },
   })
 
+  // Sprawdź czy projekt oczekuje na akceptację
+  const isPendingApproval = project.status.slug === 'oczekuje-na-akceptacje'
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -105,7 +104,7 @@ export default async function ProjectDetailPage({
             <ArrowLeft className="w-4 h-4" />
             Projekty
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{project.title}</h1>
             <span className="font-mono text-sm text-gray-500 dark:text-gray-400">{project.number}</span>
           </div>
@@ -114,9 +113,12 @@ export default async function ProjectDetailPage({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {isAdmin ? (
             <>
+              {isPendingApproval && (
+                <AcceptProjectButton projectId={project.id} />
+              )}
               <ProjectStatusSelect
                 projectId={project.id}
                 currentStatusId={project.statusId}
@@ -144,6 +146,21 @@ export default async function ProjectDetailPage({
         </div>
       </div>
 
+      {/* Pending approval banner for client */}
+      {!isAdmin && isPendingApproval && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <Clock className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-300">Projekt oczekuje na akceptację</p>
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Otrzymasz powiadomienie email, gdy projekt zostanie zaakceptowany.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tags */}
       {project.tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -164,6 +181,17 @@ export default async function ProjectDetailPage({
 
       {/* Info cards */}
       <div className="grid md:grid-cols-3 gap-4">
+        {project.createdBy && (
+          <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+              <User className="w-4 h-4" />
+              <span className="text-sm">Zgłosił</span>
+            </div>
+            <p className="font-medium text-gray-900 dark:text-white">{project.createdBy.name}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{formatDate(project.createdAt)}</p>
+          </div>
+        )}
+
         {project.deadline && (
           <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
             <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
@@ -172,6 +200,18 @@ export default async function ProjectDetailPage({
             </div>
             <p className="font-medium text-gray-900 dark:text-white">
               {formatDate(project.deadline)}
+            </p>
+          </div>
+        )}
+
+        {(project as any).preferredDeadline && !project.deadline && (
+          <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+              <Calendar className="w-4 h-4" />
+              <span className="text-sm">Preferowany termin</span>
+            </div>
+            <p className="font-medium text-gray-900 dark:text-white">
+              {formatDate((project as any).preferredDeadline)}
             </p>
           </div>
         )}
@@ -185,14 +225,6 @@ export default async function ProjectDetailPage({
             {formatRelativeTime(project.updatedAt)}
           </p>
         </div>
-
-        <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
-          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
-            <Ticket className="w-4 h-4" />
-            <span className="text-sm">Tickety</span>
-          </div>
-          <p className="font-medium text-gray-900 dark:text-white">{project.tickets.length}</p>
-        </div>
       </div>
 
       {/* Description */}
@@ -200,6 +232,41 @@ export default async function ProjectDetailPage({
         <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
           <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Opis</h2>
           <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{project.description}</p>
+        </div>
+      )}
+
+      {/* Example links - visible for all */}
+      {(project as any).exampleLinks && (
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Link2 className="w-5 h-5 text-gray-400" />
+            <h2 className="font-semibold text-gray-900 dark:text-white">Przykłady / Inspiracje</h2>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{(project as any).exampleLinks}</p>
+        </div>
+      )}
+
+      {/* Admin-only: Credentials and Budget */}
+      {isAdmin && ((project as any).credentials || (project as any).budget) && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {(project as any).credentials && (
+            <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Lock className="w-5 h-5 text-gray-400" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">Hasła i dostępy</h2>
+              </div>
+              <pre className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap font-mono bg-gray-50 dark:bg-gray-900 p-3 rounded">{(project as any).credentials}</pre>
+            </div>
+          )}
+          {(project as any).budget && (
+            <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-5 h-5 text-gray-400" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">Budżet</h2>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400">{(project as any).budget}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -223,57 +290,6 @@ export default async function ProjectDetailPage({
             <div className="p-4">
               <Timeline stages={project.timelineStages} isAdmin={isAdmin} />
             </div>
-          </div>
-
-          {/* Tickets */}
-          <div className="card dark:bg-gray-800 dark:border-gray-700">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900 dark:text-white">Powiązane tickety</h2>
-              <Link
-                href={`/panel/tickets/new?projectId=${project.id}`}
-                className="text-sm link flex items-center gap-1"
-              >
-                <Plus className="w-4 h-4" />
-                Nowy ticket
-              </Link>
-            </div>
-            {project.tickets.length === 0 ? (
-              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                Brak powiązanych ticketów
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                {project.tickets.map((ticket) => (
-                  <Link
-                    key={ticket.id}
-                    href={`/panel/tickets/${ticket.id}`}
-                    className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-mono text-gray-500 dark:text-gray-400 mr-2">
-                          {ticket.number}
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {ticket.title}
-                        </span>
-                      </div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatRelativeTime(ticket.createdAt)}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-                {project.tickets.length >= 5 && (
-                  <Link
-                    href={`/panel/tickets?project=${project.id}`}
-                    className="block p-4 text-center text-sm link"
-                  >
-                    Zobacz wszystkie tickety →
-                  </Link>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Comments */}

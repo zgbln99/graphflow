@@ -37,8 +37,10 @@ model User {
   // Relacje
   comments          Comment[]
   createdTickets    Ticket[]  @relation("TicketCreator")
+  createdProjects   Project[] @relation("ProjectCreator")
   emailMessages     EmailMessage[]
   sessions          Session[]
+  notifications     Notification[]
 
   @@index([clientAccountId])
 }
@@ -122,12 +124,22 @@ model Project {
   clientAccountId String
   clientAccount   ClientAccount @relation(fields: [clientAccountId], references: [id])
 
+  // Twórca projektu (klient lub admin)
+  createdById     String?
+  createdBy       User?         @relation("ProjectCreator", fields: [createdById], references: [id])
+
+  // Dodatkowe pola od klienta
+  exampleLinks    String?       // Linki do przykładowych projektów/inspiracji
+  credentials     String?       // Hasła do grafik (widoczne tylko dla admina)
+  budget          String?       // Budżet/zakres cenowy
+  preferredDeadline DateTime?   // Preferowany termin realizacji przez klienta
+
   // Lokalizacja plików
   localPath       String?       // Ścieżka lokalna np. /Projekty/KlientX/ProjektY
   dropboxPath     String?       // Ścieżka Dropbox
   dropboxLink     String?       // Link do Dropbox
 
-  // Deadline
+  // Deadline (ustawiany przez admina)
   deadline        DateTime?
 
   // Relacje
@@ -141,6 +153,7 @@ model Project {
 
   @@index([clientAccountId])
   @@index([statusId])
+  @@index([createdById])
 }
 
 model ProjectStatusHistory {
@@ -475,4 +488,37 @@ model Webhook {
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// ============================================
+// POWIADOMIENIA W APLIKACJI
+// ============================================
+
+enum NotificationType {
+  PROJECT_CREATED       // Nowy projekt do akceptacji
+  PROJECT_ACCEPTED      // Projekt zaakceptowany
+  PROJECT_STATUS_CHANGE // Zmiana statusu projektu
+  COMMENT_ADDED         // Nowy komentarz
+  DEADLINE_REMINDER     // Przypomnienie o deadline
+}
+
+model Notification {
+  id          String            @id @default(cuid())
+  type        NotificationType
+  title       String
+  message     String
+  link        String?           // Link do powiązanego obiektu
+  isRead      Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+
+  // Odbiorca
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Powiązania opcjonalne
+  projectId   String?
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
 }

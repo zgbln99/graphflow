@@ -6,7 +6,6 @@ import {
   FolderKanban,
   LayoutDashboard,
   Briefcase,
-  Ticket,
   Users,
   Building2,
   Settings,
@@ -17,6 +16,7 @@ import {
   Calendar,
   Download,
   History,
+  Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SessionUser } from '@/lib/auth'
@@ -34,7 +34,6 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   const adminLinks = [
     { href: '/panel', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/panel/projects', label: 'Projekty', icon: Briefcase },
-    { href: '/panel/tickets', label: 'Tickety', icon: Ticket },
     { href: '/panel/clients', label: 'Klienci', icon: Building2 },
     { href: '/panel/calendar', label: 'Kalendarz', icon: Calendar },
     { href: '/panel/inbox', label: 'Skrzynka', icon: Mail },
@@ -45,8 +44,8 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
 
   const clientLinks = [
     { href: '/panel', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/panel/projects', label: 'Projekty', icon: Briefcase },
-    { href: '/panel/tickets', label: 'Moje zgłoszenia', icon: Ticket },
+    { href: '/panel/projects', label: 'Moje projekty', icon: Briefcase },
+    { href: '/panel/projects/new', label: 'Nowy projekt', icon: Plus },
     { href: '/panel/calendar', label: 'Kalendarz', icon: Calendar },
   ]
 

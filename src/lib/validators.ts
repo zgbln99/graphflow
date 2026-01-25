@@ -88,6 +88,16 @@ export const createProjectSchema = z.object({
 
 export const updateProjectSchema = createProjectSchema.partial()
 
+// Schema dla tworzenia projektu przez klienta
+export const clientProjectSchema = z.object({
+  title: z.string().min(3, 'Tytuł musi mieć minimum 3 znaki'),
+  description: z.string().min(10, 'Opis musi mieć minimum 10 znaków'),
+  exampleLinks: z.string().optional(), // Linki do przykładów/inspiracji
+  credentials: z.string().optional(), // Hasła do grafik/materiałów
+  budget: z.string().optional(), // Budżet/zakres cenowy
+  preferredDeadline: z.string().optional().transform((val) => val ? new Date(val) : undefined),
+})
+
 // ============================================
 // PROJECT STATUS
 // ============================================
@@ -208,6 +218,7 @@ export type RegisterInput = z.infer<typeof registerSchema>
 export type CreateClientAccountInput = z.infer<typeof createClientAccountSchema>
 export type CreateUserInput = z.infer<typeof createUserSchema>
 export type CreateProjectInput = z.infer<typeof createProjectSchema>
+export type ClientProjectInput = z.infer<typeof clientProjectSchema>
 export type CreateTicketInput = z.infer<typeof createTicketSchema>
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>
 export type CreateCommentInput = z.infer<typeof createCommentSchema>

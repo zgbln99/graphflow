@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, Bell, LogOut, User, Settings, ChevronDown, Search } from 'lucide-react'
+import { Menu, LogOut, User, Settings, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SessionUser } from '@/lib/auth'
 import { logoutAction } from '@/app/(panel)/actions'
 import { ThemeToggleSimple } from '@/components/theme/theme-toggle'
 import { GlobalSearch } from '@/components/search/global-search'
+import { NotificationDropdown } from '@/components/notifications/notification-dropdown'
 
 interface HeaderProps {
   user: SessionUser
@@ -47,11 +48,7 @@ export function Header({ user }: HeaderProps) {
           <ThemeToggleSimple />
 
           {/* Notifications */}
-          <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded-lg relative">
-            <Bell className="w-5 h-5" />
-            {/* Notification badge - example */}
-            {/* <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" /> */}
-          </button>
+          <NotificationDropdown />
 
           {/* User menu */}
           <div className="relative">

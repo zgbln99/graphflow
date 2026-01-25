@@ -7,8 +7,9 @@ import {
   ticketNewCommentEmail,
   ticketDeadlineReminderEmail,
   projectStatusChangedEmail,
+  newProjectRequestEmail,
 } from './templates'
-import type { Ticket, Project, Comment, User } from '@prisma/client'
+import type { Ticket, Project, Comment, User, ClientAccount } from '@prisma/client'
 
 /**
  * Wysyła powiadomienie o utworzeniu ticketa do klienta
@@ -234,6 +235,40 @@ export async function notifyProjectStatusChanged(
 
     await sendEmail({
       to: user.email,
+      subject: emailData.subject,
+      html: emailData.html,
+      text: emailData.text,
+      projectId: project.id,
+    })
+  }
+}
+
+/**
+ * Wysyła powiadomienie do adminów o nowym zgłoszeniu projektu
+ */
+export async function notifyNewProjectRequest(
+  project: Project & { clientAccount: ClientAccount; createdBy: User | null }
+): Promise<void> {
+  const admins = await prisma.user.findMany({
+    where: {
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
+  for (const admin of admins) {
+    const emailData = newProjectRequestEmail({
+      projectNumber: project.number,
+      projectTitle: project.title,
+      projectId: project.id,
+      recipientName: admin.name,
+      clientName: project.clientAccount.name,
+      createdByName: project.createdBy?.name || 'Nieznany',
+      description: project.description || undefined,
+    })
+
+    await sendEmail({
+      to: admin.email,
       subject: emailData.subject,
       html: emailData.html,
       text: emailData.text,

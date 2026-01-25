@@ -246,6 +246,58 @@ Link do projektu: ${projectUrl}
   return { subject, html, text }
 }
 
+export function newProjectRequestEmail(
+  data: ProjectEmailData & { clientName: string; createdByName: string; description?: string }
+): { subject: string; html: string; text: string } {
+  const projectUrl = `${APP_URL}/panel/projects/${data.projectId}`
+  const subject = `GraphFlow: [${data.projectNumber}] Nowe zgłoszenie projektu od ${data.clientName}`
+
+  const html = getBaseTemplate(`
+    <h2 style="color: #f59e0b; margin: 0 0 16px 0;">Nowe zgłoszenie projektu</h2>
+    ${data.recipientName ? `<p>Cześć ${data.recipientName},</p>` : ''}
+    <p>Klient zgłosił nowy projekt do realizacji.</p>
+
+    <div style="background: #fffbeb; border-radius: 6px; padding: 16px; margin: 16px 0; border: 1px solid #fcd34d;">
+      <p style="margin: 0 0 8px 0;"><strong>Projekt:</strong> [${data.projectNumber}] ${data.projectTitle}</p>
+      <p style="margin: 0 0 8px 0;"><strong>Klient:</strong> ${data.clientName}</p>
+      <p style="margin: 0 0 8px 0;"><strong>Zgłosił:</strong> ${data.createdByName}</p>
+      ${data.description ? `<p style="margin: 0;"><strong>Opis:</strong><br/>${data.description}</p>` : ''}
+    </div>
+
+    <p>Przejrzyj zgłoszenie i zaakceptuj lub odrzuć projekt.</p>
+
+    <p style="margin: 24px 0;">
+      <a href="${projectUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">Przejrzyj projekt</a>
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+    <p style="color: #9ca3af; font-size: 11px; margin: 0;">
+      GraphFlow - System zarządzania projektami graficznymi
+    </p>
+  `)
+
+  const text = `
+Nowe zgłoszenie projektu
+
+${data.recipientName ? `Cześć ${data.recipientName},` : ''}
+
+Klient zgłosił nowy projekt do realizacji.
+
+Projekt: [${data.projectNumber}] ${data.projectTitle}
+Klient: ${data.clientName}
+Zgłosił: ${data.createdByName}
+${data.description ? `Opis: ${data.description}` : ''}
+
+Przejrzyj zgłoszenie i zaakceptuj lub odrzuć projekt.
+
+---
+Link do projektu: ${projectUrl}
+GraphFlow - System zarządzania projektami graficznymi
+  `.trim()
+
+  return { subject, html, text }
+}
+
 // ============================================
 // AUTH EMAILS
 // ============================================
