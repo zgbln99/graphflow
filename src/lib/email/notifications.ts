@@ -246,6 +246,7 @@ export async function notifyProjectStatusChanged(
     }]
   }
 
+  // Wyślij do użytkowników klienta
   for (const user of clientUsers) {
     const emailData = projectStatusChangedEmail({
       projectNumber: project.number,
@@ -259,6 +260,27 @@ export async function notifyProjectStatusChanged(
 
     await sendEmail({
       to: user.email,
+      subject: emailData.subject,
+      html: emailData.html,
+      text: emailData.text,
+      projectId: project.id,
+      attachments,
+    })
+  }
+
+  // Wyślij do dodatkowego emaila jeśli jest ustawiony
+  if ((project as any).notifyEmail) {
+    const emailData = projectStatusChangedEmail({
+      projectNumber: project.number,
+      projectTitle: project.title,
+      projectId: project.id,
+      oldStatus: oldStatusName,
+      newStatus: project.status.name,
+      previewCid,
+    })
+
+    await sendEmail({
+      to: (project as any).notifyEmail,
       subject: emailData.subject,
       html: emailData.html,
       text: emailData.text,

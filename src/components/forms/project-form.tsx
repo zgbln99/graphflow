@@ -23,6 +23,7 @@ interface ProjectFormProps {
     localPath: string | null
     dropboxPath: string | null
     dropboxLink: string | null
+    notifyEmail: string | null
     tags: { id: string }[]
   }
 }
@@ -291,6 +292,27 @@ export function ProjectForm({
               placeholder="https://www.dropbox.com/..."
             />
           </div>
+        </div>
+      </div>
+
+      {/* Dodatkowy email do powiadomień */}
+      <div className="border-t border-gray-200 pt-6">
+        <h3 className="font-medium text-gray-900 mb-4">Powiadomienia</h3>
+        <div>
+          <label htmlFor="notifyEmail" className="label">
+            Dodatkowy email do powiadomień
+          </label>
+          <input
+            id="notifyEmail"
+            name="notifyEmail"
+            type="email"
+            defaultValue={project?.notifyEmail || ''}
+            className="input"
+            placeholder="np. szef@firma.pl"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            Ten email otrzyma powiadomienie po zakończeniu projektu (oprócz standardowych użytkowników)
+          </p>
         </div>
       </div>
 

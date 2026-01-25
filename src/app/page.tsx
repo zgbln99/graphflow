@@ -7,10 +7,10 @@ export default function HomePage() {
       {/* Main content */}
       <main className="flex-1 flex items-center justify-center px-4">
         <div className="text-center">
-          {/* Logo */}
+          {/* Logo - używamy białej wersji na ciemnym tle */}
           <div className="mb-12">
             <img
-              src="/logo.png"
+              src="/logo-white.png"
               alt="GraphFlow"
               className="h-16 md:h-20 w-auto mx-auto"
             />

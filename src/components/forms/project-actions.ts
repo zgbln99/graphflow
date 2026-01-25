@@ -320,6 +320,7 @@ export async function updateProjectAction(projectId: string, formData: FormData)
     localPath: formData.get('localPath') || '',
     dropboxPath: formData.get('dropboxPath') || '',
     dropboxLink: formData.get('dropboxLink') || '',
+    notifyEmail: formData.get('notifyEmail') || '',
     tagIds: formData.getAll('tagIds') as string[],
   }
 
@@ -352,6 +353,9 @@ export async function updateProjectAction(projectId: string, formData: FormData)
       })
     }
 
+    // Pobierz notifyEmail z formData (poza walidacją)
+    const notifyEmail = (formData.get('notifyEmail') as string) || null
+
     // Aktualizuj projekt
     const project = await prisma.project.update({
       where: { id: projectId },
@@ -363,6 +367,7 @@ export async function updateProjectAction(projectId: string, formData: FormData)
         localPath: data.localPath || null,
         dropboxPath: data.dropboxPath || null,
         dropboxLink: data.dropboxLink || null,
+        notifyEmail: notifyEmail || null,
         tags: {
           set: data.tagIds?.map((id) => ({ id })) || [],
         },

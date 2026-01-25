@@ -143,6 +143,9 @@ model Project {
   // Deadline (ustawiany przez admina)
   deadline        DateTime?
 
+  // Dodatkowy email do powiadomień przy zakończeniu projektu
+  notifyEmail     String?
+
   // Relacje
   tickets         Ticket[]
   timelineStages  TimelineStage[]

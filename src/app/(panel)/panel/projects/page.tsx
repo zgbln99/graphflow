@@ -52,6 +52,9 @@ export default async function ProjectsPage({
       status: true,
       clientAccount: true,
       tags: true,
+      createdBy: {
+        select: { id: true, name: true },
+      },
       _count: {
         select: { tickets: true },
       },
@@ -153,6 +156,7 @@ export default async function ProjectsPage({
                 <th className="table-header">Numer</th>
                 <th className="table-header">Tytuł</th>
                 {isAdmin && <th className="table-header">Klient</th>}
+                <th className="table-header">Zlecił</th>
                 <th className="table-header">Status</th>
                 <th className="table-header">Tickety</th>
                 <th className="table-header">Deadline</th>
@@ -199,6 +203,9 @@ export default async function ProjectsPage({
                       {project.clientAccount.name}
                     </td>
                   )}
+                  <td className="table-cell text-gray-600 dark:text-gray-400">
+                    {project.createdBy?.name || '-'}
+                  </td>
                   <td className="table-cell">
                     <span
                       className="badge"

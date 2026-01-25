@@ -11,7 +11,7 @@ export default function AuthLayout({
       <header className="p-6">
         <Link href="/" className="flex items-center w-fit">
           <img
-            src="/logo.png"
+            src="/logo-white.png"
             alt="GraphFlow"
             className="h-10 w-auto"
           />
