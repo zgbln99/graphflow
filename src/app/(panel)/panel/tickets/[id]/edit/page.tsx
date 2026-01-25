@@ -40,6 +40,7 @@ export default async function EditTicketPage({
       id: true,
       number: true,
       title: true,
+      clientAccountId: true,
     },
   })
 
