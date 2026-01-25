@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRealtime } from '@/hooks/use-realtime'
 
 interface ProjectStatus {
@@ -21,8 +20,8 @@ export function ProjectDetailClient({
   initialStatus,
   children,
 }: ProjectDetailClientProps) {
-  const router = useRouter()
   const [status, setStatus] = useState(initialStatus)
+  const isReloading = useRef(false)
 
   // Update status when props change
   useEffect(() => {
@@ -31,6 +30,9 @@ export function ProjectDetailClient({
 
   // Listen for real-time updates
   const handleRealtimeEvent = useCallback((event: { type: string; data?: any }) => {
+    // Prevent multiple reloads
+    if (isReloading.current) return
+
     // Events come as { type: 'notification', data: { type: 'PROJECT_STATUS_CHANGED', ... } }
     if (event.type !== 'notification' || !event.data) return
 
@@ -38,22 +40,28 @@ export function ProjectDetailClient({
     const eventData = event.data
     if (eventData.projectId !== projectId) return
 
+    console.log('[ProjectDetailClient] Received event:', eventData.type, eventData)
+
     switch (eventData.type) {
       case 'PROJECT_STATUS_CHANGED':
         if (eventData.newStatus) {
           setStatus(eventData.newStatus)
         }
-        router.refresh()
+        // Force full page reload to get fresh data
+        isReloading.current = true
+        window.location.reload()
         break
 
       case 'PROJECT_UPDATED':
       case 'FILES_UPDATED':
       case 'TIMELINE_UPDATED':
-        // Refresh the page to get updated data
-        router.refresh()
+      case 'COMMENT_ADDED':
+        // Force full page reload to get fresh data
+        isReloading.current = true
+        window.location.reload()
         break
     }
-  }, [projectId, router])
+  }, [projectId])
 
   useRealtime(handleRealtimeEvent)
 
@@ -74,7 +82,6 @@ export function LiveStatusBadge({
   className = '',
   size = 'md',
 }: LiveStatusBadgeProps) {
-  const router = useRouter()
   const [status, setStatus] = useState(initialStatus)
 
   // Update status when props change
@@ -90,16 +97,12 @@ export function LiveStatusBadge({
     const eventData = event.data
     if (eventData.projectId !== projectId) return
 
-    if (eventData.type === 'PROJECT_STATUS_CHANGED') {
-      if (eventData.newStatus) {
-        setStatus(eventData.newStatus)
-        router.refresh()
-      }
-    } else if (eventData.type === 'PROJECT_UPDATED') {
-      // Project was updated, refresh to get new status
-      router.refresh()
+    console.log('[LiveStatusBadge] Received event:', eventData.type, eventData)
+
+    if (eventData.type === 'PROJECT_STATUS_CHANGED' && eventData.newStatus) {
+      setStatus(eventData.newStatus)
     }
-  }, [projectId, router])
+  }, [projectId])
 
   useRealtime(handleRealtimeEvent)
 

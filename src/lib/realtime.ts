@@ -81,5 +81,6 @@ export function notifyUser(userId: string, data: any) {
  * Send notification event to multiple users
  */
 export function notifyUsers(userIds: string[], data: any) {
+  console.log('[Realtime] Sending to users:', userIds, 'data:', JSON.stringify(data))
   eventBus.sendToUsers(userIds, { type: 'notification', data })
 }

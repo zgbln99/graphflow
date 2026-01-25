@@ -39,6 +39,7 @@ export function useRealtime(onEvent: (event: RealtimeEvent) => void) {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
+        console.log('[SSE] Message received:', JSON.stringify(data))
         onEventRef.current(data)
       } catch (error) {
         console.error('Error parsing SSE message:', error)
