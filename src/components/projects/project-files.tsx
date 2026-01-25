@@ -10,7 +10,7 @@ interface ProjectFile {
   mimeType: string
   size: number
   isPreview: boolean
-  createdAt: string
+  createdAt: string | Date
   uploadedBy?: { name: string } | null
 }
 
