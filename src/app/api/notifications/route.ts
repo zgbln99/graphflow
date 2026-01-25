@@ -78,6 +78,13 @@ export async function POST(request: Request) {
         },
         data: { isRead: true },
       })
+    } else if (action === 'clear-all') {
+      // Usuń wszystkie powiadomienia użytkownika
+      await prisma.notification.deleteMany({
+        where: {
+          userId: session.user.id,
+        },
+      })
     }
 
     return NextResponse.json({ success: true })

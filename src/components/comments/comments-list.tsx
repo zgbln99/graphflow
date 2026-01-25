@@ -36,14 +36,18 @@ export function CommentsList({
 
   // Listen for real-time comment updates
   const handleRealtimeEvent = useCallback((event: { type: string; data?: any }) => {
-    if (event.type === 'COMMENT_ADDED' && event.data) {
-      const { comment: newComment } = event.data
+    // Events come as { type: 'notification', data: { type: 'COMMENT_ADDED', ... } }
+    if (event.type !== 'notification' || !event.data) return
+
+    const eventData = event.data
+    if (eventData.type === 'COMMENT_ADDED' && eventData.comment) {
+      const newComment = eventData.comment
       // Check if this comment belongs to current project/ticket
       if (
         (projectId && newComment.projectId === projectId) ||
         (ticketId && newComment.ticketId === ticketId)
       ) {
-        // Only add if not already in list and not from current user (we add it immediately)
+        // Only add if not already in list
         setComments(prev => {
           if (prev.some(c => c.id === newComment.id)) return prev
           return [newComment, ...prev]

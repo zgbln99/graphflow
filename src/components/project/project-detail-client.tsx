@@ -31,14 +31,17 @@ export function ProjectDetailClient({
 
   // Listen for real-time updates
   const handleRealtimeEvent = useCallback((event: { type: string; data?: any }) => {
-    // Only handle events for this project
-    if (event.data?.projectId !== projectId) return
+    // Events come as { type: 'notification', data: { type: 'PROJECT_STATUS_CHANGED', ... } }
+    if (event.type !== 'notification' || !event.data) return
 
-    switch (event.type) {
+    // Only handle events for this project
+    const eventData = event.data
+    if (eventData.projectId !== projectId) return
+
+    switch (eventData.type) {
       case 'PROJECT_STATUS_CHANGED':
-        const { newStatus } = event.data
-        if (newStatus) {
-          setStatus(newStatus)
+        if (eventData.newStatus) {
+          setStatus(eventData.newStatus)
         }
         router.refresh()
         break
@@ -81,15 +84,18 @@ export function LiveStatusBadge({
 
   // Listen for real-time updates
   const handleRealtimeEvent = useCallback((event: { type: string; data?: any }) => {
-    if (event.data?.projectId !== projectId) return
+    // Events come as { type: 'notification', data: { type: 'PROJECT_STATUS_CHANGED', ... } }
+    if (event.type !== 'notification' || !event.data) return
 
-    if (event.type === 'PROJECT_STATUS_CHANGED') {
-      const { newStatus } = event.data
-      if (newStatus) {
-        setStatus(newStatus)
+    const eventData = event.data
+    if (eventData.projectId !== projectId) return
+
+    if (eventData.type === 'PROJECT_STATUS_CHANGED') {
+      if (eventData.newStatus) {
+        setStatus(eventData.newStatus)
         router.refresh()
       }
-    } else if (event.type === 'PROJECT_UPDATED') {
+    } else if (eventData.type === 'PROJECT_UPDATED') {
       // Project was updated, refresh to get new status
       router.refresh()
     }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Bell, Check, CheckCheck, ExternalLink, Loader2, X } from 'lucide-react'
+import { Bell, Check, CheckCheck, ExternalLink, Loader2, X, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { formatRelativeTime } from '@/lib/utils'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -107,6 +107,26 @@ export function NotificationDropdown() {
     }
   }
 
+  async function clearAll() {
+    if (!confirm('Czy na pewno chcesz usunąć wszystkie powiadomienia?')) return
+
+    setIsLoading(true)
+    try {
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear-all' }),
+      })
+
+      setNotifications([])
+      setUnreadCount(0)
+    } catch (error) {
+      console.error('Error clearing notifications:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   function handleNotificationClick(notification: Notification) {
     if (!notification.isRead) {
       markAsRead(notification.id)
@@ -153,7 +173,21 @@ export function NotificationDropdown() {
                   ) : (
                     <CheckCheck className="w-3 h-3" />
                   )}
-                  Oznacz wszystkie
+                  Oznacz
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={clearAll}
+                  disabled={isLoading}
+                  className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 flex items-center gap-1"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3 h-3" />
+                  )}
+                  Wyczyść
                 </button>
               )}
               <button
