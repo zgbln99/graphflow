@@ -1,0 +1,398 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// UŻYTKOWNICY I AUTORYZACJA
+// ============================================
+
+enum UserRole {
+  ADMIN
+  CLIENT_USER
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  password          String
+  name              String
+  role              UserRole  @default(CLIENT_USER)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Powiązanie z firmą klienta (null dla admina)
+  clientAccountId   String?
+  clientAccount     ClientAccount? @relation(fields: [clientAccountId], references: [id])
+
+  // Reset hasła
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+
+  // Relacje
+  comments          Comment[]
+  createdTickets    Ticket[]  @relation("TicketCreator")
+  emailMessages     EmailMessage[]
+  sessions          Session[]
+
+  @@index([clientAccountId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+// ============================================
+// KLIENCI (MULTI-TENANT)
+// ============================================
+
+model ClientAccount {
+  id              String    @id @default(cuid())
+  name            String    // Nazwa firmy
+  slug            String    @unique // URL-friendly identyfikator
+  email           String?   // Główny email kontaktowy
+  phone           String?
+  address         String?
+  notes           String?   // Notatki admina o kliencie
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Email domain whitelist (rozdzielone przecinkami)
+  emailDomains    String?
+
+  // Relacje
+  users           User[]
+  projects        Project[]
+  tickets         Ticket[]
+}
+
+// ============================================
+// PROJEKTY
+// ============================================
+
+model ProjectStatus {
+  id          String    @id @default(cuid())
+  name        String    // Np. "Nowe", "W trakcie", "Do akceptacji"
+  slug        String    @unique
+  color       String    @default("#6366f1") // Kolor HEX
+  order       Int       @default(0)
+  isDefault   Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  projects    Project[]
+}
+
+model ProjectTag {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  color     String    @default("#6366f1")
+  createdAt DateTime  @default(now())
+
+  projects  Project[] @relation("ProjectTags")
+}
+
+model Project {
+  id              String        @id @default(cuid())
+  number          String        @unique // PRJ-000001
+  title           String
+  description     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Status
+  statusId        String
+  status          ProjectStatus @relation(fields: [statusId], references: [id])
+
+  // Klient
+  clientAccountId String
+  clientAccount   ClientAccount @relation(fields: [clientAccountId], references: [id])
+
+  // Lokalizacja plików
+  localPath       String?       // Ścieżka lokalna np. /Projekty/KlientX/ProjektY
+  dropboxPath     String?       // Ścieżka Dropbox
+  dropboxLink     String?       // Link do Dropbox
+
+  // Deadline
+  deadline        DateTime?
+
+  // Relacje
+  tickets         Ticket[]
+  timelineStages  TimelineStage[]
+  tags            ProjectTag[]  @relation("ProjectTags")
+  statusHistory   ProjectStatusHistory[]
+  comments        Comment[]
+  notes           Note[]
+  fileLocations   FileLocation[]
+
+  @@index([clientAccountId])
+  @@index([statusId])
+}
+
+model ProjectStatusHistory {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromStatus  String?   // Nazwa poprzedniego statusu
+  toStatus    String    // Nazwa nowego statusu
+  changedAt   DateTime  @default(now())
+  changedBy   String?   // ID użytkownika lub "system"
+
+  @@index([projectId])
+}
+
+// ============================================
+// TIMELINE (SZABLON ETAPÓW)
+// ============================================
+
+model TimelineTemplate {
+  id          String    @id @default(cuid())
+  name        String    // Np. "Standardowy", "Express"
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  stages      TimelineTemplateStage[]
+}
+
+model TimelineTemplateStage {
+  id          String            @id @default(cuid())
+  templateId  String
+  template    TimelineTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name        String            // Np. "Brief", "Koncepcja", "Wersja 1"
+  order       Int
+
+  @@index([templateId])
+}
+
+model TimelineStage {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String    // Np. "Brief", "Koncepcja", "Wersja 1"
+  order       Int
+  plannedDate DateTime?
+  actualDate  DateTime?
+  isCurrent   Boolean   @default(false)
+  isCompleted Boolean   @default(false)
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([projectId])
+}
+
+// ============================================
+// TICKETY (ZLECENIA)
+// ============================================
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  NEW
+  IN_PROGRESS
+  WAITING_FOR_CLIENT
+  WAITING_FOR_ADMIN
+  RESOLVED
+  CLOSED
+}
+
+model Ticket {
+  id              String          @id @default(cuid())
+  number          String          @unique // TCK-000123
+  title           String
+  description     String?
+  priority        TicketPriority  @default(NORMAL)
+  status          TicketStatus    @default(NEW)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deadline        DateTime?
+
+  // Klient
+  clientAccountId String
+  clientAccount   ClientAccount   @relation(fields: [clientAccountId], references: [id])
+
+  // Twórca
+  createdById     String
+  createdBy       User            @relation("TicketCreator", fields: [createdById], references: [id])
+
+  // Powiązany projekt (opcjonalnie)
+  projectId       String?
+  project         Project?        @relation(fields: [projectId], references: [id])
+
+  // Token do odpowiedzi e-mail (HMAC)
+  replyToken      String          @unique
+
+  // Relacje
+  comments        Comment[]
+  emailMessages   EmailMessage[]
+  notes           Note[]
+
+  @@index([clientAccountId])
+  @@index([projectId])
+  @@index([createdById])
+}
+
+// ============================================
+// KOMENTARZE I NOTATKI
+// ============================================
+
+enum CommentVisibility {
+  PUBLIC    // Widoczne dla wszystkich
+  INTERNAL  // Tylko dla admina
+}
+
+model Comment {
+  id          String            @id @default(cuid())
+  content     String
+  visibility  CommentVisibility @default(PUBLIC)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Autor
+  authorId    String
+  author      User              @relation(fields: [authorId], references: [id])
+
+  // Powiązanie z ticketem LUB projektem
+  ticketId    String?
+  ticket      Ticket?           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  projectId   String?
+  project     Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Powiązanie z emailem (jeśli komentarz pochodzi z maila)
+  emailMessageId String? @unique
+  emailMessage   EmailMessage? @relation(fields: [emailMessageId], references: [id])
+
+  @@index([ticketId])
+  @@index([projectId])
+  @@index([authorId])
+}
+
+model Note {
+  id          String    @id @default(cuid())
+  content     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Powiązanie z ticketem LUB projektem
+  ticketId    String?
+  ticket      Ticket?   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([projectId])
+}
+
+// ============================================
+// LOKALIZACJE PLIKÓW
+// ============================================
+
+enum FileLocationType {
+  LOCAL
+  DROPBOX
+  GOOGLE_DRIVE
+  OTHER
+}
+
+model FileLocation {
+  id          String            @id @default(cuid())
+  projectId   String
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type        FileLocationType  @default(LOCAL)
+  path        String            // Ścieżka lub link
+  label       String?           // Np. "Pliki źródłowe", "Finalne"
+  createdAt   DateTime          @default(now())
+
+  @@index([projectId])
+}
+
+// ============================================
+// EMAIL
+// ============================================
+
+model EmailMessage {
+  id              String    @id @default(cuid())
+  messageId       String    @unique // Message-ID z nagłówka
+  inReplyTo       String?   // In-Reply-To header
+  references      String?   // References header
+  fromEmail       String
+  fromName        String?
+  toEmail         String
+  subject         String
+  bodyText        String?
+  bodyHtml        String?
+  receivedAt      DateTime
+  processedAt     DateTime  @default(now())
+
+  // Status przetwarzania
+  isMatched       Boolean   @default(false)
+  matchedBy       String?   // "reply-to" | "subject" | "manual"
+
+  // Powiązania
+  ticketId        String?
+  ticket          Ticket?   @relation(fields: [ticketId], references: [id])
+
+  // Kto powiązał (jeśli ręcznie)
+  matchedById     String?
+  matchedByUser   User?     @relation(fields: [matchedById], references: [id])
+
+  // Utworzony komentarz
+  comment         Comment?
+
+  @@index([ticketId])
+  @@index([isMatched])
+}
+
+// ============================================
+// POWIADOMIENIA
+// ============================================
+
+model NotificationSetting {
+  id                        String    @id @default(cuid())
+  // Globalne ustawienia
+  statusChangeEnabled       Boolean   @default(true)
+  newCommentEnabled         Boolean   @default(true)
+  deadlineReminderEnabled   Boolean   @default(true)
+  deadlineReminder48h       Boolean   @default(true)
+  deadlineReminder24h       Boolean   @default(true)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+}
+
+model EmailLog {
+  id          String    @id @default(cuid())
+  toEmail     String
+  subject     String
+  templateId  String?
+  status      String    // "sent" | "failed"
+  error       String?
+  sentAt      DateTime  @default(now())
+
+  // Powiązania (opcjonalne)
+  ticketId    String?
+  projectId   String?
+
+  @@index([toEmail])
+  @@index([status])
+}

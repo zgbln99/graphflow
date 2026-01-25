@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: graphflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-graphflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-graphflow}
+      POSTGRES_DB: ${POSTGRES_DB:-graphflow}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-graphflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: graphflow-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-graphflow}:${POSTGRES_PASSWORD:-graphflow}@postgres:5432/${POSTGRES_DB:-graphflow}?schema=public
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://graphflow.eu}
+      APP_SECRET: ${APP_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURE: ${SMTP_SECURE:-true}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-GraphFlow}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@graphflow.eu}
+      EMAIL_REPLY_SECRET: ${EMAIL_REPLY_SECRET}
+      EMAIL_REPLY_DOMAIN: ${EMAIL_REPLY_DOMAIN:-graphflow.eu}
+    ports:
+      - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.graphflow.rule=Host(`graphflow.eu`)"
+      - "traefik.http.routers.graphflow.entrypoints=websecure"
+      - "traefik.http.routers.graphflow.tls.certresolver=letsencrypt"
+      - "traefik.http.services.graphflow.loadbalancer.server.port=3000"
+
+  # Email Worker
+  email-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: graphflow-email-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-graphflow}:${POSTGRES_PASSWORD:-graphflow}@postgres:5432/${POSTGRES_DB:-graphflow}?schema=public
+      IMAP_HOST: ${IMAP_HOST}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      IMAP_USER: ${IMAP_USER}
+      IMAP_PASS: ${IMAP_PASS}
+      IMAP_TLS: ${IMAP_TLS:-true}
+      IMAP_MAILBOX: ${IMAP_MAILBOX:-INBOX}
+      EMAIL_REPLY_SECRET: ${EMAIL_REPLY_SECRET}
+      EMAIL_REPLY_DOMAIN: ${EMAIL_REPLY_DOMAIN:-graphflow.eu}
+      EMAIL_POLL_INTERVAL: ${EMAIL_POLL_INTERVAL:-60000}
+
+  # Traefik Reverse Proxy (with SSL)
+  traefik:
+    image: traefik:v2.10
+    container_name: graphflow-traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@graphflow.eu}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+
+volumes:
+  postgres_data:
+  letsencrypt:
