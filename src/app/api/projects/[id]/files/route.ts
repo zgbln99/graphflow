@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { notifyUsers } from '@/lib/realtime'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 import { randomUUID } from 'crypto'
@@ -152,6 +153,21 @@ export async function POST(
       },
     })
 
+    // Wyślij powiadomienie real-time o nowym pliku
+    const clientAccount = await prisma.clientAccount.findFirst({
+      where: { projects: { some: { id: projectId } } },
+      include: { users: { where: { isActive: true }, select: { id: true } } },
+    })
+
+    if (clientAccount && clientAccount.users.length > 0) {
+      const clientUserIds = clientAccount.users.map(u => u.id)
+      notifyUsers(clientUserIds, {
+        type: 'FILES_UPDATED',
+        projectId,
+        projectNumber: project.number,
+      })
+    }
+
     return NextResponse.json({ file: projectFile })
   } catch (error) {
     console.error('Error uploading file:', error)
@@ -195,6 +211,28 @@ export async function DELETE(
   await prisma.projectFile.delete({
     where: { id: fileId },
   })
+
+  // Wyślij powiadomienie real-time o usunięciu pliku
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { number: true, clientAccountId: true },
+  })
+
+  if (project) {
+    const clientAccount = await prisma.clientAccount.findUnique({
+      where: { id: project.clientAccountId },
+      include: { users: { where: { isActive: true }, select: { id: true } } },
+    })
+
+    if (clientAccount && clientAccount.users.length > 0) {
+      const clientUserIds = clientAccount.users.map(u => u.id)
+      notifyUsers(clientUserIds, {
+        type: 'FILES_UPDATED',
+        projectId,
+        projectNumber: project.number,
+      })
+    }
+  }
 
   return NextResponse.json({ success: true })
 }

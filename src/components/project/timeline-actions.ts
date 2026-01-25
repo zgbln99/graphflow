@@ -2,6 +2,28 @@
 
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { notifyUsers } from '@/lib/realtime'
+
+async function notifyTimelineUpdate(projectId: string) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      number: true,
+      clientAccount: {
+        include: { users: { where: { isActive: true }, select: { id: true } } },
+      },
+    },
+  })
+
+  if (project && project.clientAccount.users.length > 0) {
+    const clientUserIds = project.clientAccount.users.map(u => u.id)
+    notifyUsers(clientUserIds, {
+      type: 'TIMELINE_UPDATED',
+      projectId,
+      projectNumber: project.number,
+    })
+  }
+}
 
 export async function addTimelineStageAction(
   projectId: string,
@@ -22,6 +44,8 @@ export async function addTimelineStageAction(
         description: data.description || null,
       },
     })
+
+    await notifyTimelineUpdate(projectId)
 
     return { success: true, stageId: stage.id }
   } catch (error) {
@@ -48,10 +72,12 @@ export async function updateTimelineStageAction(
   }
 
   try {
-    await prisma.timelineStage.update({
+    const stage = await prisma.timelineStage.update({
       where: { id: stageId },
       data,
     })
+
+    await notifyTimelineUpdate(stage.projectId)
 
     return { success: true }
   } catch (error) {
@@ -67,9 +93,19 @@ export async function deleteTimelineStageAction(stageId: string) {
   }
 
   try {
+    // Pobierz projectId przed usunięciem
+    const stage = await prisma.timelineStage.findUnique({
+      where: { id: stageId },
+      select: { projectId: true },
+    })
+
     await prisma.timelineStage.delete({
       where: { id: stageId },
     })
+
+    if (stage) {
+      await notifyTimelineUpdate(stage.projectId)
+    }
 
     return { success: true }
   } catch (error) {
@@ -111,6 +147,8 @@ export async function applyTemplateAction(projectId: string, templateId: string)
         order: stage.order,
       })),
     })
+
+    await notifyTimelineUpdate(projectId)
 
     return { success: true }
   } catch (error) {

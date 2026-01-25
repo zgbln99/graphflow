@@ -29,15 +29,26 @@ export function ProjectDetailClient({
     setStatus(initialStatus)
   }, [initialStatus])
 
-  // Listen for real-time status updates
+  // Listen for real-time updates
   const handleRealtimeEvent = useCallback((event: { type: string; data?: any }) => {
-    if (event.type === 'PROJECT_STATUS_CHANGED' && event.data?.projectId === projectId) {
-      const { newStatus } = event.data
-      if (newStatus) {
-        setStatus(newStatus)
-        // Also refresh to get any other updates
+    // Only handle events for this project
+    if (event.data?.projectId !== projectId) return
+
+    switch (event.type) {
+      case 'PROJECT_STATUS_CHANGED':
+        const { newStatus } = event.data
+        if (newStatus) {
+          setStatus(newStatus)
+        }
         router.refresh()
-      }
+        break
+
+      case 'PROJECT_UPDATED':
+      case 'FILES_UPDATED':
+      case 'TIMELINE_UPDATED':
+        // Refresh the page to get updated data
+        router.refresh()
+        break
     }
   }, [projectId, router])
 
@@ -68,14 +79,19 @@ export function LiveStatusBadge({
     setStatus(initialStatus)
   }, [initialStatus])
 
-  // Listen for real-time status updates
+  // Listen for real-time updates
   const handleRealtimeEvent = useCallback((event: { type: string; data?: any }) => {
-    if (event.type === 'PROJECT_STATUS_CHANGED' && event.data?.projectId === projectId) {
+    if (event.data?.projectId !== projectId) return
+
+    if (event.type === 'PROJECT_STATUS_CHANGED') {
       const { newStatus } = event.data
       if (newStatus) {
         setStatus(newStatus)
         router.refresh()
       }
+    } else if (event.type === 'PROJECT_UPDATED') {
+      // Project was updated, refresh to get new status
+      router.refresh()
     }
   }, [projectId, router])
 

@@ -411,11 +411,30 @@ export async function updateProjectAction(projectId: string, formData: FormData)
         })
 
         notifyUsers(clientUserIds, {
-          type: 'status_changed',
+          type: 'PROJECT_STATUS_CHANGED',
           projectId,
           projectNumber: currentProject.number,
           oldStatus: currentProject.status.name,
-          newStatus: newStatus.name,
+          newStatus: {
+            id: newStatus.id,
+            name: newStatus.name,
+            color: newStatus.color,
+          },
+        })
+      }
+    } else {
+      // Wyślij ogólne powiadomienie o aktualizacji projektu (bez zmiany statusu)
+      const clientAccount = await prisma.clientAccount.findUnique({
+        where: { id: currentProject.clientAccountId },
+        include: { users: { where: { isActive: true }, select: { id: true } } },
+      })
+
+      if (clientAccount && clientAccount.users.length > 0) {
+        const clientUserIds = clientAccount.users.map(u => u.id)
+        notifyUsers(clientUserIds, {
+          type: 'PROJECT_UPDATED',
+          projectId,
+          projectNumber: currentProject.number,
         })
       }
     }
