@@ -1,4 +1,15 @@
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://graphflow.eu'
+const LOGO_URL = `${APP_URL}/logo.png`
+
+// Brand colors
+const COLORS = {
+  mirage: '#1B1F3B',      // Dark navy - headers, footer
+  toryBlue: '#0B46AC',    // Primary blue - buttons, links
+  white: '#FFFFFF',
+  shark: '#1F1F21',       // Dark gray - text
+  athensGray: '#E3E7ED',  // Light gray - backgrounds
+  gullGray: '#979FB6',    // Medium gray - secondary text
+}
 
 interface TicketEmailData {
   ticketNumber: string
@@ -13,19 +24,7 @@ interface ProjectEmailData {
   projectTitle: string
   projectId: string
   recipientName?: string
-}
-
-function getFooter(ticketUrl: string): string {
-  return `
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-    <p style="color: #6b7280; font-size: 12px; margin: 0;">
-      Możesz odpowiedzieć bezpośrednio na ten email lub przejść do panelu:<br />
-      <a href="${ticketUrl}" style="color: #4f46e5;">${ticketUrl}</a>
-    </p>
-    <p style="color: #9ca3af; font-size: 11px; margin: 16px 0 0 0;">
-      GraphFlow - System zarządzania projektami graficznymi
-    </p>
-  `
+  submittedByName?: string  // Imię i nazwisko zgłaszającego
 }
 
 function getBaseTemplate(content: string): string {
@@ -36,12 +35,56 @@ function getBaseTemplate(content: string): string {
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
     </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #374151; margin: 0; padding: 20px;">
-      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb; padding: 24px;">
-        ${content}
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: ${COLORS.shark}; margin: 0; padding: 0; background-color: ${COLORS.athensGray};">
+      <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <!-- Header with logo -->
+        <div style="background: ${COLORS.mirage}; padding: 24px 32px; border-radius: 8px 8px 0 0; text-align: center;">
+          <img src="${LOGO_URL}" alt="GraphFlow" style="max-height: 48px; max-width: 200px;" />
+        </div>
+
+        <!-- Content -->
+        <div style="background: ${COLORS.white}; padding: 32px; border-left: 1px solid ${COLORS.athensGray}; border-right: 1px solid ${COLORS.athensGray};">
+          ${content}
+        </div>
+
+        <!-- Footer -->
+        <div style="background: ${COLORS.mirage}; padding: 20px 32px; border-radius: 0 0 8px 8px; text-align: center;">
+          <p style="color: ${COLORS.gullGray}; font-size: 12px; margin: 0 0 8px 0;">
+            GraphFlow - System zarządzania projektami graficznymi
+          </p>
+          <p style="color: ${COLORS.gullGray}; font-size: 11px; margin: 0;">
+            <a href="${APP_URL}" style="color: ${COLORS.gullGray}; text-decoration: underline;">${APP_URL}</a>
+          </p>
+        </div>
       </div>
     </body>
     </html>
+  `
+}
+
+function getButton(text: string, url: string, color: string = COLORS.toryBlue): string {
+  return `
+    <a href="${url}" style="display: inline-block; background: ${color}; color: ${COLORS.white}; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 8px 0;">
+      ${text}
+    </a>
+  `
+}
+
+function getInfoBox(content: string, borderColor: string = COLORS.toryBlue): string {
+  return `
+    <div style="background: ${COLORS.athensGray}; border-left: 4px solid ${borderColor}; border-radius: 4px; padding: 16px 20px; margin: 20px 0;">
+      ${content}
+    </div>
+  `
+}
+
+function getFooterLink(url: string, text: string = 'Przejdź do panelu'): string {
+  return `
+    <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid ${COLORS.athensGray};">
+      <p style="color: ${COLORS.gullGray}; font-size: 13px; margin: 0;">
+        ${text}: <a href="${url}" style="color: ${COLORS.toryBlue};">${url}</a>
+      </p>
+    </div>
   `
 }
 
@@ -49,156 +92,233 @@ function getBaseTemplate(content: string): string {
 // TICKET EMAILS
 // ============================================
 
-export function ticketCreatedEmail(data: TicketEmailData & { description?: string }): { subject: string; html: string; text: string } {
+export function ticketCreatedEmail(data: TicketEmailData & { description?: string; submittedByName?: string }): { subject: string; html: string; text: string } {
   const ticketUrl = `${APP_URL}/panel/tickets/${data.ticketId}`
-  const subject = `GraphFlow: [${data.ticketNumber}] ${data.ticketTitle}`
+  const subject = `[${data.ticketNumber}] ${data.ticketTitle}`
 
   const html = getBaseTemplate(`
-    <h2 style="color: #111827; margin: 0 0 16px 0;">Nowe zgłoszenie utworzone</h2>
-    ${data.recipientName ? `<p>Cześć ${data.recipientName},</p>` : ''}
-    <p>Twoje zgłoszenie zostało zarejestrowane w systemie.</p>
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Nowe zgłoszenie utworzone</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Twoje zgłoszenie zostało zarejestrowane</p>
 
-    <div style="background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0;">
-      <p style="margin: 0 0 8px 0;"><strong>Numer:</strong> ${data.ticketNumber}</p>
-      <p style="margin: 0 0 8px 0;"><strong>Tytuł:</strong> ${data.ticketTitle}</p>
-      ${data.description ? `<p style="margin: 0;"><strong>Opis:</strong> ${data.description}</p>` : ''}
+    ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
+    <p style="margin: 0 0 20px 0;">Twoje zgłoszenie zostało pomyślnie zarejestrowane w systemie GraphFlow. Powiadomimy Cię o wszelkich zmianach statusu.</p>
+
+    ${getInfoBox(`
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">NUMER ZGŁOSZENIA</p>
+      <p style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: ${COLORS.mirage};">${data.ticketNumber}</p>
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">TYTUŁ</p>
+      <p style="margin: 0; font-size: 16px; color: ${COLORS.shark};">${data.ticketTitle}</p>
+      ${data.submittedByName ? `
+        <p style="margin: 16px 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSIŁ</p>
+        <p style="margin: 0; font-size: 14px; color: ${COLORS.shark};">${data.submittedByName}</p>
+      ` : ''}
+      ${data.description ? `
+        <p style="margin: 16px 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">OPIS</p>
+        <p style="margin: 0; font-size: 14px; color: ${COLORS.shark};">${data.description}</p>
+      ` : ''}
+    `)}
+
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Zobacz zgłoszenie', ticketUrl)}
     </div>
 
-    <p>Powiadomimy Cię o wszelkich zmianach statusu.</p>
-    ${getFooter(ticketUrl)}
+    <p style="color: ${COLORS.gullGray}; font-size: 13px; margin: 0;">
+      Możesz odpowiedzieć bezpośrednio na ten email, a Twoja odpowiedź zostanie dodana do zgłoszenia.
+    </p>
   `)
 
   const text = `
-Nowe zgłoszenie utworzone
+NOWE ZGŁOSZENIE UTWORZONE
+${data.ticketNumber}
 
 ${data.recipientName ? `Cześć ${data.recipientName},` : ''}
 
-Twoje zgłoszenie zostało zarejestrowane w systemie.
+Twoje zgłoszenie zostało pomyślnie zarejestrowane w systemie GraphFlow.
 
 Numer: ${data.ticketNumber}
 Tytuł: ${data.ticketTitle}
+${data.submittedByName ? `Zgłosił: ${data.submittedByName}` : ''}
 ${data.description ? `Opis: ${data.description}` : ''}
 
-Powiadomimy Cię o wszelkich zmianach statusu.
+Link do zgłoszenia: ${ticketUrl}
+
+Możesz odpowiedzieć bezpośrednio na ten email.
 
 ---
-Link do zgłoszenia: ${ticketUrl}
 GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
   `.trim()
 
   return { subject, html, text }
 }
 
 export function ticketStatusChangedEmail(
-  data: TicketEmailData & { oldStatus: string; newStatus: string }
+  data: TicketEmailData & { oldStatus: string; newStatus: string; submittedByName?: string }
 ): { subject: string; html: string; text: string } {
   const ticketUrl = `${APP_URL}/panel/tickets/${data.ticketId}`
-  const subject = `GraphFlow: [${data.ticketNumber}] Zmiana statusu - ${data.newStatus}`
+  const subject = `[${data.ticketNumber}] Zmiana statusu: ${data.newStatus}`
 
   const html = getBaseTemplate(`
-    <h2 style="color: #111827; margin: 0 0 16px 0;">Zmiana statusu zgłoszenia</h2>
-    ${data.recipientName ? `<p>Cześć ${data.recipientName},</p>` : ''}
-    <p>Status Twojego zgłoszenia został zmieniony.</p>
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Zmiana statusu zgłoszenia</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Status Twojego zgłoszenia został zaktualizowany</p>
 
-    <div style="background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0;">
-      <p style="margin: 0 0 8px 0;"><strong>Zgłoszenie:</strong> [${data.ticketNumber}] ${data.ticketTitle}</p>
-      <p style="margin: 0;"><strong>Status:</strong> <span style="text-decoration: line-through; color: #9ca3af;">${data.oldStatus}</span> → <strong style="color: #059669;">${data.newStatus}</strong></p>
+    ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
+    <p style="margin: 0 0 20px 0;">Informujemy o zmianie statusu Twojego zgłoszenia.</p>
+
+    ${getInfoBox(`
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSZENIE</p>
+      <p style="margin: 0 0 16px 0; font-size: 16px; color: ${COLORS.shark};">[${data.ticketNumber}] ${data.ticketTitle}</p>
+      ${data.submittedByName ? `
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSIŁ</p>
+        <p style="margin: 0 0 16px 0; font-size: 14px; color: ${COLORS.shark};">${data.submittedByName}</p>
+      ` : ''}
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZMIANA STATUSU</p>
+      <p style="margin: 0;">
+        <span style="color: ${COLORS.gullGray}; text-decoration: line-through;">${data.oldStatus}</span>
+        <span style="color: ${COLORS.gullGray}; margin: 0 8px;">→</span>
+        <strong style="color: ${COLORS.toryBlue};">${data.newStatus}</strong>
+      </p>
+    `)}
+
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Zobacz zgłoszenie', ticketUrl)}
     </div>
-    ${getFooter(ticketUrl)}
   `)
 
   const text = `
-Zmiana statusu zgłoszenia
+ZMIANA STATUSU ZGŁOSZENIA
+${data.ticketNumber}
 
 ${data.recipientName ? `Cześć ${data.recipientName},` : ''}
 
-Status Twojego zgłoszenia został zmieniony.
+Informujemy o zmianie statusu Twojego zgłoszenia.
 
 Zgłoszenie: [${data.ticketNumber}] ${data.ticketTitle}
+${data.submittedByName ? `Zgłosił: ${data.submittedByName}` : ''}
 Status: ${data.oldStatus} → ${data.newStatus}
 
----
 Link do zgłoszenia: ${ticketUrl}
+
+---
+GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
   `.trim()
 
   return { subject, html, text }
 }
 
 export function ticketNewCommentEmail(
-  data: TicketEmailData & { commentAuthor: string; commentContent: string }
+  data: TicketEmailData & { commentAuthor: string; commentContent: string; submittedByName?: string }
 ): { subject: string; html: string; text: string } {
   const ticketUrl = `${APP_URL}/panel/tickets/${data.ticketId}`
-  const subject = `GraphFlow: [${data.ticketNumber}] Nowy komentarz`
+  const subject = `[${data.ticketNumber}] Nowy komentarz od ${data.commentAuthor}`
 
   const html = getBaseTemplate(`
-    <h2 style="color: #111827; margin: 0 0 16px 0;">Nowy komentarz</h2>
-    ${data.recipientName ? `<p>Cześć ${data.recipientName},</p>` : ''}
-    <p>Do Twojego zgłoszenia dodano nowy komentarz.</p>
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Nowy komentarz</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Do Twojego zgłoszenia dodano komentarz</p>
 
-    <div style="background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0;">
-      <p style="margin: 0 0 8px 0;"><strong>Zgłoszenie:</strong> [${data.ticketNumber}] ${data.ticketTitle}</p>
-      <p style="margin: 0 0 8px 0;"><strong>Od:</strong> ${data.commentAuthor}</p>
-      <div style="border-left: 3px solid #4f46e5; padding-left: 12px; margin-top: 12px;">
-        ${data.commentContent}
+    ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
+    <p style="margin: 0 0 20px 0;"><strong>${data.commentAuthor}</strong> dodał komentarz do zgłoszenia <strong>[${data.ticketNumber}]</strong>.</p>
+
+    ${getInfoBox(`
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSZENIE</p>
+      <p style="margin: 0 0 16px 0; font-size: 16px; color: ${COLORS.shark};">[${data.ticketNumber}] ${data.ticketTitle}</p>
+      ${data.submittedByName ? `
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSIŁ</p>
+        <p style="margin: 0 0 16px 0; font-size: 14px; color: ${COLORS.shark};">${data.submittedByName}</p>
+      ` : ''}
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">KOMENTARZ OD ${data.commentAuthor.toUpperCase()}</p>
+      <div style="background: ${COLORS.white}; border-radius: 4px; padding: 12px; margin-top: 8px; border: 1px solid ${COLORS.athensGray};">
+        <p style="margin: 0; color: ${COLORS.shark}; white-space: pre-wrap;">${data.commentContent}</p>
       </div>
+    `)}
+
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Odpowiedz', ticketUrl)}
     </div>
 
-    <p>Możesz odpowiedzieć bezpośrednio na ten email.</p>
-    ${getFooter(ticketUrl)}
+    <p style="color: ${COLORS.gullGray}; font-size: 13px; margin: 0;">
+      Możesz odpowiedzieć bezpośrednio na ten email, a Twoja odpowiedź zostanie dodana do zgłoszenia.
+    </p>
   `)
 
   const text = `
-Nowy komentarz
+NOWY KOMENTARZ
+${data.ticketNumber}
 
 ${data.recipientName ? `Cześć ${data.recipientName},` : ''}
 
-Do Twojego zgłoszenia dodano nowy komentarz.
+${data.commentAuthor} dodał komentarz do zgłoszenia [${data.ticketNumber}].
 
-Zgłoszenie: [${data.ticketNumber}] ${data.ticketTitle}
-Od: ${data.commentAuthor}
+Zgłoszenie: ${data.ticketTitle}
+${data.submittedByName ? `Zgłosił: ${data.submittedByName}` : ''}
 
+Komentarz:
 ${data.commentContent}
 
----
-Możesz odpowiedzieć bezpośrednio na ten email.
 Link do zgłoszenia: ${ticketUrl}
+
+Możesz odpowiedzieć bezpośrednio na ten email.
+
+---
+GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
   `.trim()
 
   return { subject, html, text }
 }
 
 export function ticketDeadlineReminderEmail(
-  data: TicketEmailData & { deadline: string; hoursLeft: number }
+  data: TicketEmailData & { deadline: string; hoursLeft: number; submittedByName?: string }
 ): { subject: string; html: string; text: string } {
   const ticketUrl = `${APP_URL}/panel/tickets/${data.ticketId}`
-  const subject = `GraphFlow: [${data.ticketNumber}] Przypomnienie o terminie`
-
-  const urgencyText = data.hoursLeft <= 24 ? 'PILNE: ' : ''
+  const isUrgent = data.hoursLeft <= 24
+  const subject = `${isUrgent ? '⚠️ PILNE: ' : ''}[${data.ticketNumber}] Zbliża się termin`
 
   const html = getBaseTemplate(`
-    <h2 style="color: #dc2626; margin: 0 0 16px 0;">${urgencyText}Zbliża się termin</h2>
-    ${data.recipientName ? `<p>Cześć ${data.recipientName},</p>` : ''}
-    <p>Przypominamy o zbliżającym się terminie realizacji zgłoszenia.</p>
+    <h1 style="color: ${isUrgent ? '#dc2626' : COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">
+      ${isUrgent ? '⚠️ ' : ''}Zbliża się termin realizacji
+    </h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Przypomnienie o terminie zgłoszenia</p>
 
-    <div style="background: #fef2f2; border-radius: 6px; padding: 16px; margin: 16px 0; border: 1px solid #fecaca;">
-      <p style="margin: 0 0 8px 0;"><strong>Zgłoszenie:</strong> [${data.ticketNumber}] ${data.ticketTitle}</p>
-      <p style="margin: 0; color: #dc2626;"><strong>Termin:</strong> ${data.deadline} (za ${data.hoursLeft}h)</p>
+    ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
+    <p style="margin: 0 0 20px 0;">Przypominamy o zbliżającym się terminie realizacji zgłoszenia.</p>
+
+    ${getInfoBox(`
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSZENIE</p>
+      <p style="margin: 0 0 16px 0; font-size: 16px; color: ${COLORS.shark};">[${data.ticketNumber}] ${data.ticketTitle}</p>
+      ${data.submittedByName ? `
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSIŁ</p>
+        <p style="margin: 0 0 16px 0; font-size: 14px; color: ${COLORS.shark};">${data.submittedByName}</p>
+      ` : ''}
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">TERMIN</p>
+      <p style="margin: 0; font-size: 18px; font-weight: 600; color: ${isUrgent ? '#dc2626' : COLORS.toryBlue};">
+        ${data.deadline} <span style="font-size: 14px; font-weight: normal;">(za ${data.hoursLeft}h)</span>
+      </p>
+    `, isUrgent ? '#dc2626' : COLORS.toryBlue)}
+
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Zobacz zgłoszenie', ticketUrl)}
     </div>
-    ${getFooter(ticketUrl)}
   `)
 
   const text = `
-${urgencyText}Zbliża się termin
+${isUrgent ? '⚠️ PILNE: ' : ''}ZBLIŻA SIĘ TERMIN
+${data.ticketNumber}
 
 ${data.recipientName ? `Cześć ${data.recipientName},` : ''}
 
 Przypominamy o zbliżającym się terminie realizacji zgłoszenia.
 
 Zgłoszenie: [${data.ticketNumber}] ${data.ticketTitle}
+${data.submittedByName ? `Zgłosił: ${data.submittedByName}` : ''}
 Termin: ${data.deadline} (za ${data.hoursLeft}h)
 
----
 Link do zgłoszenia: ${ticketUrl}
+
+---
+GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
   `.trim()
 
   return { subject, html, text }
@@ -212,35 +332,52 @@ export function projectStatusChangedEmail(
   data: ProjectEmailData & { oldStatus: string; newStatus: string }
 ): { subject: string; html: string; text: string } {
   const projectUrl = `${APP_URL}/panel/projects/${data.projectId}`
-  const subject = `GraphFlow: [${data.projectNumber}] Zmiana statusu projektu - ${data.newStatus}`
+  const subject = `[${data.projectNumber}] Zmiana statusu projektu: ${data.newStatus}`
 
   const html = getBaseTemplate(`
-    <h2 style="color: #111827; margin: 0 0 16px 0;">Zmiana statusu projektu</h2>
-    ${data.recipientName ? `<p>Cześć ${data.recipientName},</p>` : ''}
-    <p>Status Twojego projektu został zmieniony.</p>
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Zmiana statusu projektu</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Status Twojego projektu został zaktualizowany</p>
 
-    <div style="background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0;">
-      <p style="margin: 0 0 8px 0;"><strong>Projekt:</strong> [${data.projectNumber}] ${data.projectTitle}</p>
-      <p style="margin: 0;"><strong>Status:</strong> <span style="text-decoration: line-through; color: #9ca3af;">${data.oldStatus}</span> → <strong style="color: #059669;">${data.newStatus}</strong></p>
+    ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
+    <p style="margin: 0 0 20px 0;">Informujemy o zmianie statusu Twojego projektu w systemie GraphFlow.</p>
+
+    ${getInfoBox(`
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">PROJEKT</p>
+      <p style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: ${COLORS.mirage};">[${data.projectNumber}] ${data.projectTitle}</p>
+      ${data.submittedByName ? `
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSIŁ</p>
+        <p style="margin: 0 0 16px 0; font-size: 14px; color: ${COLORS.shark};">${data.submittedByName}</p>
+      ` : ''}
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZMIANA STATUSU</p>
+      <p style="margin: 0;">
+        <span style="color: ${COLORS.gullGray}; text-decoration: line-through;">${data.oldStatus}</span>
+        <span style="color: ${COLORS.gullGray}; margin: 0 8px;">→</span>
+        <strong style="color: ${COLORS.toryBlue};">${data.newStatus}</strong>
+      </p>
+    `)}
+
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Zobacz projekt', projectUrl)}
     </div>
-
-    <p>
-      <a href="${projectUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">Zobacz projekt</a>
-    </p>
   `)
 
   const text = `
-Zmiana statusu projektu
+ZMIANA STATUSU PROJEKTU
+${data.projectNumber}
 
 ${data.recipientName ? `Cześć ${data.recipientName},` : ''}
 
-Status Twojego projektu został zmieniony.
+Informujemy o zmianie statusu Twojego projektu.
 
 Projekt: [${data.projectNumber}] ${data.projectTitle}
+${data.submittedByName ? `Zgłosił: ${data.submittedByName}` : ''}
 Status: ${data.oldStatus} → ${data.newStatus}
 
----
 Link do projektu: ${projectUrl}
+
+---
+GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
   `.trim()
 
   return { subject, html, text }
@@ -250,49 +387,53 @@ export function newProjectRequestEmail(
   data: ProjectEmailData & { clientName: string; createdByName: string; description?: string }
 ): { subject: string; html: string; text: string } {
   const projectUrl = `${APP_URL}/panel/projects/${data.projectId}`
-  const subject = `GraphFlow: [${data.projectNumber}] Nowe zgłoszenie projektu od ${data.clientName}`
+  const subject = `[${data.projectNumber}] Nowe zgłoszenie projektu od ${data.clientName}`
 
   const html = getBaseTemplate(`
-    <h2 style="color: #f59e0b; margin: 0 0 16px 0;">Nowe zgłoszenie projektu</h2>
-    ${data.recipientName ? `<p>Cześć ${data.recipientName},</p>` : ''}
-    <p>Klient zgłosił nowy projekt do realizacji.</p>
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Nowe zgłoszenie projektu</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Klient zgłosił nowy projekt do realizacji</p>
 
-    <div style="background: #fffbeb; border-radius: 6px; padding: 16px; margin: 16px 0; border: 1px solid #fcd34d;">
-      <p style="margin: 0 0 8px 0;"><strong>Projekt:</strong> [${data.projectNumber}] ${data.projectTitle}</p>
-      <p style="margin: 0 0 8px 0;"><strong>Klient:</strong> ${data.clientName}</p>
-      <p style="margin: 0 0 8px 0;"><strong>Zgłosił:</strong> ${data.createdByName}</p>
-      ${data.description ? `<p style="margin: 0;"><strong>Opis:</strong><br/>${data.description}</p>` : ''}
+    ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
+    <p style="margin: 0 0 20px 0;">Otrzymaliśmy nowe zgłoszenie projektu wymagające Twojej akceptacji.</p>
+
+    ${getInfoBox(`
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">NUMER PROJEKTU</p>
+      <p style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: ${COLORS.mirage};">${data.projectNumber}</p>
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">TYTUŁ</p>
+      <p style="margin: 0 0 16px 0; font-size: 16px; color: ${COLORS.shark};">${data.projectTitle}</p>
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">KLIENT</p>
+      <p style="margin: 0 0 16px 0; font-size: 14px; color: ${COLORS.shark};">${data.clientName}</p>
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSIŁ</p>
+      <p style="margin: 0${data.description ? ' 0 16px 0' : ''}; font-size: 14px; color: ${COLORS.shark}; font-weight: 600;">${data.createdByName}</p>
+      ${data.description ? `
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">OPIS</p>
+        <p style="margin: 0; font-size: 14px; color: ${COLORS.shark}; white-space: pre-wrap;">${data.description}</p>
+      ` : ''}
+    `, '#f59e0b')}
+
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Przejrzyj i zaakceptuj', projectUrl, '#f59e0b')}
     </div>
-
-    <p>Przejrzyj zgłoszenie i zaakceptuj lub odrzuć projekt.</p>
-
-    <p style="margin: 24px 0;">
-      <a href="${projectUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">Przejrzyj projekt</a>
-    </p>
-
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-    <p style="color: #9ca3af; font-size: 11px; margin: 0;">
-      GraphFlow - System zarządzania projektami graficznymi
-    </p>
   `)
 
   const text = `
-Nowe zgłoszenie projektu
+NOWE ZGŁOSZENIE PROJEKTU
+${data.projectNumber}
 
 ${data.recipientName ? `Cześć ${data.recipientName},` : ''}
 
-Klient zgłosił nowy projekt do realizacji.
+Otrzymaliśmy nowe zgłoszenie projektu wymagające Twojej akceptacji.
 
 Projekt: [${data.projectNumber}] ${data.projectTitle}
 Klient: ${data.clientName}
 Zgłosił: ${data.createdByName}
 ${data.description ? `Opis: ${data.description}` : ''}
 
-Przejrzyj zgłoszenie i zaakceptuj lub odrzuć projekt.
+Link do projektu: ${projectUrl}
 
 ---
-Link do projektu: ${projectUrl}
 GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
   `.trim()
 
   return { subject, html, text }
@@ -306,33 +447,32 @@ export function passwordResetEmail(data: {
   recipientName?: string
   resetUrl: string
 }): { subject: string; html: string; text: string } {
-  const subject = 'GraphFlow: Reset hasła'
+  const subject = 'Reset hasła - GraphFlow'
 
   const html = getBaseTemplate(`
-    <h2 style="color: #111827; margin: 0 0 16px 0;">Reset hasła</h2>
-    ${data.recipientName ? `<p>Cześć ${data.recipientName},</p>` : ''}
-    <p>Otrzymaliśmy prośbę o reset hasła do Twojego konta w GraphFlow.</p>
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Reset hasła</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Otrzymaliśmy prośbę o reset hasła</p>
 
-    <p style="margin: 24px 0;">
-      <a href="${data.resetUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">Zresetuj hasło</a>
-    </p>
+    ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
+    <p style="margin: 0 0 20px 0;">Otrzymaliśmy prośbę o reset hasła do Twojego konta w systemie GraphFlow. Kliknij poniższy przycisk, aby ustawić nowe hasło.</p>
 
-    <p style="color: #6b7280; font-size: 14px;">
-      Link jest ważny przez 1 godzinę. Jeśli nie prosiłeś o reset hasła, zignoruj tę wiadomość.
-    </p>
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Zresetuj hasło', data.resetUrl)}
+    </div>
 
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-    <p style="color: #9ca3af; font-size: 11px; margin: 0;">
-      GraphFlow - System zarządzania projektami graficznymi
-    </p>
+    <div style="background: ${COLORS.athensGray}; border-radius: 4px; padding: 16px; margin: 20px 0;">
+      <p style="margin: 0; font-size: 13px; color: ${COLORS.gullGray};">
+        <strong>Ważne:</strong> Link jest ważny przez 1 godzinę. Jeśli nie prosiłeś o reset hasła, zignoruj tę wiadomość - Twoje konto jest bezpieczne.
+      </p>
+    </div>
   `)
 
   const text = `
-Reset hasła
+RESET HASŁA - GRAPHFLOW
 
 ${data.recipientName ? `Cześć ${data.recipientName},` : ''}
 
-Otrzymaliśmy prośbę o reset hasła do Twojego konta w GraphFlow.
+Otrzymaliśmy prośbę o reset hasła do Twojego konta w systemie GraphFlow.
 
 Kliknij poniższy link, aby zresetować hasło:
 ${data.resetUrl}
@@ -341,6 +481,7 @@ Link jest ważny przez 1 godzinę. Jeśli nie prosiłeś o reset hasła, zignoru
 
 ---
 GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
   `.trim()
 
   return { subject, html, text }
@@ -352,46 +493,54 @@ export function welcomeEmail(data: {
   temporaryPassword?: string
   loginUrl: string
 }): { subject: string; html: string; text: string } {
-  const subject = 'GraphFlow: Witamy w systemie!'
+  const subject = 'Witamy w GraphFlow!'
 
   const html = getBaseTemplate(`
-    <h2 style="color: #111827; margin: 0 0 16px 0;">Witamy w GraphFlow!</h2>
-    <p>Cześć ${data.recipientName},</p>
-    <p>Twoje konto w systemie GraphFlow zostało utworzone.</p>
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Witamy w GraphFlow!</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Twoje konto zostało utworzone</p>
 
-    <div style="background: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0;">
-      <p style="margin: 0 0 8px 0;"><strong>Email:</strong> ${data.email}</p>
-      ${data.temporaryPassword ? `<p style="margin: 0;"><strong>Tymczasowe hasło:</strong> ${data.temporaryPassword}</p>` : ''}
+    <p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>
+    <p style="margin: 0 0 20px 0;">Twoje konto w systemie GraphFlow zostało pomyślnie utworzone. Możesz teraz zalogować się i rozpocząć współpracę.</p>
+
+    ${getInfoBox(`
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">EMAIL</p>
+      <p style="margin: 0${data.temporaryPassword ? ' 0 16px 0' : ''}; font-size: 16px; color: ${COLORS.shark};">${data.email}</p>
+      ${data.temporaryPassword ? `
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">TYMCZASOWE HASŁO</p>
+        <p style="margin: 0; font-size: 16px; font-family: monospace; color: ${COLORS.shark}; background: ${COLORS.white}; padding: 8px 12px; border-radius: 4px; display: inline-block;">${data.temporaryPassword}</p>
+      ` : ''}
+    `)}
+
+    ${data.temporaryPassword ? `
+      <div style="background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px; padding: 12px 16px; margin: 20px 0;">
+        <p style="margin: 0; font-size: 13px; color: #dc2626;">
+          <strong>Ważne:</strong> Zalecamy zmianę hasła po pierwszym logowaniu.
+        </p>
+      </div>
+    ` : ''}
+
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Zaloguj się', data.loginUrl)}
     </div>
-
-    ${data.temporaryPassword ? '<p style="color: #dc2626;">Zalecamy zmianę hasła po pierwszym logowaniu.</p>' : ''}
-
-    <p style="margin: 24px 0;">
-      <a href="${data.loginUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">Zaloguj się</a>
-    </p>
-
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-    <p style="color: #9ca3af; font-size: 11px; margin: 0;">
-      GraphFlow - System zarządzania projektami graficznymi
-    </p>
   `)
 
   const text = `
-Witamy w GraphFlow!
+WITAMY W GRAPHFLOW!
 
 Cześć ${data.recipientName},
 
-Twoje konto w systemie GraphFlow zostało utworzone.
+Twoje konto w systemie GraphFlow zostało pomyślnie utworzone.
 
 Email: ${data.email}
 ${data.temporaryPassword ? `Tymczasowe hasło: ${data.temporaryPassword}` : ''}
 
-${data.temporaryPassword ? 'Zalecamy zmianę hasła po pierwszym logowaniu.' : ''}
+${data.temporaryPassword ? 'WAŻNE: Zalecamy zmianę hasła po pierwszym logowaniu.' : ''}
 
 Zaloguj się: ${data.loginUrl}
 
 ---
 GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
   `.trim()
 
   return { subject, html, text }
