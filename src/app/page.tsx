@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { ArrowRight, CheckCircle, Mail, FolderKanban, Clock, Users } from 'lucide-react'
 
 export default function HomePage() {
@@ -9,13 +8,10 @@ export default function HomePage() {
       <header className="container mx-auto px-4 py-6">
         <nav className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Image
+            <img
               src="/logo.png"
               alt="GraphFlow"
-              width={160}
-              height={40}
               className="h-10 w-auto"
-              priority
             />
           </div>
           <Link
@@ -95,11 +91,9 @@ export default function HomePage() {
       <footer className="container mx-auto px-4 py-8 mt-16 border-t border-white/10">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-gray-400 text-sm">
           <div className="flex items-center gap-2">
-            <Image
+            <img
               src="/icon.png"
               alt="GraphFlow"
-              width={24}
-              height={24}
               className="w-6 h-6"
             />
             <span>GraphFlow</span>
