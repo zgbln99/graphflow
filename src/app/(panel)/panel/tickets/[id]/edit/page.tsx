@@ -30,19 +30,28 @@ export default async function EditTicketPage({
     notFound()
   }
 
-  // Pobierz projekty dla dropdown
-  const projects = await prisma.project.findMany({
-    where: isAdmin
-      ? {}
-      : { clientAccountId: session.user.clientAccountId! },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      number: true,
-      title: true,
-      clientAccountId: true,
-    },
-  })
+  // Pobierz projekty i klientów dla dropdown
+  const [projects, clients] = await Promise.all([
+    prisma.project.findMany({
+      where: isAdmin
+        ? {}
+        : { clientAccountId: session.user.clientAccountId! },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        number: true,
+        title: true,
+        clientAccountId: true,
+      },
+    }),
+    isAdmin
+      ? prisma.clientAccount.findMany({
+          where: { isActive: true },
+          orderBy: { name: 'asc' },
+          select: { id: true, name: true },
+        })
+      : [],
+  ])
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -59,7 +68,9 @@ export default async function EditTicketPage({
         <TicketForm
           ticket={ticket}
           projects={projects}
+          clients={clients}
           isAdmin={isAdmin}
+          userClientAccountId={session.user.clientAccountId}
         />
       </div>
     </div>
