@@ -396,3 +396,83 @@ model EmailLog {
   @@index([toEmail])
   @@index([status])
 }
+
+// ============================================
+// AUDIT LOG (HISTORIA ZMIAN)
+// ============================================
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  COMMENT_ADD
+  LOGIN
+  LOGOUT
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  action      AuditAction
+  entityType  String      // "project" | "ticket" | "client" | "user" | "comment"
+  entityId    String
+  entityName  String?     // Czytelna nazwa np. "PRJ-000001: Logo firmy"
+
+  // Szczegóły zmiany
+  changes     String?     // JSON z polami przed/po
+  description String?     // Opis zmiany np. "Zmieniono status z 'Nowe' na 'W trakcie'"
+
+  // Kto wykonał
+  userId      String?
+  userName    String?     // Zapisane statycznie dla historii
+  userEmail   String?
+
+  // Metadata
+  ipAddress   String?
+  userAgent   String?
+
+  createdAt   DateTime    @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================
+// API I WEBHOOKS
+// ============================================
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String    // Opis klucza
+  key         String    @unique
+  secret      String    // Hashed secret
+  isActive    Boolean   @default(true)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  // Uprawnienia
+  permissions String[]  // ["projects:read", "tickets:write", etc.]
+
+  @@index([key])
+}
+
+model Webhook {
+  id          String    @id @default(cuid())
+  name        String
+  url         String    // URL do wysyłania webhooków
+  secret      String    // Secret do podpisywania payloadu
+  isActive    Boolean   @default(true)
+
+  // Eventy do nasłuchiwania
+  events      String[]  // ["project.created", "ticket.status_changed", etc.]
+
+  // Statystyki
+  lastCalledAt    DateTime?
+  lastStatusCode  Int?
+  failCount       Int       @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}

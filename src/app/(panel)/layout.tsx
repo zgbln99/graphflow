@@ -15,7 +15,7 @@ export default async function PanelLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Sidebar user={session.user} />
       <div className="lg:pl-64">
         <Header user={session.user} />

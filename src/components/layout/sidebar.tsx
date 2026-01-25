@@ -14,6 +14,9 @@ import {
   Tags,
   Clock,
   X,
+  Calendar,
+  Download,
+  History,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SessionUser } from '@/lib/auth'
@@ -33,7 +36,10 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     { href: '/panel/projects', label: 'Projekty', icon: Briefcase },
     { href: '/panel/tickets', label: 'Tickety', icon: Ticket },
     { href: '/panel/clients', label: 'Klienci', icon: Building2 },
+    { href: '/panel/calendar', label: 'Kalendarz', icon: Calendar },
     { href: '/panel/inbox', label: 'Skrzynka', icon: Mail },
+    { href: '/panel/export', label: 'Eksport', icon: Download },
+    { href: '/panel/audit', label: 'Historia zmian', icon: History },
     { href: '/panel/settings', label: 'Ustawienia', icon: Settings },
   ]
 
@@ -41,6 +47,7 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     { href: '/panel', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/panel/projects', label: 'Projekty', icon: Briefcase },
     { href: '/panel/tickets', label: 'Moje zgłoszenia', icon: Ticket },
+    { href: '/panel/calendar', label: 'Kalendarz', icon: Calendar },
   ]
 
   const links = isAdmin ? adminLinks : clientLinks
@@ -58,21 +65,21 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transition-transform lg:translate-x-0',
+          'fixed top-0 left-0 z-50 h-full w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-transform lg:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
           <Link href="/panel" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
               <FolderKanban className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold text-gray-900">GraphFlow</span>
+            <span className="text-lg font-bold text-gray-900 dark:text-white">GraphFlow</span>
           </Link>
           <button
             onClick={onClose}
-            className="lg:hidden p-2 text-gray-500 hover:text-gray-700"
+            className="lg:hidden p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
             <X className="w-5 h-5" />
           </button>
@@ -104,8 +111,8 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
 
         {/* Admin extra section */}
         {isAdmin && (
-          <div className="p-4 border-t border-gray-200">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-3">
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3">
               Konfiguracja
             </p>
             <nav className="space-y-1">
@@ -150,18 +157,18 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
         )}
 
         {/* User info */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-primary-700">
+            <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/50 rounded-full flex items-center justify-center">
+              <span className="text-sm font-medium text-primary-700 dark:text-primary-400">
                 {user.name.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                 {user.name}
               </p>
-              <p className="text-xs text-gray-500 truncate">
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                 {isAdmin ? 'Administrator' : 'Klient'}
               </p>
             </div>
