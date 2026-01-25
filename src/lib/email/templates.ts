@@ -1,5 +1,6 @@
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://graphflow.eu'
 const LOGO_URL = `${APP_URL}/logo.png`
+const ICON_URL = `${APP_URL}/icon.png`
 
 // Brand colors
 const COLORS = {
@@ -48,7 +49,8 @@ function getBaseTemplate(content: string): string {
         </div>
 
         <!-- Footer -->
-        <div style="background: ${COLORS.mirage}; padding: 20px 32px; border-radius: 0 0 8px 8px; text-align: center;">
+        <div style="background: ${COLORS.mirage}; padding: 24px 32px; border-radius: 0 0 8px 8px; text-align: center;">
+          <img src="${ICON_URL}" alt="GraphFlow" style="width: 32px; height: 32px; margin-bottom: 12px;" />
           <p style="color: ${COLORS.gullGray}; font-size: 12px; margin: 0 0 8px 0;">
             GraphFlow - System zarządzania projektami graficznymi
           </p>

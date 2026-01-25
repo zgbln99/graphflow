@@ -13,6 +13,7 @@ import {
   Link2,
   Lock,
   DollarSign,
+  User,
 } from 'lucide-react'
 import { formatDate, formatDateTime, formatRelativeTime } from '@/lib/utils'
 import { Timeline } from '@/components/project/timeline'
@@ -44,6 +45,9 @@ export default async function ProjectDetailPage({
             select: { id: true, name: true, email: true },
           },
         },
+      },
+      createdBy: {
+        select: { id: true, name: true, email: true },
       },
       tags: true,
       timelineStages: {
@@ -176,6 +180,17 @@ export default async function ProjectDetailPage({
 
       {/* Info cards */}
       <div className="grid md:grid-cols-3 gap-4">
+        {project.createdBy && (
+          <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+              <User className="w-4 h-4" />
+              <span className="text-sm">Zgłosił</span>
+            </div>
+            <p className="font-medium text-gray-900 dark:text-white">{project.createdBy.name}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{formatDate(project.createdAt)}</p>
+          </div>
+        )}
+
         {project.deadline && (
           <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
             <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
