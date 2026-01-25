@@ -14,6 +14,7 @@ import {
   Lock,
   DollarSign,
   User,
+  Image,
 } from 'lucide-react'
 import { formatDate, formatDateTime, formatRelativeTime } from '@/lib/utils'
 import { Timeline } from '@/components/project/timeline'
@@ -22,6 +23,7 @@ import { NotesList } from '@/components/notes/notes-list'
 import { FileLocationsList } from '@/components/project/file-locations'
 import { ProjectStatusSelect } from '@/components/project/project-status-select'
 import { AcceptProjectButton } from '@/components/project/accept-project-button'
+import { ProjectFiles } from '@/components/projects/project-files'
 
 export default async function ProjectDetailPage({
   params,
@@ -68,6 +70,14 @@ export default async function ProjectDetailPage({
       fileLocations: isAdmin ? {
         orderBy: { createdAt: 'desc' },
       } : undefined,
+      files: {
+        orderBy: { createdAt: 'desc' },
+        include: {
+          uploadedBy: {
+            select: { name: true },
+          },
+        },
+      },
       statusHistory: {
         orderBy: { changedAt: 'desc' },
         take: 10,
@@ -268,6 +278,19 @@ export default async function ProjectDetailPage({
           )}
         </div>
       )}
+
+      {/* Project Files/Preview */}
+      <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Image className="w-5 h-5 text-gray-400" />
+          <h2 className="font-semibold text-gray-900 dark:text-white">Podglądy i pliki</h2>
+        </div>
+        <ProjectFiles
+          projectId={project.id}
+          initialFiles={project.files || []}
+          isAdmin={isAdmin}
+        />
+      </div>
 
       {/* Main content grid */}
       <div className="grid lg:grid-cols-3 gap-6">

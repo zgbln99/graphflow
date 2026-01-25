@@ -54,8 +54,8 @@ export function NotificationDropdown() {
   useEffect(() => {
     fetchNotifications()
 
-    // Poll for new notifications every 60 seconds as fallback
-    const interval = setInterval(fetchNotifications, 60000)
+    // Poll for new notifications every 15 seconds as fallback
+    const interval = setInterval(fetchNotifications, 15000)
 
     return () => clearInterval(interval)
   }, [fetchNotifications])

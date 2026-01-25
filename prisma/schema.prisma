@@ -41,6 +41,7 @@ model User {
   emailMessages     EmailMessage[]
   sessions          Session[]
   notifications     Notification[]
+  uploadedFiles     ProjectFile[]
 
   @@index([clientAccountId])
 }
@@ -150,6 +151,7 @@ model Project {
   comments        Comment[]
   notes           Note[]
   fileLocations   FileLocation[]
+  files           ProjectFile[]
 
   @@index([clientAccountId])
   @@index([statusId])
@@ -338,6 +340,24 @@ model FileLocation {
   createdAt   DateTime          @default(now())
 
   @@index([projectId])
+}
+
+// Pliki uploadowane do projektu (podglądy, załączniki)
+model ProjectFile {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  filename    String    // Oryginalna nazwa pliku
+  storedName  String    // Nazwa pod jaką zapisano na dysku
+  mimeType    String    // np. image/png, image/jpeg
+  size        Int       // Rozmiar w bajtach
+  isPreview   Boolean   @default(false) // Czy to jest główny podgląd projektu
+  uploadedById String?
+  uploadedBy  User?     @relation(fields: [uploadedById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([projectId])
+  @@index([uploadedById])
 }
 
 // ============================================
