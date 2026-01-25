@@ -7,13 +7,12 @@ export default function HomePage() {
       {/* Header */}
       <header className="container mx-auto px-4 py-6">
         <nav className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center">
             <img
               src="/logo.png"
               alt="GraphFlow"
               className="h-10 w-auto"
             />
-            <span className="text-xl font-bold text-white">GraphFlow</span>
           </div>
           <Link
             href="/login"

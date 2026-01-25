@@ -70,14 +70,12 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
       >
         {/* Logo */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-          <Link href="/panel" className="flex items-center gap-2">
+          <Link href="/panel" className="flex items-center">
             <img
               src="/logo.png"
               alt="GraphFlow"
               className="h-8 w-auto"
-              onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
-            <span className="text-lg font-bold text-gray-900 dark:text-white">GraphFlow</span>
           </Link>
           <button
             onClick={onClose}
