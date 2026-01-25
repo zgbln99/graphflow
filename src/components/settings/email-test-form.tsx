@@ -26,14 +26,14 @@ export function EmailTestForm({ type }: EmailTestFormProps) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-medium text-gray-900 text-sm">Test wysyłki</h3>
+      <h3 className="font-medium text-gray-900 dark:text-white text-sm">Test wysyłki</h3>
       <div className="flex gap-2">
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Podaj email do testu..."
-          className="input flex-1"
+          className="input flex-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
         <button
           onClick={handleTest}
@@ -53,8 +53,8 @@ export function EmailTestForm({ type }: EmailTestFormProps) {
         <div
           className={`flex items-center gap-2 p-3 rounded-lg text-sm ${
             result.success
-              ? 'bg-green-50 text-green-700'
-              : 'bg-red-50 text-red-700'
+              ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+              : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400'
           }`}
         >
           {result.success ? (
