@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, Lock, Loader2 } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 import { addCommentAction } from './comment-actions'
+import { useRealtime } from '@/hooks/use-realtime'
 import type { User, UserRole, Comment } from '@prisma/client'
 
 interface CommentsListProps {
@@ -16,16 +17,42 @@ interface CommentsListProps {
 }
 
 export function CommentsList({
-  comments,
+  comments: initialComments,
   ticketId,
   projectId,
   isAdmin,
   currentUserId,
 }: CommentsListProps) {
   const router = useRouter()
+  const [comments, setComments] = useState(initialComments)
   const [isLoading, setIsLoading] = useState(false)
   const [content, setContent] = useState('')
   const [isInternal, setIsInternal] = useState(false)
+
+  // Update comments when props change
+  useEffect(() => {
+    setComments(initialComments)
+  }, [initialComments])
+
+  // Listen for real-time comment updates
+  const handleRealtimeEvent = useCallback((event: { type: string; data?: any }) => {
+    if (event.type === 'COMMENT_ADDED' && event.data) {
+      const { comment: newComment } = event.data
+      // Check if this comment belongs to current project/ticket
+      if (
+        (projectId && newComment.projectId === projectId) ||
+        (ticketId && newComment.ticketId === ticketId)
+      ) {
+        // Only add if not already in list and not from current user (we add it immediately)
+        setComments(prev => {
+          if (prev.some(c => c.id === newComment.id)) return prev
+          return [newComment, ...prev]
+        })
+      }
+    }
+  }, [projectId, ticketId])
+
+  useRealtime(handleRealtimeEvent)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

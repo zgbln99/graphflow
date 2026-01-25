@@ -113,10 +113,20 @@ export async function addCommentAction(formData: FormData) {
 
         if (usersToNotify.length > 0) {
           notifyUsers(usersToNotify, {
-            type: 'comment_added',
-            ticketId: ticket.id,
-            ticketNumber: ticket.number,
-            authorName: comment.author.name,
+            type: 'COMMENT_ADDED',
+            comment: {
+              id: comment.id,
+              content: comment.content,
+              visibility: comment.visibility,
+              createdAt: comment.createdAt,
+              projectId: null,
+              ticketId: ticket.id,
+              author: {
+                id: comment.author.id,
+                name: comment.author.name,
+                role: comment.author.role,
+              },
+            },
           })
         }
       }
@@ -172,10 +182,20 @@ export async function addCommentAction(formData: FormData) {
 
         if (usersToNotify.length > 0) {
           notifyUsers(usersToNotify, {
-            type: 'comment_added',
-            projectId: project.id,
-            projectNumber: project.number,
-            authorName: comment.author.name,
+            type: 'COMMENT_ADDED',
+            comment: {
+              id: comment.id,
+              content: comment.content,
+              visibility: comment.visibility,
+              createdAt: comment.createdAt,
+              projectId: project.id,
+              ticketId: null,
+              author: {
+                id: comment.author.id,
+                name: comment.author.name,
+                role: comment.author.role,
+              },
+            },
           })
         }
       }
