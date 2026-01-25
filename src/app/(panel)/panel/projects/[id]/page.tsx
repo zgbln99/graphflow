@@ -14,7 +14,7 @@ import {
   Lock,
   DollarSign,
   User,
-  Image,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { formatDate, formatDateTime, formatRelativeTime } from '@/lib/utils'
 import { Timeline } from '@/components/project/timeline'
@@ -282,7 +282,7 @@ export default async function ProjectDetailPage({
       {/* Project Files/Preview */}
       <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
         <div className="flex items-center gap-2 mb-4">
-          <Image className="w-5 h-5 text-gray-400" />
+          <ImageIcon className="w-5 h-5 text-gray-400" />
           <h2 className="font-semibold text-gray-900 dark:text-white">Podglądy i pliki</h2>
         </div>
         <ProjectFiles

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Upload, Trash2, Image, Loader2, Download, Star } from 'lucide-react'
+import { Upload, Trash2, Image as ImageIcon, Loader2, Download, Star } from 'lucide-react'
 
 interface ProjectFile {
   id: string
@@ -142,9 +142,9 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
         ) : (
           <div className="flex items-center justify-center h-48 bg-gray-50 dark:bg-gray-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
             <div className="text-center text-gray-500 dark:text-gray-400">
-              <Image className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>Brak podglądu</p>
-              {isAdmin && <p className="text-sm">Kliknij "Dodaj" aby wgrać</p>}
+              {isAdmin && <p className="text-sm">Kliknij &quot;Dodaj&quot; aby wgrać</p>}
             </div>
           </div>
         )}

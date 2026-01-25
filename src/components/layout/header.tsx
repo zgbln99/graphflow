@@ -12,11 +12,11 @@ import { NotificationDropdown } from '@/components/notifications/notification-dr
 
 interface HeaderProps {
   user: SessionUser
+  onMenuClick?: () => void
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, onMenuClick }: HeaderProps) {
   const router = useRouter()
-  const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
   async function handleLogout() {
@@ -30,7 +30,7 @@ export function Header({ user }: HeaderProps) {
       <div className="flex items-center justify-between h-full px-4 lg:px-6">
         {/* Mobile menu button */}
         <button
-          onClick={() => setShowMobileMenu(!showMobileMenu)}
+          onClick={onMenuClick}
           className="lg:hidden p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
         >
           <Menu className="w-6 h-6" />

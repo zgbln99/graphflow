@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
-import { Sidebar } from '@/components/layout/sidebar'
-import { Header } from '@/components/layout/header'
+import { PanelLayoutClient } from '@/components/layout/panel-layout-client'
 
 export default async function PanelLayout({
   children,
@@ -15,14 +14,8 @@ export default async function PanelLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Sidebar user={session.user} />
-      <div className="lg:pl-64">
-        <Header user={session.user} />
-        <main className="p-6">
-          {children}
-        </main>
-      </div>
-    </div>
+    <PanelLayoutClient user={session.user}>
+      {children}
+    </PanelLayoutClient>
   )
 }
