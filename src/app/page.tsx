@@ -12,7 +12,9 @@ export default function HomePage() {
               src="/logo.png"
               alt="GraphFlow"
               className="h-10 w-auto"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
+            <span className="text-xl font-bold text-white">GraphFlow</span>
           </div>
           <Link
             href="/login"

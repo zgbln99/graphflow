@@ -75,7 +75,9 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               src="/logo.png"
               alt="GraphFlow"
               className="h-8 w-auto"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
+            <span className="text-lg font-bold text-gray-900 dark:text-white">GraphFlow</span>
           </Link>
           <button
             onClick={onClose}
