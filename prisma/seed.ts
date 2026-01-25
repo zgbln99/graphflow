@@ -366,10 +366,12 @@ async function main() {
   })
 
   await prisma.comment.create({
-    data: 'Klient lubi ciemniejsze odcienie. Sprawdzić paletę z poprzedniego projektu.',
-    visibility: 'INTERNAL',
-    authorId: admin.id,
-    ticketId: ticket1.id,
+    data: {
+      content: 'Klient lubi ciemniejsze odcienie. Sprawdzić paletę z poprzedniego projektu.',
+      visibility: 'INTERNAL',
+      authorId: admin.id,
+      ticketId: ticket1.id,
+    },
   })
 
   console.log(`   ✓ Utworzono przykładowe komentarze\n`)
