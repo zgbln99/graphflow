@@ -15,6 +15,7 @@ import {
   ChevronRight
 } from 'lucide-react'
 import Link from 'next/link'
+import { AuditFilters } from '@/components/audit/audit-filters'
 
 const ITEMS_PER_PAGE = 50
 
@@ -103,58 +104,7 @@ export default async function AuditLogPage({
       </div>
 
       {/* Filters */}
-      <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
-        <div className="flex flex-wrap gap-4">
-          <div>
-            <label className="label dark:text-gray-300">Typ obiektu</label>
-            <select
-              defaultValue={entityType || ''}
-              className="input dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[150px]"
-              onChange={(e) => {
-                const params = new URLSearchParams(window.location.search)
-                if (e.target.value) {
-                  params.set('type', e.target.value)
-                } else {
-                  params.delete('type')
-                }
-                params.delete('page')
-                window.location.search = params.toString()
-              }}
-            >
-              <option value="">Wszystkie</option>
-              <option value="project">Projekty</option>
-              <option value="ticket">Tickety</option>
-              <option value="client">Klienci</option>
-              <option value="user">Użytkownicy</option>
-              <option value="comment">Komentarze</option>
-            </select>
-          </div>
-          <div>
-            <label className="label dark:text-gray-300">Akcja</label>
-            <select
-              defaultValue={action || ''}
-              className="input dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[150px]"
-              onChange={(e) => {
-                const params = new URLSearchParams(window.location.search)
-                if (e.target.value) {
-                  params.set('action', e.target.value)
-                } else {
-                  params.delete('action')
-                }
-                params.delete('page')
-                window.location.search = params.toString()
-              }}
-            >
-              <option value="">Wszystkie</option>
-              <option value="CREATE">Utworzenie</option>
-              <option value="UPDATE">Edycja</option>
-              <option value="DELETE">Usunięcie</option>
-              <option value="STATUS_CHANGE">Zmiana statusu</option>
-              <option value="COMMENT_ADD">Komentarz</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      <AuditFilters />
 
       {/* Logs table */}
       <div className="card dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
