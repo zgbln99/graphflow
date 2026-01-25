@@ -53,8 +53,8 @@ export default async function InboxPage({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Skrzynka</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Skrzynka</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">
           Przychodzące wiadomości email i ich powiązania z ticketami
         </p>
       </div>
@@ -91,10 +91,10 @@ export default async function InboxPage({
 
       {/* Emails list */}
       {emails.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Brak wiadomości</h3>
-          <p className="text-gray-500">
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-12 text-center">
+          <Mail className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Brak wiadomości</h3>
+          <p className="text-gray-500 dark:text-gray-400">
             {filter === 'unmatched'
               ? 'Wszystkie wiadomości zostały przypisane do ticketów.'
               : 'Brak wiadomości do wyświetlenia.'}
@@ -103,13 +103,13 @@ export default async function InboxPage({
       ) : (
         <div className="space-y-4">
           {emails.map((email) => (
-            <div key={email.id} className="card p-4">
+            <div key={email.id} className="card dark:bg-gray-800 dark:border-gray-700 p-4">
               <div className="flex items-start gap-4">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                     email.isMatched
-                      ? 'bg-green-100 text-green-600'
-                      : 'bg-yellow-100 text-yellow-600'
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                      : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'
                   }`}
                 >
                   <Mail className="w-5 h-5" />
@@ -117,11 +117,11 @@ export default async function InboxPage({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-gray-900 dark:text-white">
                       {email.fromName || email.fromEmail}
                     </span>
                     {email.fromName && (
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
                         &lt;{email.fromEmail}&gt;
                       </span>
                     )}
@@ -130,10 +130,10 @@ export default async function InboxPage({
                     </span>
                   </div>
 
-                  <p className="font-medium text-gray-800 mb-1">{email.subject}</p>
+                  <p className="font-medium text-gray-800 dark:text-gray-200 mb-1">{email.subject}</p>
 
                   {email.bodyText && (
-                    <p className="text-sm text-gray-600 line-clamp-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                       {email.bodyText.slice(0, 200)}...
                     </p>
                   )}
@@ -143,7 +143,7 @@ export default async function InboxPage({
                     {email.isMatched && email.ticket ? (
                       <Link
                         href={`/panel/tickets/${email.ticket.id}`}
-                        className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
+                        className="inline-flex items-center gap-1 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
                       >
                         <LinkIcon className="w-4 h-4" />
                         Przypisano do: {email.ticket.number} - {email.ticket.title}
@@ -153,14 +153,14 @@ export default async function InboxPage({
                     )}
 
                     {email.matchedBy && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         Dopasowano przez: {email.matchedBy}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="text-right text-xs text-gray-500">
+                <div className="text-right text-xs text-gray-500 dark:text-gray-400">
                   {formatDateTime(email.receivedAt)}
                 </div>
               </div>

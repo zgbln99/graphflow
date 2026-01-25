@@ -25,13 +25,13 @@ export default async function TagsSettingsPage() {
         <div>
           <Link
             href="/panel/settings"
-            className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 mb-2"
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center gap-1 mb-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Ustawienia
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Tagi projektów</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tagi projektów</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             Zarządzaj tagami do kategoryzacji projektów
           </p>
         </div>
@@ -41,26 +41,26 @@ export default async function TagsSettingsPage() {
         </Link>
       </div>
 
-      <div className="card">
+      <div className="card dark:bg-gray-800 dark:border-gray-700">
         {tags.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
             Brak zdefiniowanych tagów
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {tags.map((tag) => (
               <Link
                 key={tag.id}
                 href={`/panel/settings/tags/${tag.id}`}
-                className="flex items-center gap-4 p-4 hover:bg-gray-50"
+                className="flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50"
               >
                 <div
                   className="w-4 h-4 rounded-full"
                   style={{ backgroundColor: tag.color }}
                 />
                 <div className="flex-1">
-                  <span className="font-medium text-gray-900">{tag.name}</span>
-                  <p className="text-sm text-gray-500">
+                  <span className="font-medium text-gray-900 dark:text-white">{tag.name}</span>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {tag._count.projects} projektów
                   </p>
                 </div>

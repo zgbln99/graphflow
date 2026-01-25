@@ -31,25 +31,25 @@ export default async function NotificationSettingsPage() {
       <div>
         <Link
           href="/panel/settings"
-          className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 mb-2"
+          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center gap-1 mb-2"
         >
           <ArrowLeft className="w-4 h-4" />
           Ustawienia
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Powiadomienia</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Powiadomienia</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">
           Konfiguracja powiadomień email dla klientów
         </p>
       </div>
 
-      <div className="card p-6">
+      <div className="card dark:bg-gray-800 dark:border-gray-700 p-6">
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-primary-100 rounded-lg">
-            <Bell className="w-5 h-5 text-primary-600" />
+          <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
+            <Bell className="w-5 h-5 text-primary-600 dark:text-primary-400" />
           </div>
           <div>
-            <h2 className="font-semibold text-gray-900">Ustawienia powiadomień</h2>
-            <p className="text-sm text-gray-500">Które powiadomienia wysyłać do klientów</p>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Ustawienia powiadomień</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Które powiadomienia wysyłać do klientów</p>
           </div>
         </div>
 

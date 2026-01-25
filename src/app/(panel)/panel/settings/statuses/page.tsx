@@ -25,13 +25,13 @@ export default async function StatusesSettingsPage() {
         <div>
           <Link
             href="/panel/settings"
-            className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 mb-2"
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center gap-1 mb-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Ustawienia
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Statusy projektów</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Statusy projektów</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             Zarządzaj statusami dostępnymi dla projektów
           </p>
         </div>
@@ -41,40 +41,40 @@ export default async function StatusesSettingsPage() {
         </Link>
       </div>
 
-      <div className="card">
+      <div className="card dark:bg-gray-800 dark:border-gray-700">
         {statuses.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
             Brak zdefiniowanych statusów
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {statuses.map((status) => (
               <Link
                 key={status.id}
                 href={`/panel/settings/statuses/${status.id}`}
-                className="flex items-center gap-4 p-4 hover:bg-gray-50"
+                className="flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50"
               >
-                <GripVertical className="w-5 h-5 text-gray-300" />
+                <GripVertical className="w-5 h-5 text-gray-300 dark:text-gray-600" />
                 <div
                   className="w-4 h-4 rounded-full"
                   style={{ backgroundColor: status.color }}
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">{status.name}</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{status.name}</span>
                     {status.isDefault && (
-                      <span className="badge bg-yellow-100 text-yellow-700 flex items-center gap-1">
+                      <span className="badge bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
                         <Star className="w-3 h-3" />
                         Domyślny
                       </span>
                     )}
                     {!status.isActive && (
-                      <span className="badge bg-gray-100 text-gray-700">
+                      <span className="badge bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                         Nieaktywny
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {status._count.projects} projektów
                   </p>
                 </div>

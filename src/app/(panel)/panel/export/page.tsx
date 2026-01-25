@@ -45,7 +45,7 @@ export default async function ExportPage() {
         />
       </div>
 
-      <div className="card p-6">
+      <div className="card dark:bg-gray-800 dark:border-gray-700 p-6">
         <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Eksport niestandardowy</h2>
         <ExportForm />
       </div>
@@ -68,7 +68,7 @@ function ExportCard({
     <form action={`/api/export/${type}`} method="GET">
       <button
         type="submit"
-        className="card p-6 w-full text-left hover:border-primary-300 hover:shadow-lg transition-all group"
+        className="card dark:bg-gray-800 dark:border-gray-700 p-6 w-full text-left hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-lg transition-all group"
       >
         <div className="flex items-start gap-4">
           <div className="p-3 bg-primary-100 dark:bg-primary-900 rounded-lg text-primary-600 dark:text-primary-400 group-hover:scale-110 transition-transform">

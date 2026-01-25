@@ -95,17 +95,17 @@ export default async function TicketDetailPage({
         <div>
           <Link
             href="/panel/tickets"
-            className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 mb-2"
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center gap-1 mb-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Tickety
           </Link>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-gray-900">{ticket.title}</h1>
-            <span className="font-mono text-sm text-gray-500">{ticket.number}</span>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{ticket.title}</h1>
+            <span className="font-mono text-sm text-gray-500 dark:text-gray-400">{ticket.number}</span>
           </div>
           {isAdmin && (
-            <p className="text-gray-600 mt-1">{ticket.clientAccount.name}</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">{ticket.clientAccount.name}</p>
           )}
         </div>
 
@@ -137,24 +137,24 @@ export default async function TicketDetailPage({
 
       {/* Info cards */}
       <div className="grid md:grid-cols-4 gap-4">
-        <div className="card p-4">
-          <div className="flex items-center gap-2 text-gray-500 mb-1">
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
             <User className="w-4 h-4" />
             <span className="text-sm">Zgłosił</span>
           </div>
-          <p className="font-medium text-gray-900">{ticket.createdBy.name}</p>
-          <p className="text-sm text-gray-500">{formatDate(ticket.createdAt)}</p>
+          <p className="font-medium text-gray-900 dark:text-white">{ticket.createdBy.name}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{formatDate(ticket.createdAt)}</p>
         </div>
 
         {ticket.deadline && (
-          <div className="card p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
+          <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
               <Calendar className="w-4 h-4" />
               <span className="text-sm">Deadline</span>
             </div>
-            <p className="font-medium text-gray-900">{formatDate(ticket.deadline)}</p>
+            <p className="font-medium text-gray-900 dark:text-white">{formatDate(ticket.deadline)}</p>
             {ticket.deadline < new Date() && ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED' && (
-              <p className="text-sm text-red-600 flex items-center gap-1 mt-1">
+              <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1 mt-1">
                 <AlertTriangle className="w-3 h-3" />
                 Po terminie!
               </p>
@@ -163,27 +163,27 @@ export default async function TicketDetailPage({
         )}
 
         {ticket.project && (
-          <div className="card p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
+          <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
               <FolderOpen className="w-4 h-4" />
               <span className="text-sm">Projekt</span>
             </div>
             <Link
               href={`/panel/projects/${ticket.project.id}`}
-              className="font-medium text-primary-600 hover:text-primary-700"
+              className="font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700"
             >
               {ticket.project.number}
             </Link>
-            <p className="text-sm text-gray-500 truncate">{ticket.project.title}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{ticket.project.title}</p>
           </div>
         )}
 
-        <div className="card p-4">
-          <div className="flex items-center gap-2 text-gray-500 mb-1">
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
             <Clock className="w-4 h-4" />
             <span className="text-sm">Ostatnia aktualizacja</span>
           </div>
-          <p className="font-medium text-gray-900">
+          <p className="font-medium text-gray-900 dark:text-white">
             {formatRelativeTime(ticket.updatedAt)}
           </p>
         </div>
@@ -191,9 +191,9 @@ export default async function TicketDetailPage({
 
       {/* Description */}
       {ticket.description && (
-        <div className="card p-4">
-          <h2 className="font-semibold text-gray-900 mb-2">Opis</h2>
-          <p className="text-gray-600 whitespace-pre-wrap">{ticket.description}</p>
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Opis</h2>
+          <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{ticket.description}</p>
         </div>
       )}
 
@@ -202,11 +202,11 @@ export default async function TicketDetailPage({
         {/* Left column - Comments */}
         <div className="lg:col-span-2 space-y-6">
           {/* Comments */}
-          <div className="card">
-            <div className="p-4 border-b border-gray-200 flex items-center gap-2">
+          <div className="card dark:bg-gray-800 dark:border-gray-700">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-gray-400" />
-              <h2 className="font-semibold text-gray-900">Komentarze</h2>
-              <span className="text-sm text-gray-500">
+              <h2 className="font-semibold text-gray-900 dark:text-white">Komentarze</h2>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
                 ({ticket.comments.length})
               </span>
             </div>
@@ -224,23 +224,23 @@ export default async function TicketDetailPage({
           <div className="space-y-6">
             {/* Email thread */}
             {ticket.emailMessages && ticket.emailMessages.length > 0 && (
-              <div className="card">
-                <div className="p-4 border-b border-gray-200 flex items-center gap-2">
+              <div className="card dark:bg-gray-800 dark:border-gray-700">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
                   <Mail className="w-5 h-5 text-gray-400" />
-                  <h2 className="font-semibold text-gray-900">Historia maili</h2>
+                  <h2 className="font-semibold text-gray-900 dark:text-white">Historia maili</h2>
                 </div>
-                <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-64 overflow-y-auto">
                   {ticket.emailMessages.map((email) => (
                     <div key={email.id} className="p-3 text-sm">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-gray-900 truncate">
+                        <span className="font-medium text-gray-900 dark:text-white truncate">
                           {email.fromName || email.fromEmail}
                         </span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
                           {formatRelativeTime(email.receivedAt)}
                         </span>
                       </div>
-                      <p className="text-gray-600 truncate">{email.subject}</p>
+                      <p className="text-gray-600 dark:text-gray-400 truncate">{email.subject}</p>
                     </div>
                   ))}
                 </div>
@@ -248,17 +248,17 @@ export default async function TicketDetailPage({
             )}
 
             {/* Private notes */}
-            <div className="card">
-              <div className="p-4 border-b border-gray-200 flex items-center gap-2">
+            <div className="card dark:bg-gray-800 dark:border-gray-700">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
                 <StickyNote className="w-5 h-5 text-gray-400" />
-                <h2 className="font-semibold text-gray-900">Notatki prywatne</h2>
+                <h2 className="font-semibold text-gray-900 dark:text-white">Notatki prywatne</h2>
               </div>
               <NotesList notes={ticket.notes || []} ticketId={ticket.id} />
             </div>
 
             {/* Quick actions */}
-            <div className="card p-4">
-              <h2 className="font-semibold text-gray-900 mb-3">Szybkie akcje</h2>
+            <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+              <h2 className="font-semibold text-gray-900 dark:text-white mb-3">Szybkie akcje</h2>
               <div className="space-y-2">
                 {!ticket.projectId && (
                   <Link

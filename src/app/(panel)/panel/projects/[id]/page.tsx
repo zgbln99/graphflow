@@ -100,17 +100,17 @@ export default async function ProjectDetailPage({
         <div>
           <Link
             href="/panel/projects"
-            className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 mb-2"
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center gap-1 mb-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Projekty
           </Link>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
-            <span className="font-mono text-sm text-gray-500">{project.number}</span>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{project.title}</h1>
+            <span className="font-mono text-sm text-gray-500 dark:text-gray-400">{project.number}</span>
           </div>
           {isAdmin && (
-            <p className="text-gray-600 mt-1">{project.clientAccount.name}</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">{project.clientAccount.name}</p>
           )}
         </div>
 
@@ -165,41 +165,41 @@ export default async function ProjectDetailPage({
       {/* Info cards */}
       <div className="grid md:grid-cols-3 gap-4">
         {project.deadline && (
-          <div className="card p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
+          <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
               <Calendar className="w-4 h-4" />
               <span className="text-sm">Deadline</span>
             </div>
-            <p className="font-medium text-gray-900">
+            <p className="font-medium text-gray-900 dark:text-white">
               {formatDate(project.deadline)}
             </p>
           </div>
         )}
 
-        <div className="card p-4">
-          <div className="flex items-center gap-2 text-gray-500 mb-1">
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
             <Clock className="w-4 h-4" />
             <span className="text-sm">Ostatnia aktualizacja</span>
           </div>
-          <p className="font-medium text-gray-900">
+          <p className="font-medium text-gray-900 dark:text-white">
             {formatRelativeTime(project.updatedAt)}
           </p>
         </div>
 
-        <div className="card p-4">
-          <div className="flex items-center gap-2 text-gray-500 mb-1">
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
             <Ticket className="w-4 h-4" />
             <span className="text-sm">Tickety</span>
           </div>
-          <p className="font-medium text-gray-900">{project.tickets.length}</p>
+          <p className="font-medium text-gray-900 dark:text-white">{project.tickets.length}</p>
         </div>
       </div>
 
       {/* Description */}
       {project.description && (
-        <div className="card p-4">
-          <h2 className="font-semibold text-gray-900 mb-2">Opis</h2>
-          <p className="text-gray-600 whitespace-pre-wrap">{project.description}</p>
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Opis</h2>
+          <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{project.description}</p>
         </div>
       )}
 
@@ -208,9 +208,9 @@ export default async function ProjectDetailPage({
         {/* Left column - Timeline */}
         <div className="lg:col-span-2 space-y-6">
           {/* Timeline */}
-          <div className="card">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900">Timeline</h2>
+          <div className="card dark:bg-gray-800 dark:border-gray-700">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900 dark:text-white">Timeline</h2>
               {isAdmin && (
                 <Link
                   href={`/panel/projects/${project.id}/timeline`}
@@ -226,9 +226,9 @@ export default async function ProjectDetailPage({
           </div>
 
           {/* Tickets */}
-          <div className="card">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900">Powiązane tickety</h2>
+          <div className="card dark:bg-gray-800 dark:border-gray-700">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900 dark:text-white">Powiązane tickety</h2>
               <Link
                 href={`/panel/tickets/new?projectId=${project.id}`}
                 className="text-sm link flex items-center gap-1"
@@ -238,27 +238,27 @@ export default async function ProjectDetailPage({
               </Link>
             </div>
             {project.tickets.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                 Brak powiązanych ticketów
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {project.tickets.map((ticket) => (
                   <Link
                     key={ticket.id}
                     href={`/panel/tickets/${ticket.id}`}
-                    className="block p-4 hover:bg-gray-50"
+                    className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-xs font-mono text-gray-500 mr-2">
+                        <span className="text-xs font-mono text-gray-500 dark:text-gray-400 mr-2">
                           {ticket.number}
                         </span>
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-gray-900 dark:text-white">
                           {ticket.title}
                         </span>
                       </div>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         {formatRelativeTime(ticket.createdAt)}
                       </span>
                     </div>
@@ -277,10 +277,10 @@ export default async function ProjectDetailPage({
           </div>
 
           {/* Comments */}
-          <div className="card">
-            <div className="p-4 border-b border-gray-200 flex items-center gap-2">
+          <div className="card dark:bg-gray-800 dark:border-gray-700">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-gray-400" />
-              <h2 className="font-semibold text-gray-900">Komentarze</h2>
+              <h2 className="font-semibold text-gray-900 dark:text-white">Komentarze</h2>
             </div>
             <CommentsList
               comments={project.comments}
@@ -295,10 +295,10 @@ export default async function ProjectDetailPage({
         {isAdmin && (
           <div className="space-y-6">
             {/* File locations */}
-            <div className="card">
-              <div className="p-4 border-b border-gray-200 flex items-center gap-2">
+            <div className="card dark:bg-gray-800 dark:border-gray-700">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
                 <Folder className="w-5 h-5 text-gray-400" />
-                <h2 className="font-semibold text-gray-900">Lokalizacje plików</h2>
+                <h2 className="font-semibold text-gray-900 dark:text-white">Lokalizacje plików</h2>
               </div>
               <FileLocationsList
                 projectId={project.id}
@@ -310,10 +310,10 @@ export default async function ProjectDetailPage({
             </div>
 
             {/* Private notes */}
-            <div className="card">
-              <div className="p-4 border-b border-gray-200 flex items-center gap-2">
+            <div className="card dark:bg-gray-800 dark:border-gray-700">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
                 <StickyNote className="w-5 h-5 text-gray-400" />
-                <h2 className="font-semibold text-gray-900">Notatki prywatne</h2>
+                <h2 className="font-semibold text-gray-900 dark:text-white">Notatki prywatne</h2>
               </div>
               <NotesList
                 notes={project.notes || []}
@@ -322,27 +322,27 @@ export default async function ProjectDetailPage({
             </div>
 
             {/* Status history */}
-            <div className="card">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="font-semibold text-gray-900">Historia statusów</h2>
+            <div className="card dark:bg-gray-800 dark:border-gray-700">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold text-gray-900 dark:text-white">Historia statusów</h2>
               </div>
               {project.statusHistory.length === 0 ? (
-                <div className="p-4 text-center text-gray-500 text-sm">
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
                   Brak historii
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-gray-100 dark:divide-gray-700">
                   {project.statusHistory.map((history) => (
                     <div key={history.id} className="p-3 text-sm">
-                      <p className="text-gray-900">
+                      <p className="text-gray-900 dark:text-white">
                         {history.fromStatus && (
-                          <span className="text-gray-500">
+                          <span className="text-gray-500 dark:text-gray-400">
                             {history.fromStatus} →{' '}
                           </span>
                         )}
                         <span className="font-medium">{history.toStatus}</span>
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
                         {formatDateTime(history.changedAt)}
                       </p>
                     </div>

@@ -64,8 +64,8 @@ export default async function ProjectsPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Projekty</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projekty</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             {isAdmin ? 'Zarządzaj wszystkimi projektami' : 'Twoje projekty'}
           </p>
         </div>
@@ -78,7 +78,7 @@ export default async function ProjectsPage({
       </div>
 
       {/* Filters */}
-      <div className="card p-4">
+      <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
         <form className="flex flex-wrap gap-4">
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
@@ -88,7 +88,7 @@ export default async function ProjectsPage({
                 name="search"
                 defaultValue={params.search}
                 placeholder="Szukaj projektu..."
-                className="input pl-10"
+                className="input pl-10 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               />
             </div>
           </div>
@@ -96,7 +96,7 @@ export default async function ProjectsPage({
           <select
             name="status"
             defaultValue={params.status || ''}
-            className="input w-auto"
+            className="input w-auto dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           >
             <option value="">Wszystkie statusy</option>
             {statuses.map((status) => (
@@ -110,7 +110,7 @@ export default async function ProjectsPage({
             <select
               name="client"
               defaultValue={params.client || ''}
-              className="input w-auto"
+              className="input w-auto dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Wszyscy klienci</option>
               {clients.map((client) => (
@@ -130,10 +130,10 @@ export default async function ProjectsPage({
 
       {/* Projects list */}
       {projects.length === 0 ? (
-        <div className="card p-12 text-center">
-          <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Brak projektów</h3>
-          <p className="text-gray-500 mb-4">
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-12 text-center">
+          <FolderOpen className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Brak projektów</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">
             {params.search || params.status
               ? 'Nie znaleziono projektów spełniających kryteria wyszukiwania.'
               : 'Nie masz jeszcze żadnych projektów.'}
@@ -146,9 +146,9 @@ export default async function ProjectsPage({
           )}
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
               <tr>
                 <th className="table-header">Numer</th>
                 <th className="table-header">Tytuł</th>
@@ -159,13 +159,13 @@ export default async function ProjectsPage({
                 <th className="table-header">Aktualizacja</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {projects.map((project) => (
-                <tr key={project.id} className="hover:bg-gray-50">
+                <tr key={project.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="table-cell">
                     <Link
                       href={`/panel/projects/${project.id}`}
-                      className="font-mono text-sm text-primary-600 hover:text-primary-700"
+                      className="font-mono text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700"
                     >
                       {project.number}
                     </Link>
@@ -173,7 +173,7 @@ export default async function ProjectsPage({
                   <td className="table-cell">
                     <Link
                       href={`/panel/projects/${project.id}`}
-                      className="font-medium text-gray-900 hover:text-primary-600"
+                      className="font-medium text-gray-900 dark:text-white hover:text-primary-600"
                     >
                       {project.title}
                     </Link>
@@ -195,7 +195,7 @@ export default async function ProjectsPage({
                     )}
                   </td>
                   {isAdmin && (
-                    <td className="table-cell text-gray-600">
+                    <td className="table-cell text-gray-600 dark:text-gray-400">
                       {project.clientAccount.name}
                     </td>
                   )}
@@ -210,13 +210,13 @@ export default async function ProjectsPage({
                       {project.status.name}
                     </span>
                   </td>
-                  <td className="table-cell text-gray-600">
+                  <td className="table-cell text-gray-600 dark:text-gray-400">
                     {project._count.tickets}
                   </td>
-                  <td className="table-cell text-gray-600">
+                  <td className="table-cell text-gray-600 dark:text-gray-400">
                     {formatDate(project.deadline)}
                   </td>
-                  <td className="table-cell text-gray-500 text-sm">
+                  <td className="table-cell text-gray-500 dark:text-gray-400 text-sm">
                     {formatDate(project.updatedAt)}
                   </td>
                 </tr>
