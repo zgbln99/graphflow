@@ -505,3 +505,22 @@ export async function updateProjectStatusAction(projectId: string, statusId: str
     return { error: 'Nie udało się zmienić statusu' }
   }
 }
+
+export async function deleteProjectAction(projectId: string) {
+  const session = await getSession()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Brak uprawnień' }
+  }
+
+  try {
+    // Usuń projekt (cascaded relations will be deleted automatically)
+    await prisma.project.delete({
+      where: { id: projectId },
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting project:', error)
+    return { error: 'Nie udało się usunąć projektu' }
+  }
+}

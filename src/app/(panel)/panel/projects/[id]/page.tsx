@@ -25,6 +25,7 @@ import { ProjectStatusSelect } from '@/components/project/project-status-select'
 import { AcceptProjectButton } from '@/components/project/accept-project-button'
 import { ProjectFiles } from '@/components/projects/project-files'
 import { LiveStatusBadge, ProjectDetailClient } from '@/components/project/project-detail-client'
+import { DeleteProjectButton } from '@/components/projects/delete-project-button'
 
 export default async function ProjectDetailPage({
   params,
@@ -145,6 +146,7 @@ export default async function ProjectDetailPage({
                 <Edit className="w-4 h-4 mr-2" />
                 Edytuj
               </Link>
+              <DeleteProjectButton projectId={project.id} projectTitle={project.title} />
             </>
           ) : (
             <LiveStatusBadge

@@ -14,6 +14,7 @@ import {
   MapPin,
 } from 'lucide-react'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
+import { DeleteClientButton } from '@/components/clients/delete-client-button'
 
 export default async function ClientDetailPage({
   params,
@@ -80,10 +81,13 @@ export default async function ClientDetailPage({
           </div>
         </div>
 
-        <Link href={`/panel/clients/${client.id}/edit`} className="btn-secondary">
-          <Edit className="w-4 h-4 mr-2" />
-          Edytuj
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href={`/panel/clients/${client.id}/edit`} className="btn-secondary">
+            <Edit className="w-4 h-4 mr-2" />
+            Edytuj
+          </Link>
+          <DeleteClientButton clientId={client.id} clientName={client.name} />
+        </div>
       </div>
 
       {/* Contact info */}

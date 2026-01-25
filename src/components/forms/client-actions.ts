@@ -103,3 +103,45 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     return { error: 'Nie udało się zaktualizować klienta' }
   }
 }
+
+export async function deleteClientAction(clientId: string) {
+  const session = await getSession()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Brak uprawnień' }
+  }
+
+  try {
+    // Sprawdź czy klient ma projekty
+    const projectCount = await prisma.project.count({
+      where: { clientAccountId: clientId },
+    })
+
+    if (projectCount > 0) {
+      return { error: `Nie można usunąć klienta - ma ${projectCount} projektów. Najpierw usuń projekty.` }
+    }
+
+    // Sprawdź czy klient ma tickety
+    const ticketCount = await prisma.ticket.count({
+      where: { clientAccountId: clientId },
+    })
+
+    if (ticketCount > 0) {
+      return { error: `Nie można usunąć klienta - ma ${ticketCount} ticketów. Najpierw usuń tickety.` }
+    }
+
+    // Usuń użytkowników klienta
+    await prisma.user.deleteMany({
+      where: { clientAccountId: clientId },
+    })
+
+    // Usuń klienta
+    await prisma.clientAccount.delete({
+      where: { id: clientId },
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting client:', error)
+    return { error: 'Nie udało się usunąć klienta' }
+  }
+}
