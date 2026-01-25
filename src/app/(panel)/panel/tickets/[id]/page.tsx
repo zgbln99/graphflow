@@ -26,6 +26,7 @@ import { CommentsList } from '@/components/comments/comments-list'
 import { NotesList } from '@/components/notes/notes-list'
 import { TicketStatusSelect } from '@/components/ticket/ticket-status-select'
 import { TicketPrioritySelect } from '@/components/ticket/ticket-priority-select'
+import { DeleteTicketButton } from '@/components/tickets/delete-ticket-button'
 
 export default async function TicketDetailPage({
   params,
@@ -119,6 +120,7 @@ export default async function TicketDetailPage({
               ticketId={ticket.id}
               currentPriority={ticket.priority}
             />
+            <DeleteTicketButton ticketId={ticket.id} ticketTitle={ticket.title} />
           </div>
         )}
       </div>

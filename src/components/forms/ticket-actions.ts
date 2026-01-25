@@ -189,3 +189,22 @@ export async function updateTicketPriorityAction(ticketId: string, priority: str
     return { error: 'Nie udało się zmienić priorytetu' }
   }
 }
+
+export async function deleteTicketAction(ticketId: string) {
+  const session = await getSession()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Brak uprawnień' }
+  }
+
+  try {
+    // Usuń ticket (cascaded relations will be deleted automatically)
+    await prisma.ticket.delete({
+      where: { id: ticketId },
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting ticket:', error)
+    return { error: 'Nie udało się usunąć ticketa' }
+  }
+}
