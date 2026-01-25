@@ -487,11 +487,15 @@ export async function updateProjectStatusAction(projectId: string, statusId: str
       })
 
       notifyUsers(clientUserIds, {
-        type: 'status_changed',
+        type: 'PROJECT_STATUS_CHANGED',
         projectId,
         projectNumber: currentProject.number,
         oldStatus: currentProject.status.name,
-        newStatus: newStatus.name,
+        newStatus: {
+          id: newStatus.id,
+          name: newStatus.name,
+          color: newStatus.color,
+        },
       })
     }
 

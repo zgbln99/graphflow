@@ -24,6 +24,7 @@ import { FileLocationsList } from '@/components/project/file-locations'
 import { ProjectStatusSelect } from '@/components/project/project-status-select'
 import { AcceptProjectButton } from '@/components/project/accept-project-button'
 import { ProjectFiles } from '@/components/projects/project-files'
+import { LiveStatusBadge, ProjectDetailClient } from '@/components/project/project-detail-client'
 
 export default async function ProjectDetailPage({
   params,
@@ -102,6 +103,10 @@ export default async function ProjectDetailPage({
   const isPendingApproval = project.status.slug === 'oczekuje-na-akceptacje'
 
   return (
+    <ProjectDetailClient
+      projectId={project.id}
+      initialStatus={{ id: project.status.id, name: project.status.name, color: project.status.color }}
+    >
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -142,15 +147,11 @@ export default async function ProjectDetailPage({
               </Link>
             </>
           ) : (
-            <div
-              className="badge"
-              style={{
-                backgroundColor: `${project.status.color}20`,
-                color: project.status.color,
-              }}
-            >
-              {project.status.name}
-            </div>
+            <LiveStatusBadge
+              projectId={project.id}
+              initialStatus={{ id: project.status.id, name: project.status.name, color: project.status.color }}
+              size="lg"
+            />
           )}
         </div>
       </div>
@@ -165,6 +166,26 @@ export default async function ProjectDetailPage({
               <p className="text-sm text-amber-700 dark:text-amber-400">
                 Otrzymasz powiadomienie email, gdy projekt zostanie zaakceptowany.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status card for client - prominent display */}
+      {!isAdmin && !isPendingApproval && (
+        <div className="card dark:bg-gray-800 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Status projektu</p>
+              <LiveStatusBadge
+                projectId={project.id}
+                initialStatus={{ id: project.status.id, name: project.status.name, color: project.status.color }}
+                size="lg"
+              />
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500 dark:text-gray-400">Aktualizacja</p>
+              <p className="text-gray-900 dark:text-white font-medium">{formatRelativeTime(project.updatedAt)}</p>
             </div>
           </div>
         </div>
@@ -392,5 +413,6 @@ export default async function ProjectDetailPage({
         )}
       </div>
     </div>
+    </ProjectDetailClient>
   )
 }
