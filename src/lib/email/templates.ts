@@ -35,8 +35,11 @@ function getBaseTemplate(content: string): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: ${COLORS.shark}; margin: 0; padding: 0; background-color: ${COLORS.athensGray};">
+    <body style="font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: ${COLORS.shark}; margin: 0; padding: 0; background-color: ${COLORS.athensGray};">
       <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
         <!-- Header with logo -->
         <div style="background: ${COLORS.mirage}; padding: 24px 32px; border-radius: 8px 8px 0 0; text-align: center;">
