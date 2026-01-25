@@ -145,7 +145,7 @@ export async function addCommentAction(formData: FormData) {
           // Utwórz powiadomienie w bazie dla adminów
           await prisma.notification.createMany({
             data: admins.map(admin => ({
-              type: 'COMMENT_ADDED',
+              type: 'COMMENT_ADDED' as const,
               title: 'Nowy komentarz',
               message: `${comment.author.name} dodał komentarz do projektu ${project.number}`,
               link: `/panel/projects/${project.id}`,
@@ -160,7 +160,7 @@ export async function addCommentAction(formData: FormData) {
           // Utwórz powiadomienie w bazie dla użytkowników klienta
           await prisma.notification.createMany({
             data: project.clientAccount.users.map(user => ({
-              type: 'COMMENT_ADDED',
+              type: 'COMMENT_ADDED' as const,
               title: 'Nowy komentarz',
               message: `${comment.author.name} dodał komentarz do projektu ${project.number}`,
               link: `/panel/projects/${project.id}`,

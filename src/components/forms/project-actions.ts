@@ -396,7 +396,7 @@ export async function updateProjectAction(projectId: string, formData: FormData)
 
         await prisma.notification.createMany({
           data: clientUserIds.map(userId => ({
-            type: 'STATUS_CHANGED',
+            type: 'PROJECT_STATUS_CHANGE' as const,
             title: 'Zmiana statusu projektu',
             message: `Status projektu ${currentProject.number} zmieniono na: ${newStatus.name}`,
             link: `/panel/projects/${projectId}`,
