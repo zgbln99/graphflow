@@ -2,15 +2,17 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { MoreVertical, UserCheck, UserX, Key, Loader2 } from 'lucide-react'
-import { toggleUserActiveAction, resetUserPasswordAction } from '@/components/forms/user-actions'
+import Link from 'next/link'
+import { MoreVertical, UserCheck, UserX, Key, Loader2, Edit, Trash2 } from 'lucide-react'
+import { toggleUserActiveAction, resetUserPasswordAction, deleteUserAction } from '@/components/forms/user-actions'
 
 interface UserActionsProps {
   userId: string
+  clientId: string
   isActive: boolean
 }
 
-export function UserActions({ userId, isActive }: UserActionsProps) {
+export function UserActions({ userId, clientId, isActive }: UserActionsProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isOpen, setIsOpen] = useState(false)
@@ -46,6 +48,23 @@ export function UserActions({ userId, isActive }: UserActionsProps) {
     })
   }
 
+  async function handleDelete() {
+    setIsOpen(false)
+
+    if (!confirm('Czy na pewno chcesz usunąć tego użytkownika? Ta operacja jest nieodwracalna.')) {
+      return
+    }
+
+    startTransition(async () => {
+      const result = await deleteUserAction(userId)
+      if (result.success) {
+        router.refresh()
+      } else {
+        alert(result.error || 'Wystąpił błąd')
+      }
+    })
+  }
+
   return (
     <div className="relative">
       <button
@@ -66,10 +85,18 @@ export function UserActions({ userId, isActive }: UserActionsProps) {
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+            <Link
+              href={`/panel/clients/${clientId}/users/${userId}/edit`}
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <Edit className="w-4 h-4 text-gray-400" />
+              <span>Edytuj</span>
+            </Link>
             <button
               onClick={handleToggleActive}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50"
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               {isActive ? (
                 <>
@@ -85,10 +112,18 @@ export function UserActions({ userId, isActive }: UserActionsProps) {
             </button>
             <button
               onClick={handleResetPassword}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50"
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               <Key className="w-4 h-4 text-gray-400" />
-              <span>Resetuj hasło</span>
+              <span>Resetuj haslo</span>
+            </button>
+            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+            <button
+              onClick={handleDelete}
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Usun</span>
             </button>
           </div>
         </>

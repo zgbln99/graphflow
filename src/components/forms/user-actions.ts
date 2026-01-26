@@ -206,3 +206,45 @@ export async function resetUserPasswordAction(userId: string) {
     return { error: 'Nie udało się zresetować hasła' }
   }
 }
+
+export async function deleteUserAction(userId: string) {
+  const session = await getSession()
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: 'Brak uprawnień' }
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    })
+
+    if (!user) {
+      return { error: 'Użytkownik nie istnieje' }
+    }
+
+    // Nie można usunąć admina
+    if (user.role === 'ADMIN') {
+      return { error: 'Nie można usunąć konta administratora' }
+    }
+
+    // Usuń sesje użytkownika
+    await prisma.session.deleteMany({
+      where: { userId },
+    })
+
+    // Usuń powiadomienia użytkownika
+    await prisma.notification.deleteMany({
+      where: { userId },
+    })
+
+    // Usuń użytkownika
+    await prisma.user.delete({
+      where: { id: userId },
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    return { error: 'Nie udało się usunąć użytkownika' }
+  }
+}

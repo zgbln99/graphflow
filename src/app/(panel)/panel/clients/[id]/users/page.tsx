@@ -99,7 +99,7 @@ export default async function ClientUsersPage({
                   <span className="text-sm text-gray-400">
                     Dodany: {formatDate(user.createdAt)}
                   </span>
-                  <UserActions userId={user.id} isActive={user.isActive} />
+                  <UserActions userId={user.id} clientId={id} isActive={user.isActive} />
                 </div>
               </div>
             ))}
