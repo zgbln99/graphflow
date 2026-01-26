@@ -83,11 +83,11 @@ export async function POST(
       return NextResponse.json({ error: 'Brak pliku' }, { status: 400 })
     }
 
-    // Max 100MB dla plików projektowych
-    const maxSize = 100 * 1024 * 1024
+    // Max 500MB dla plików projektowych (Dropbox)
+    const maxSize = 500 * 1024 * 1024
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'Maksymalny rozmiar pliku to 10MB' },
+        { error: 'Maksymalny rozmiar pliku to 500MB' },
         { status: 400 }
       )
     }
