@@ -5,6 +5,7 @@ import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { CommandPalette } from '@/components/search/command-palette'
 import { ToastProvider } from '@/components/ui/toast'
+import { KeyboardShortcuts } from '@/components/ui/keyboard-shortcuts'
 import type { SessionUser } from '@/lib/auth'
 
 interface PanelLayoutClientProps {
@@ -19,6 +20,7 @@ export function PanelLayoutClient({ user, children }: PanelLayoutClientProps) {
     <ToastProvider>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <CommandPalette />
+        <KeyboardShortcuts />
         <Sidebar
           user={user}
           isOpen={isMobileMenuOpen}

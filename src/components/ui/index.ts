@@ -16,3 +16,16 @@ export {
   LoadingWrapper,
 } from './skeleton'
 export { ToastProvider, useToast } from './toast'
+
+// New components
+export { Avatar, AvatarGroup, AvatarWithName } from './avatar'
+export { Breadcrumbs, PageHeader } from './breadcrumbs'
+export {
+  ProgressBar,
+  StepProgress,
+  VerticalStepProgress,
+  CircularProgress
+} from './progress'
+export { ActivityFeed, ActivityTimeline } from './activity-feed'
+export { KeyboardShortcuts, ShortcutIndicator } from './keyboard-shortcuts'
+export { DataTable } from './data-table'
