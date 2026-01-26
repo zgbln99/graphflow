@@ -499,6 +499,133 @@ ${APP_URL}
   return { subject, html, text }
 }
 
+export interface CorrectionItem {
+  number: string
+  title: string
+  priority?: string
+  createdAt?: string
+}
+
+export function projectCorrectionsEmail(
+  data: ProjectEmailData & {
+    oldStatus: string
+    corrections: CorrectionItem[]
+    files?: ProjectFileLink[]
+  }
+): { subject: string; html: string; text: string } {
+  const projectUrl = `${APP_URL}/panel/projects/${data.projectId}`
+  const correctionsCount = data.corrections.length
+  const subject = `[${data.projectNumber}] ${data.projectTitle} - Poprawki (${correctionsCount})`
+
+  // Priority colors
+  const priorityColors: Record<string, string> = {
+    'HIGH': '#dc2626',
+    'URGENT': '#dc2626',
+    'NORMAL': '#f59e0b',
+    'LOW': '#10b981',
+  }
+
+  const correctionsSection = data.corrections.length > 0 ? `
+    <div style="margin: 24px 0;">
+      <p style="margin: 0 0 16px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">POPRAWKI DO WYKONANIA (${data.corrections.length})</p>
+      <table style="width: 100%; background: ${COLORS.athensGray}; border-radius: 8px; border-collapse: collapse;">
+        ${data.corrections.map((correction, index) => `
+          <tr>
+            <td style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} vertical-align: middle;">
+              <div style="display: flex; align-items: center;">
+                <span style="
+                  display: inline-block;
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 50%;
+                  background: ${priorityColors[correction.priority || 'NORMAL'] || '#f59e0b'};
+                  margin-right: 12px;
+                "></span>
+                <div>
+                  <p style="margin: 0; font-size: 14px; color: ${COLORS.shark}; font-weight: 500;">${correction.title}</p>
+                  <p style="margin: 4px 0 0 0; font-size: 12px; color: ${COLORS.gullGray};">${correction.number}</p>
+                </div>
+              </div>
+            </td>
+          </tr>
+        `).join('')}
+      </table>
+    </div>
+  ` : ''
+
+  const filesSection = data.files && data.files.length > 0 ? `
+    <div style="margin: 24px 0;">
+      <p style="margin: 0 0 16px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">PLIKI DO POBRANIA (${data.files.length})</p>
+      <table style="width: 100%; background: ${COLORS.athensGray}; border-radius: 8px; border-collapse: collapse;">
+        ${data.files.map((file, index) => `
+          <tr>
+            <td style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} vertical-align: middle;">
+              <p style="margin: 0; font-size: 14px; color: ${COLORS.shark}; word-break: break-word;">${file.filename}</p>
+              ${file.size ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: ${COLORS.gullGray};">${formatFileSizeForEmail(file.size)}</p>` : ''}
+            </td>
+            <td style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} vertical-align: middle; text-align: right; width: 100px;">
+              <a href="${file.url}" style="display: inline-block; padding: 8px 16px; background: ${COLORS.toryBlue}; color: ${COLORS.white}; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 500; white-space: nowrap;">Pobierz</a>
+            </td>
+          </tr>
+        `).join('')}
+      </table>
+    </div>
+  ` : ''
+
+  const html = getBaseTemplate(`
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">${data.projectTitle}</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">${data.projectNumber} - Wymagane poprawki</p>
+
+    ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
+    <p style="margin: 0 0 20px 0;">Projekt <strong>${data.projectTitle}</strong> wymaga poprawek. Poniżej znajdziesz listę zgłoszonych uwag oraz pliki do pobrania.</p>
+
+    ${getInfoBox(`
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">STATUS</p>
+      <p style="margin: 0;">
+        <span style="display: inline-block; padding: 4px 12px; background: #ef4444; color: white; border-radius: 9999px; font-size: 13px; font-weight: 500;">Poprawki</span>
+        <span style="margin-left: 12px; font-size: 14px; color: ${COLORS.gullGray};">${correctionsCount} ${correctionsCount === 1 ? 'poprawka' : correctionsCount < 5 ? 'poprawki' : 'poprawek'} do wykonania</span>
+      </p>
+    `, '#ef4444')}
+
+    ${correctionsSection}
+
+    ${filesSection}
+
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Zobacz projekt', projectUrl, '#ef4444')}
+    </div>
+
+    <p style="color: ${COLORS.gullGray}; font-size: 13px; margin: 24px 0 0 0;">
+      Po wykonaniu poprawek, proszę przesłać zaktualizowane pliki lub zmienić status projektu.
+    </p>
+  `)
+
+  const correctionsText = data.corrections.length > 0
+    ? `\nPOPRAWKI DO WYKONANIA:\n${data.corrections.map(c => `- [${c.number}] ${c.title}`).join('\n')}\n`
+    : ''
+
+  const filesText = data.files && data.files.length > 0
+    ? `\nPLIKI DO POBRANIA:\n${data.files.map(f => `- ${f.filename}${f.size ? ` (${formatFileSizeForEmail(f.size)})` : ''}\n  ${f.url}`).join('\n')}\n`
+    : ''
+
+  const text = `
+WYMAGANE POPRAWKI
+${data.projectNumber}
+
+${data.recipientName ? `Cześć ${data.recipientName},` : ''}
+
+Projekt "${data.projectTitle}" wymaga poprawek.
+${correctionsText}${filesText}
+Link do projektu: ${projectUrl}
+
+---
+GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
+  `.trim()
+
+  return { subject, html, text }
+}
+
 export function newProjectRequestEmail(
   data: ProjectEmailData & { clientName: string; createdByName: string; description?: string }
 ): { subject: string; html: string; text: string } {

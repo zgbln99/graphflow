@@ -8,8 +8,10 @@ import {
   ticketDeadlineReminderEmail,
   projectStatusChangedEmail,
   projectCompletedEmail,
+  projectCorrectionsEmail,
   newProjectRequestEmail,
   ProjectFileLink,
+  CorrectionItem,
 } from './templates'
 import { getDropboxClient } from '../dropbox'
 import type { Ticket, Project, Comment, User, ClientAccount, ProjectFile } from '@prisma/client'
@@ -321,11 +323,42 @@ export async function notifyProjectStatusChanged(
   const statusSlug = (project.status as any).slug
   const isCompleted = statusSlug === 'zakonczone' || project.status.name.toLowerCase().includes('zakończon')
   const isForApproval = statusSlug === 'do-akceptacji' || project.status.name.toLowerCase().includes('do akceptacji')
+  const isCorrections = statusSlug === 'poprawki' || project.status.name.toLowerCase().includes('poprawki')
 
-  // Generate file links for completed or approval statuses
+  // Generate file links for completed, approval, or corrections statuses
   let fileLinks: ProjectFileLink[] = []
-  if (isCompleted || isForApproval) {
+  if (isCompleted || isForApproval || isCorrections) {
     fileLinks = await generateFileLinks(project.id)
+  }
+
+  // Fetch open tickets (corrections) for the project if status is "poprawki"
+  let corrections: CorrectionItem[] = []
+  if (isCorrections) {
+    const openTickets = await prisma.ticket.findMany({
+      where: {
+        projectId: project.id,
+        status: {
+          notIn: ['RESOLVED', 'CLOSED'],
+        },
+      },
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        number: true,
+        title: true,
+        priority: true,
+        createdAt: true,
+      },
+    })
+
+    corrections = openTickets.map((ticket: { number: string; title: string; priority: string; createdAt: Date }) => ({
+      number: ticket.number,
+      title: ticket.title,
+      priority: ticket.priority,
+      createdAt: ticket.createdAt.toLocaleDateString('pl-PL'),
+    }))
   }
 
   // Wyślij do kontaktów projektu
@@ -340,6 +373,17 @@ export async function notifyProjectStatusChanged(
         projectId: project.id,
         recipientName: contact.name,
         oldStatus: oldStatusName,
+        files: fileLinks,
+      })
+    } else if (isCorrections) {
+      // Use corrections email template with files and corrections list
+      emailData = projectCorrectionsEmail({
+        projectNumber: project.number,
+        projectTitle: project.title,
+        projectId: project.id,
+        recipientName: contact.name,
+        oldStatus: oldStatusName,
+        corrections,
         files: fileLinks,
       })
     } else {
@@ -375,6 +419,15 @@ export async function notifyProjectStatusChanged(
         projectTitle: project.title,
         projectId: project.id,
         oldStatus: oldStatusName,
+        files: fileLinks,
+      })
+    } else if (isCorrections) {
+      emailData = projectCorrectionsEmail({
+        projectNumber: project.number,
+        projectTitle: project.title,
+        projectId: project.id,
+        oldStatus: oldStatusName,
+        corrections,
         files: fileLinks,
       })
     } else {
