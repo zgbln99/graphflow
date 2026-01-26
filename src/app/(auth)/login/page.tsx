@@ -2,12 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { loginAction } from './actions'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,8 +20,8 @@ export default function LoginPage() {
       if (result.error) {
         setError(result.error)
       } else {
-        router.push('/panel')
-        router.refresh()
+        // Use window.location for reliable redirect after login
+        window.location.href = '/panel'
       }
     } catch (e) {
       setError('Wystąpił błąd podczas logowania')
