@@ -15,6 +15,15 @@ import {
 } from 'lucide-react'
 import { formatRelativeTime, formatDate } from '@/lib/utils'
 import { DonutChart } from '@/components/dashboard/charts'
+import {
+  AnimatedStatCard,
+  AnimatedQuickStat,
+  AnimatedSection,
+  AnimatedProjectCard,
+  AnimatedDeadlineCard,
+  AnimatedActivityItem,
+  AnimatedCard,
+} from '@/components/dashboard/animated-dashboard'
 
 export default async function DashboardPage() {
   const session = await getSession()
@@ -111,50 +120,57 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
-          {isAdmin ? 'Przeglad wszystkich projektow' : `Witaj, ${session.user.name}!`}
-        </p>
-      </div>
+      <AnimatedSection delay={0}>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            {isAdmin ? 'Przeglad wszystkich projektow' : `Witaj, ${session.user.name}!`}
+          </p>
+        </div>
+      </AnimatedSection>
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
+        <AnimatedStatCard
           icon={<Briefcase className="w-5 h-5" />}
           label="Wszystkie projekty"
           value={totalProjects}
           color="blue"
           href="/panel/projects"
+          delay={100}
         />
-        <StatCard
+        <AnimatedStatCard
           icon={<TrendingUp className="w-5 h-5" />}
           label="W trakcie"
           value={inProgressProjects}
           color="purple"
           href="/panel/projects?status=w-trakcie"
+          delay={200}
         />
-        <StatCard
+        <AnimatedStatCard
           icon={<CheckCircle className="w-5 h-5" />}
           label="Zakonczone"
           value={completedProjects}
           color="green"
           href="/panel/projects?status=zakonczone"
+          delay={300}
         />
         {isAdmin ? (
-          <StatCard
+          <AnimatedStatCard
             icon={<Building2 className="w-5 h-5" />}
             label="Aktywni klienci"
             value={clientsCount}
             color="yellow"
             href="/panel/clients"
+            delay={400}
           />
         ) : (
-          <StatCard
+          <AnimatedStatCard
             icon={<AlertTriangle className="w-5 h-5" />}
             label="Zblizajace sie terminy"
             value={upcomingDeadlines.length}
             color="red"
+            delay={400}
           />
         )}
       </div>
@@ -163,22 +179,22 @@ export default async function DashboardPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Projects by status chart */}
         {isAdmin && projectStatusData.length > 0 && (
-          <div className="card dark:bg-gray-800 dark:border-gray-700 p-6">
+          <AnimatedCard delay={500} className="p-6" withTilt>
             <div className="flex items-center gap-2 mb-4">
               <BarChart3 className="w-5 h-5 text-primary-600" />
               <h2 className="font-semibold text-gray-900 dark:text-white">Projekty wg statusu</h2>
             </div>
             <DonutChart data={projectStatusData} />
-          </div>
+          </AnimatedCard>
         )}
 
         {/* Recent projects */}
-        <div className="card dark:bg-gray-800 dark:border-gray-700">
+        <AnimatedCard delay={600}>
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900 dark:text-white">Ostatnie projekty</h2>
-            <Link href="/panel/projects" className="text-sm link flex items-center gap-1">
+            <Link href="/panel/projects" className="text-sm link flex items-center gap-1 group">
               Zobacz wszystkie
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -187,11 +203,11 @@ export default async function DashboardPage() {
                 Brak projektow
               </div>
             ) : (
-              recentProjects.map((project) => (
-                <Link
+              recentProjects.map((project, index) => (
+                <AnimatedProjectCard
                   key={project.id}
                   href={`/panel/projects/${project.id}`}
-                  className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  delay={700 + index * 50}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
@@ -222,14 +238,14 @@ export default async function DashboardPage() {
                       {formatRelativeTime(project.updatedAt)}
                     </span>
                   </div>
-                </Link>
+                </AnimatedProjectCard>
               ))
             )}
           </div>
-        </div>
+        </AnimatedCard>
 
         {/* Upcoming deadlines */}
-        <div className="card dark:bg-gray-800 dark:border-gray-700">
+        <AnimatedCard delay={800}>
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-gray-400" />
@@ -242,17 +258,18 @@ export default async function DashboardPage() {
                 Brak zblizajacych sie terminow
               </div>
             ) : (
-              upcomingDeadlines.map((project) => {
+              upcomingDeadlines.map((project, index) => {
                 const daysLeft = Math.ceil(
                   (project.deadline!.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
                 )
                 const isUrgent = daysLeft <= 3
 
                 return (
-                  <Link
+                  <AnimatedDeadlineCard
                     key={project.id}
                     href={`/panel/projects/${project.id}`}
-                    className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    isUrgent={isUrgent}
+                    delay={900 + index * 50}
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
@@ -265,9 +282,9 @@ export default async function DashboardPage() {
                         </p>
                       </div>
                       <div
-                        className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-medium ${
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-medium transition-all ${
                           isUrgent
-                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 animate-pulse'
                             : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                         }`}
                       >
@@ -279,16 +296,16 @@ export default async function DashboardPage() {
                           : `${daysLeft} dni`}
                       </div>
                     </div>
-                  </Link>
+                  </AnimatedDeadlineCard>
                 )
               })
             )}
           </div>
-        </div>
+        </AnimatedCard>
 
         {/* Recent activity (admin only) */}
         {isAdmin && recentActivity.length > 0 && (
-          <div className="card dark:bg-gray-800 dark:border-gray-700">
+          <AnimatedCard delay={1000}>
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-gray-400" />
@@ -296,14 +313,14 @@ export default async function DashboardPage() {
               </div>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[300px] overflow-y-auto">
-              {recentActivity.map((activity) => (
-                <Link
+              {recentActivity.map((activity, index) => (
+                <AnimatedActivityItem
                   key={activity.id}
                   href={`/panel/projects/${activity.project.id}`}
-                  className="block p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  delay={1100 + index * 30}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-primary-500" />
+                    <div className="w-2 h-2 rounded-full bg-primary-500 status-indicator" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-900 dark:text-white">
                         <span className="font-mono text-gray-500">{activity.project.number}</span>
@@ -317,84 +334,22 @@ export default async function DashboardPage() {
                       {formatRelativeTime(activity.changedAt)}
                     </span>
                   </div>
-                </Link>
+                </AnimatedActivityItem>
               ))}
             </div>
-          </div>
+          </AnimatedCard>
         )}
       </div>
 
       {/* Quick stats for admin */}
       {isAdmin && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <QuickStat label="Klienci" value={clientsCount} icon={<Building2 className="w-4 h-4" />} />
-          <QuickStat label="Uzytkownicy" value={usersCount} icon={<Users className="w-4 h-4" />} />
-          <QuickStat label="Statusow" value={projectStatuses.length} icon={<BarChart3 className="w-4 h-4" />} />
-          <QuickStat label="Aktywne projekty" value={totalProjects - completedProjects} icon={<Briefcase className="w-4 h-4" />} />
+          <AnimatedQuickStat label="Klienci" value={clientsCount} icon={<Building2 className="w-4 h-4" />} delay={1200} />
+          <AnimatedQuickStat label="Uzytkownicy" value={usersCount} icon={<Users className="w-4 h-4" />} delay={1250} />
+          <AnimatedQuickStat label="Statusow" value={projectStatuses.length} icon={<BarChart3 className="w-4 h-4" />} delay={1300} />
+          <AnimatedQuickStat label="Aktywne projekty" value={totalProjects - completedProjects} icon={<Briefcase className="w-4 h-4" />} delay={1350} />
         </div>
       )}
-    </div>
-  )
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  color,
-  href,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: number
-  color: 'blue' | 'purple' | 'yellow' | 'red' | 'green'
-  href?: string
-}) {
-  const colors = {
-    blue: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    purple: 'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-    yellow: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',
-    red: 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-    green: 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-  }
-
-  const content = (
-    <div className="flex items-center gap-3">
-      <div className={`p-2 rounded-lg ${colors[color]}`}>{icon}</div>
-      <div>
-        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-        <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
-      </div>
-    </div>
-  )
-
-  if (href) {
-    return (
-      <Link href={href} className="card dark:bg-gray-800 dark:border-gray-700 p-4 hover:shadow-md transition-shadow">
-        {content}
-      </Link>
-    )
-  }
-
-  return <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">{content}</div>
-}
-
-function QuickStat({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: number
-  icon: React.ReactNode
-}) {
-  return (
-    <div className="card dark:bg-gray-800 dark:border-gray-700 p-3 flex items-center gap-3">
-      <div className="text-gray-400">{icon}</div>
-      <div>
-        <p className="text-lg font-semibold text-gray-900 dark:text-white">{value}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-      </div>
     </div>
   )
 }
