@@ -48,7 +48,10 @@ export async function POST(request: NextRequest) {
     // Verify the token
     const verification = await verifyDropboxToken(accessToken)
     if (!verification.valid) {
-      return NextResponse.json({ error: 'Nieprawidłowy token Dropbox' }, { status: 400 })
+      console.error('Dropbox verification failed:', verification.error)
+      return NextResponse.json({
+        error: `Nieprawidłowy token Dropbox: ${verification.error || 'nieznany błąd'}`
+      }, { status: 400 })
     }
 
     // Save to database

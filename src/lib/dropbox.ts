@@ -107,7 +107,7 @@ export async function getDropboxDownloadLink(path: string): Promise<string | nul
 }
 
 // Verify Dropbox token is valid
-export async function verifyDropboxToken(token: string): Promise<{ valid: boolean; email?: string }> {
+export async function verifyDropboxToken(token: string): Promise<{ valid: boolean; email?: string; error?: string }> {
   try {
     const dbx = new Dropbox({ accessToken: token })
     const response = await dbx.usersGetCurrentAccount()
@@ -115,7 +115,19 @@ export async function verifyDropboxToken(token: string): Promise<{ valid: boolea
       valid: true,
       email: response.result.email,
     }
-  } catch (error) {
-    return { valid: false }
+  } catch (error: any) {
+    console.error('Dropbox token verification error:', error)
+
+    // Extract error message for debugging
+    let errorMessage = 'Unknown error'
+    if (error?.error?.error_summary) {
+      errorMessage = error.error.error_summary
+    } else if (error?.message) {
+      errorMessage = error.message
+    } else if (error?.status) {
+      errorMessage = `HTTP ${error.status}`
+    }
+
+    return { valid: false, error: errorMessage }
   }
 }
