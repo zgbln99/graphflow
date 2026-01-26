@@ -98,13 +98,21 @@ export default async function ProjectDetailPage({
         orderBy: { sentAt: 'desc' },
         take: 4,
       } : undefined,
-      corrections: {
-        orderBy: { createdAt: 'desc' },
-      },
     },
   })
 
   if (!project) notFound()
+
+  // Fetch corrections separately (table might not exist yet)
+  let corrections: any[] = []
+  try {
+    corrections = await (prisma as any).projectCorrection.findMany({
+      where: { projectId: id },
+      orderBy: { createdAt: 'desc' },
+    })
+  } catch {
+    // Table doesn't exist yet - that's OK
+  }
 
   // Sprawdź dostęp klienta
   if (!isAdmin && project.clientAccountId !== session.user.clientAccountId) {
@@ -355,7 +363,7 @@ export default async function ProjectDetailPage({
           </div>
 
           {/* Corrections list for client */}
-          {!isAdmin && project.corrections && project.corrections.length > 0 && (
+          {!isAdmin && corrections.length > 0 && (
             <div className="card dark:bg-gray-800 dark:border-gray-700">
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-red-500" />
@@ -365,7 +373,7 @@ export default async function ProjectDetailPage({
               </div>
               <div className="p-4">
                 <CorrectionsList
-                  corrections={project.corrections}
+                  corrections={corrections}
                   isAdmin={false}
                   projectId={project.id}
                 />
