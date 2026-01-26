@@ -57,8 +57,9 @@ export function AnimatedStatCard({
   )
 
   const cardClasses = cn(
-    'card dark:bg-gray-800 dark:border-gray-700 p-4',
-    'transition-all duration-300',
+    'bg-white rounded-xl border border-gray-200 shadow-sm',
+    'dark:bg-gray-800 dark:border-gray-700',
+    'p-4 transition-all duration-300',
     'hover:shadow-lg',
     glowColors[color],
     'group'
@@ -99,7 +100,7 @@ interface AnimatedQuickStatProps {
 export function AnimatedQuickStat({ label, value, icon, delay = 0 }: AnimatedQuickStatProps) {
   return (
     <FadeIn delay={delay} direction="up">
-      <div className="card dark:bg-gray-800 dark:border-gray-700 p-3 flex items-center gap-3 hover:shadow-md transition-shadow">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700 p-3 flex items-center gap-3 hover:shadow-md transition-shadow">
         <div className="text-gray-400 animate-pulse">{icon}</div>
         <div>
           <p className="text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
@@ -217,7 +218,7 @@ interface AnimatedCardProps {
 
 export function AnimatedCard({ children, delay = 0, className = '', withTilt = false }: AnimatedCardProps) {
   const content = (
-    <div className={cn('card dark:bg-gray-800 dark:border-gray-700', className)}>
+    <div className={cn('bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700', className)}>
       {children}
     </div>
   )
