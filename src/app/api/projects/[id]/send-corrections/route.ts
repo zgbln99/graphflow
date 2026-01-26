@@ -128,7 +128,7 @@ export async function POST(
     const now = new Date()
     await Promise.all(
       correctionsList.map((content: string) =>
-        (prisma.projectCorrection as any).create({
+        (prisma as any).projectCorrection.create({
           data: {
             projectId: project.id,
             content: content.trim(),

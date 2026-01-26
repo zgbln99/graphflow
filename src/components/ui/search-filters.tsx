@@ -55,6 +55,14 @@ export function SearchWithFilters({
   const [localSearch, setLocalSearch] = useState(value.search)
   const filtersRef = useRef<HTMLDivElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const onChangeRef = useRef(onChange)
+  const valueRef = useRef(value)
+
+  // Keep refs up to date
+  useEffect(() => {
+    onChangeRef.current = onChange
+    valueRef.current = value
+  })
 
   // Count active filters
   const activeFilterCount = Object.values(value.filters).filter((v) => {
@@ -69,8 +77,8 @@ export function SearchWithFilters({
       clearTimeout(searchTimeoutRef.current)
     }
     searchTimeoutRef.current = setTimeout(() => {
-      if (localSearch !== value.search) {
-        onChange({ ...value, search: localSearch })
+      if (localSearch !== valueRef.current.search) {
+        onChangeRef.current({ ...valueRef.current, search: localSearch })
       }
     }, 300)
 

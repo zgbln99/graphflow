@@ -25,7 +25,7 @@ export async function PATCH(
     }
 
     // Update correction
-    const correction = await (prisma.projectCorrection as any).update({
+    const correction = await (prisma as any).projectCorrection.update({
       where: { id: correctionId },
       data: {
         isResolved,
@@ -55,7 +55,7 @@ export async function DELETE(
 
     const { id, correctionId } = await context.params
 
-    await (prisma.projectCorrection as any).delete({
+    await (prisma as any).projectCorrection.delete({
       where: { id: correctionId },
     })
 
