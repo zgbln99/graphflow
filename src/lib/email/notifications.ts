@@ -286,10 +286,14 @@ async function generateFileLinks(projectId: string): Promise<ProjectFileLink[]> 
 /**
  * Wysyła powiadomienie o zmianie statusu projektu
  * Powiadomienia idą tylko do kontaktów przypisanych do projektu
+ * @param project - projekt z danymi statusu
+ * @param oldStatusName - poprzedni status
+ * @param manualCorrections - lista poprawek wpisanych ręcznie (dla statusu "poprawki")
  */
 export async function notifyProjectStatusChanged(
   project: Project & { status: { name: string; slug?: string }; contacts?: User[] },
-  oldStatusName: string
+  oldStatusName: string,
+  manualCorrections?: string[]
 ): Promise<void> {
   // Pobierz kontakty projektu (jeśli nie zostały przekazane)
   let contacts: Array<{ id: string; name: string; email: string }> = project.contacts || []
@@ -331,33 +335,12 @@ export async function notifyProjectStatusChanged(
     fileLinks = await generateFileLinks(project.id)
   }
 
-  // Fetch open tickets (corrections) for the project if status is "poprawki"
+  // Build corrections list from manual input
   let corrections: CorrectionItem[] = []
-  if (isCorrections) {
-    const openTickets = await prisma.ticket.findMany({
-      where: {
-        projectId: project.id,
-        status: {
-          notIn: ['RESOLVED', 'CLOSED'],
-        },
-      },
-      orderBy: [
-        { priority: 'desc' },
-        { createdAt: 'desc' },
-      ],
-      select: {
-        number: true,
-        title: true,
-        priority: true,
-        createdAt: true,
-      },
-    })
-
-    corrections = openTickets.map((ticket: { number: string; title: string; priority: string; createdAt: Date }) => ({
-      number: ticket.number,
-      title: ticket.title,
-      priority: ticket.priority,
-      createdAt: ticket.createdAt.toLocaleDateString('pl-PL'),
+  if (isCorrections && manualCorrections && manualCorrections.length > 0) {
+    corrections = manualCorrections.map((title, index) => ({
+      number: `${index + 1}`,
+      title: title.trim(),
     }))
   }
 

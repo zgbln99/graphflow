@@ -14,11 +14,16 @@ export async function PATCH(
     }
 
     const { id } = await context.params
-    const { statusId } = await request.json()
+    const { statusId, corrections } = await request.json()
 
     if (!statusId) {
       return NextResponse.json({ error: 'Status ID is required' }, { status: 400 })
     }
+
+    // Validate corrections if provided (array of strings)
+    const correctionsList: string[] = Array.isArray(corrections)
+      ? corrections.filter((c: unknown) => typeof c === 'string' && c.trim())
+      : []
 
     // Get current project with status
     const currentProject = await prisma.project.findUnique({
@@ -62,7 +67,7 @@ export async function PATCH(
 
     // Send notification about status change
     try {
-      await notifyProjectStatusChanged(project, currentProject.status.name)
+      await notifyProjectStatusChanged(project, currentProject.status.name, correctionsList)
     } catch (error) {
       console.error('Error sending status change notification:', error)
       // Don't fail the request if notification fails

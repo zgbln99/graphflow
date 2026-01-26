@@ -13,7 +13,10 @@ import {
   CheckCircle2,
   MoreHorizontal,
   ExternalLink,
-  User
+  User,
+  X,
+  Plus,
+  Trash2
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -71,6 +74,12 @@ export function KanbanBoard({ statuses, projects: initialProjects, clients }: Ka
   const [selectedClient, setSelectedClient] = useState<string>('')
   const [showSuccessAnimation, setShowSuccessAnimation] = useState<string | null>(null)
   const dragCounter = useRef<{ [key: string]: number }>({})
+
+  // Corrections modal state
+  const [showCorrectionsModal, setShowCorrectionsModal] = useState(false)
+  const [pendingDrop, setPendingDrop] = useState<{ projectId: string; oldStatusId: string; newStatusId: string } | null>(null)
+  const [corrections, setCorrections] = useState<string[]>([''])
+  const [isSubmittingCorrections, setIsSubmittingCorrections] = useState(false)
 
   // Filter projects by client
   const filteredProjects = selectedClient
@@ -145,22 +154,45 @@ export function KanbanBoard({ statuses, projects: initialProjects, clients }: Ka
     const oldStatusId = draggedProject.statusId
     const newStatus = statuses.find((s) => s.id === newStatusId)
 
+    // Check if dropping to "Poprawki" status - show corrections modal
+    if (newStatus?.slug === 'poprawki' || newStatus?.name.toLowerCase().includes('poprawki')) {
+      setPendingDrop({ projectId, oldStatusId, newStatusId })
+      setCorrections([''])
+      setShowCorrectionsModal(true)
+      setDraggedProject(null)
+      return
+    }
+
+    // Normal status change
+    await performStatusChange(projectId, oldStatusId, newStatusId, newStatus!)
+    setDraggedProject(null)
+  }
+
+  const performStatusChange = async (
+    projectId: string,
+    oldStatusId: string,
+    newStatusId: string,
+    newStatus: Status,
+    correctionsList?: string[]
+  ) => {
     // Optimistic update with animation
     setProjects((prev) =>
       prev.map((p) =>
         p.id === projectId
-          ? { ...p, statusId: newStatusId, status: newStatus! }
+          ? { ...p, statusId: newStatusId, status: newStatus }
           : p
       )
     )
-    setDraggedProject(null)
     setIsUpdating(projectId)
 
     try {
       const response = await fetch(`/api/projects/${projectId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statusId: newStatusId }),
+        body: JSON.stringify({
+          statusId: newStatusId,
+          corrections: correctionsList,
+        }),
       })
 
       if (!response.ok) {
@@ -183,6 +215,53 @@ export function KanbanBoard({ statuses, projects: initialProjects, clients }: Ka
     } finally {
       setIsUpdating(null)
     }
+  }
+
+  const handleCorrectionsSubmit = async () => {
+    if (!pendingDrop) return
+
+    const validCorrections = corrections.filter(c => c.trim())
+    if (validCorrections.length === 0) {
+      // If no corrections entered, still allow the status change
+    }
+
+    setIsSubmittingCorrections(true)
+    const newStatus = statuses.find((s) => s.id === pendingDrop.newStatusId)!
+
+    await performStatusChange(
+      pendingDrop.projectId,
+      pendingDrop.oldStatusId,
+      pendingDrop.newStatusId,
+      newStatus,
+      validCorrections
+    )
+
+    setIsSubmittingCorrections(false)
+    setShowCorrectionsModal(false)
+    setPendingDrop(null)
+    setCorrections([''])
+  }
+
+  const handleCorrectionsCancel = () => {
+    setShowCorrectionsModal(false)
+    setPendingDrop(null)
+    setCorrections([''])
+  }
+
+  const addCorrectionField = () => {
+    setCorrections([...corrections, ''])
+  }
+
+  const removeCorrectionField = (index: number) => {
+    if (corrections.length > 1) {
+      setCorrections(corrections.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateCorrection = (index: number, value: string) => {
+    const newCorrections = [...corrections]
+    newCorrections[index] = value
+    setCorrections(newCorrections)
   }
 
   return (
@@ -251,7 +330,7 @@ export function KanbanBoard({ statuses, projects: initialProjects, clients }: Ka
                       className="w-3 h-3 rounded-full ring-2 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-800"
                       style={{
                         backgroundColor: status.color,
-                        ringColor: status.color,
+                        ['--tw-ring-color' as string]: status.color,
                       }}
                     />
                     <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -466,6 +545,118 @@ export function KanbanBoard({ statuses, projects: initialProjects, clients }: Ka
         <span className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Przeciągnij i upuść</span>
         {' '}aby zmienić status projektu
       </div>
+
+      {/* Corrections Modal */}
+      {showCorrectionsModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
+            onClick={handleCorrectionsCancel}
+          />
+
+          {/* Modal */}
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div
+              className="relative w-full max-w-lg transform rounded-xl bg-white dark:bg-gray-900 shadow-2xl animate-fade-in-scale"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Dodaj poprawki
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    Wpisz poprawki do wykonania w projekcie
+                  </p>
+                </div>
+                <button
+                  onClick={handleCorrectionsCancel}
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 max-h-[400px] overflow-y-auto">
+                <div className="space-y-3">
+                  {corrections.map((correction, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <span className="flex-shrink-0 w-6 h-6 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center text-xs font-medium">
+                        {index + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={correction}
+                        onChange={(e) => updateCorrection(index, e.target.value)}
+                        placeholder={`Poprawka ${index + 1}...`}
+                        className="flex-1 input dark:bg-gray-800 dark:border-gray-700"
+                        autoFocus={index === corrections.length - 1}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && correction.trim()) {
+                            e.preventDefault()
+                            addCorrectionField()
+                          }
+                        }}
+                      />
+                      {corrections.length > 1 && (
+                        <button
+                          onClick={() => removeCorrectionField(index)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={addCorrectionField}
+                  className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-primary-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Dodaj kolejną poprawkę
+                </button>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                <button
+                  onClick={handleCorrectionsCancel}
+                  disabled={isSubmittingCorrections}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  Anuluj
+                </button>
+                <button
+                  onClick={handleCorrectionsSubmit}
+                  disabled={isSubmittingCorrections}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSubmittingCorrections ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Zapisywanie...
+                    </>
+                  ) : (
+                    <>
+                      Zmień na Poprawki
+                      {corrections.filter(c => c.trim()).length > 0 && (
+                        <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">
+                          {corrections.filter(c => c.trim()).length}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
