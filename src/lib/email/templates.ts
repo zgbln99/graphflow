@@ -27,7 +27,6 @@ interface ProjectEmailData {
   projectId: string
   recipientName?: string
   submittedByName?: string  // Imię i nazwisko zgłaszającego
-  previewCid?: string       // Content-ID dla osadzonego podglądu
 }
 
 function getBaseTemplate(content: string): string {
@@ -342,15 +341,25 @@ export interface ProjectFileLink {
 }
 
 export function projectStatusChangedEmail(
-  data: ProjectEmailData & { oldStatus: string; newStatus: string }
+  data: ProjectEmailData & { oldStatus: string; newStatus: string; files?: ProjectFileLink[] }
 ): { subject: string; html: string; text: string } {
   const projectUrl = `${APP_URL}/panel/projects/${data.projectId}`
   const subject = `[${data.projectNumber}] Zmiana statusu projektu: ${data.newStatus}`
 
-  const previewSection = data.previewCid ? `
-    <div style="margin: 24px 0; text-align: center;">
-      <p style="margin: 0 0 12px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">PODGLĄD PROJEKTU</p>
-      <img src="cid:${data.previewCid}" alt="Podgląd projektu" style="max-width: 100%; max-height: 400px; border-radius: 8px; border: 1px solid ${COLORS.athensGray};" />
+  const filesSection = data.files && data.files.length > 0 ? `
+    <div style="margin: 24px 0;">
+      <p style="margin: 0 0 16px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">PLIKI DO POBRANIA (${data.files.length})</p>
+      <div style="background: ${COLORS.athensGray}; border-radius: 8px; overflow: hidden;">
+        ${data.files.map((file, index) => `
+          <div style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} display: flex; align-items: center; justify-content: space-between;">
+            <div style="flex: 1; min-width: 0;">
+              <p style="margin: 0; font-size: 14px; color: ${COLORS.shark}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.filename}</p>
+              ${file.size ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: ${COLORS.gullGray};">${formatFileSizeForEmail(file.size)}</p>` : ''}
+            </div>
+            <a href="${file.url}" style="margin-left: 16px; padding: 8px 16px; background: ${COLORS.toryBlue}; color: ${COLORS.white}; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 500; white-space: nowrap;">Pobierz</a>
+          </div>
+        `).join('')}
+      </div>
     </div>
   ` : ''
 
@@ -376,12 +385,16 @@ export function projectStatusChangedEmail(
       </p>
     `)}
 
-    ${previewSection}
+    ${filesSection}
 
     <div style="text-align: center; margin: 28px 0;">
       ${getButton('Zobacz projekt', projectUrl)}
     </div>
   `)
+
+  const filesText = data.files && data.files.length > 0
+    ? `\nPLIKI DO POBRANIA:\n${data.files.map(f => `- ${f.filename}${f.size ? ` (${formatFileSizeForEmail(f.size)})` : ''}\n  ${f.url}`).join('\n')}\n`
+    : ''
 
   const text = `
 ZMIANA STATUSU PROJEKTU
@@ -394,7 +407,7 @@ Informujemy o zmianie statusu Twojego projektu.
 Projekt: [${data.projectNumber}] ${data.projectTitle}
 ${data.submittedByName ? `Zgłosił: ${data.submittedByName}` : ''}
 Status: ${data.oldStatus} → ${data.newStatus}
-
+${filesText}
 Link do projektu: ${projectUrl}
 
 ---
@@ -436,13 +449,6 @@ export function projectCompletedEmail(
     </div>
   ` : ''
 
-  const previewSection = data.previewCid ? `
-    <div style="margin: 24px 0; text-align: center;">
-      <p style="margin: 0 0 12px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">PODGLĄD PROJEKTU</p>
-      <img src="cid:${data.previewCid}" alt="Podgląd projektu" style="max-width: 100%; max-height: 400px; border-radius: 8px; border: 1px solid ${COLORS.athensGray};" />
-    </div>
-  ` : ''
-
   const html = getBaseTemplate(`
     <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Projekt zakończony!</h1>
     <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Twój projekt został ukończony i jest gotowy do odbioru</p>
@@ -459,7 +465,6 @@ export function projectCompletedEmail(
       </p>
     `, '#10b981')}
 
-    ${previewSection}
     ${filesSection}
 
     <div style="text-align: center; margin: 28px 0;">

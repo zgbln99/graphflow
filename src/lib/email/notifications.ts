@@ -282,7 +282,7 @@ async function generateFileLinks(projectId: string): Promise<ProjectFileLink[]> 
 }
 
 /**
- * Wysyła powiadomienie o zmianie statusu projektu (z opcjonalnym podglądem)
+ * Wysyła powiadomienie o zmianie statusu projektu
  */
 export async function notifyProjectStatusChanged(
   project: Project & { status: { name: string; slug?: string } },
@@ -295,36 +295,14 @@ export async function notifyProjectStatusChanged(
     },
   })
 
-  // Check if project is completed (status slug is "zakonczone" or name is "Zakończone")
+  // Check status type
   const statusSlug = (project.status as any).slug
   const isCompleted = statusSlug === 'zakonczone' || project.status.name.toLowerCase().includes('zakończon')
+  const isForApproval = statusSlug === 'do-akceptacji' || project.status.name.toLowerCase().includes('do akceptacji')
 
-  // Pobierz podgląd projektu jeśli istnieje
-  const previewFile = await prisma.projectFile.findFirst({
-    where: {
-      projectId: project.id,
-      isPreview: true,
-    },
-  })
-
-  // Przygotuj załącznik z podglądem
-  let attachments: Array<{ filename: string; path: string; cid?: string }> = []
-  let previewCid: string | undefined
-
-  if (previewFile && previewFile.storageType === 'local') {
-    const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads'
-    const filePath = `${UPLOAD_DIR}/${project.id}/${previewFile.storedName}`
-    previewCid = 'project-preview'
-    attachments = [{
-      filename: previewFile.filename,
-      path: filePath,
-      cid: previewCid,
-    }]
-  }
-
-  // Generate file links if project is completed
+  // Generate file links for completed or approval statuses
   let fileLinks: ProjectFileLink[] = []
-  if (isCompleted) {
+  if (isCompleted || isForApproval) {
     fileLinks = await generateFileLinks(project.id)
   }
 
@@ -341,10 +319,9 @@ export async function notifyProjectStatusChanged(
         recipientName: user.name,
         oldStatus: oldStatusName,
         files: fileLinks,
-        previewCid,
       })
     } else {
-      // Use regular status change email
+      // Use regular status change email (with file links for approval)
       emailData = projectStatusChangedEmail({
         projectNumber: project.number,
         projectTitle: project.title,
@@ -352,7 +329,7 @@ export async function notifyProjectStatusChanged(
         recipientName: user.name,
         oldStatus: oldStatusName,
         newStatus: project.status.name,
-        previewCid,
+        files: isForApproval ? fileLinks : undefined,
       })
     }
 
@@ -362,7 +339,6 @@ export async function notifyProjectStatusChanged(
       html: emailData.html,
       text: emailData.text,
       projectId: project.id,
-      attachments,
     })
   }
 
@@ -377,7 +353,6 @@ export async function notifyProjectStatusChanged(
         projectId: project.id,
         oldStatus: oldStatusName,
         files: fileLinks,
-        previewCid,
       })
     } else {
       emailData = projectStatusChangedEmail({
@@ -386,7 +361,7 @@ export async function notifyProjectStatusChanged(
         projectId: project.id,
         oldStatus: oldStatusName,
         newStatus: project.status.name,
-        previewCid,
+        files: isForApproval ? fileLinks : undefined,
       })
     }
 
@@ -396,7 +371,6 @@ export async function notifyProjectStatusChanged(
       html: emailData.html,
       text: emailData.text,
       projectId: project.id,
-      attachments,
     })
   }
 }
