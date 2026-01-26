@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { CommandPalette } from '@/components/search/command-palette'
+import { ToastProvider } from '@/components/ui/toast'
 import type { SessionUser } from '@/lib/auth'
 
 interface PanelLayoutClientProps {
@@ -15,22 +16,24 @@ export function PanelLayoutClient({ user, children }: PanelLayoutClientProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <CommandPalette />
-      <Sidebar
-        user={user}
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-      <div className="lg:pl-64">
-        <Header
+    <ToastProvider>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <CommandPalette />
+        <Sidebar
           user={user}
-          onMenuClick={() => setIsMobileMenuOpen(true)}
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
         />
-        <main className="p-6">
-          {children}
-        </main>
+        <div className="lg:pl-64">
+          <Header
+            user={user}
+            onMenuClick={() => setIsMobileMenuOpen(true)}
+          />
+          <main className="p-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   )
 }

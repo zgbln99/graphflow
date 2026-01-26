@@ -237,6 +237,19 @@
   }
 }
 
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-shrink {
+  animation: shrink linear forwards;
+}
+
 /* Klasy animacji */
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
