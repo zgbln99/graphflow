@@ -15,6 +15,8 @@ import {
   DollarSign,
   User,
   Image as ImageIcon,
+  Mail,
+  Users,
 } from 'lucide-react'
 import { formatDate, formatDateTime, formatRelativeTime } from '@/lib/utils'
 import { Timeline } from '@/components/project/timeline'
@@ -84,6 +86,13 @@ export default async function ProjectDetailPage({
         orderBy: { changedAt: 'desc' },
         take: 10,
       },
+      contacts: {
+        select: { id: true, name: true, email: true },
+      },
+      emailLogs: isAdmin ? {
+        orderBy: { sentAt: 'desc' },
+        take: 20,
+      } : undefined,
     },
   })
 
@@ -411,6 +420,75 @@ export default async function ProjectDetailPage({
                 </div>
               )}
             </div>
+
+            {/* Notification contacts */}
+            <div className="card dark:bg-gray-800 dark:border-gray-700">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                <Users className="w-5 h-5 text-gray-400" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">Kontakty do powiadomień</h2>
+              </div>
+              {project.contacts.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                  Brak przypisanych kontaktów
+                  <p className="text-xs mt-1">Powiadomienia będą wysyłane do twórcy projektu</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {project.contacts.map((contact) => (
+                    <div key={contact.id} className="p-3 text-sm flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">{contact.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{contact.email}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Email notifications history */}
+            {project.emailLogs && (
+              <div className="card dark:bg-gray-800 dark:border-gray-700">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-gray-400" />
+                  <h2 className="font-semibold text-gray-900 dark:text-white">Historia powiadomień email</h2>
+                </div>
+                {project.emailLogs.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                    Brak wysłanych powiadomień
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {project.emailLogs.map((log) => (
+                      <div key={log.id} className="p-3 text-sm">
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {log.toName || log.toEmail}
+                        </p>
+                        <p className="text-gray-600 dark:text-gray-400 text-xs truncate" title={log.subject}>
+                          {log.subject}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                            log.status === 'sent'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                          }`}>
+                            {log.status === 'sent' ? 'Wysłano' : 'Błąd'}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {formatDateTime(log.sentAt)}
+                          </span>
+                        </div>
+                        {log.error && (
+                          <p className="text-xs text-red-500 mt-1">{log.error}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
