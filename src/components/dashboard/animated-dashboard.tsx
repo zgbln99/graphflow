@@ -57,6 +57,7 @@ export function AnimatedStatCard({
   )
 
   const cardClasses = cn(
+    'block w-full',
     'bg-white rounded-xl border border-gray-200 shadow-sm',
     'dark:bg-gray-800 dark:border-gray-700',
     'p-4 transition-all duration-300',
@@ -68,20 +69,16 @@ export function AnimatedStatCard({
   if (href) {
     return (
       <FadeIn delay={delay} direction="up">
-        <TiltCard intensity={5}>
-          <Link href={href} className={cardClasses}>
-            {content}
-          </Link>
-        </TiltCard>
+        <Link href={href} className={cardClasses}>
+          {content}
+        </Link>
       </FadeIn>
     )
   }
 
   return (
     <FadeIn delay={delay} direction="up">
-      <TiltCard intensity={5}>
-        <div className={cardClasses}>{content}</div>
-      </TiltCard>
+      <div className={cardClasses}>{content}</div>
     </FadeIn>
   )
 }
