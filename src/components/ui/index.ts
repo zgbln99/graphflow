@@ -36,3 +36,20 @@ export { BulkActionsToolbar, createDeleteAction, createChangeStatusAction, creat
 export { SearchWithFilters } from './search-filters'
 export { MobileDrawer, ActionSheet } from './mobile-drawer'
 export { ResponsiveTable } from './responsive-table'
+
+// Animations
+export {
+  FadeIn,
+  StaggerChildren,
+  AnimatedCounter,
+  Pulse,
+  Shimmer,
+  SkeletonCard as AnimatedSkeletonCard,
+  Confetti,
+  RippleButton,
+  TiltCard,
+  FloatingActionButton,
+  GradientBackground,
+  SuccessCheckmark,
+  TypingText,
+} from './animations'
