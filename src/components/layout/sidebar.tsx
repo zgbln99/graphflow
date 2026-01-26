@@ -17,6 +17,7 @@ import {
   Download,
   History,
   Plus,
+  Cloud,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SessionUser } from '@/lib/auth'
@@ -37,6 +38,7 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     { href: '/panel/clients', label: 'Klienci', icon: Building2 },
     { href: '/panel/calendar', label: 'Kalendarz', icon: Calendar },
     { href: '/panel/inbox', label: 'Skrzynka', icon: Mail },
+    { href: '/panel/dropbox', label: 'Dropbox', icon: Cloud },
     { href: '/panel/export', label: 'Eksport', icon: Download },
     { href: '/panel/audit', label: 'Historia zmian', icon: History },
     { href: '/panel/settings', label: 'Ustawienia', icon: Settings },
