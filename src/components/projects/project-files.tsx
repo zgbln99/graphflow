@@ -13,12 +13,22 @@ interface ProjectFile {
   isPreview: boolean
   createdAt: string | Date
   uploadedBy?: { name: string } | null
+  storageType?: string
+  externalUrl?: string | null
 }
 
 interface ProjectFilesProps {
   projectId: string
   initialFiles: ProjectFile[]
   isAdmin: boolean
+}
+
+// Helper to get file URL (Dropbox or local)
+function getFileUrl(projectId: string, file: ProjectFile): string {
+  if (file.storageType === 'dropbox' && file.externalUrl) {
+    return file.externalUrl
+  }
+  return `/api/uploads/${projectId}/${file.storedName}`
 }
 
 export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesProps) {
@@ -128,7 +138,7 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
 
   // Prepare images for lightbox
   const allImages = files.map(f => ({
-    src: `/api/uploads/${projectId}/${f.storedName}`,
+    src: getFileUrl(projectId, f),
     alt: f.filename,
     filename: f.filename,
   }))
@@ -169,7 +179,7 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => handleUpload(e, true)}
+                onChange={(e) => handleInputUpload(e, true)}
                 disabled={uploading}
               />
             </label>
@@ -185,7 +195,7 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
             onDrop={isAdmin ? (e) => handleDrop(e, true) : undefined}
           >
             <img
-              src={`/api/uploads/${projectId}/${previewFile.storedName}`}
+              src={getFileUrl(projectId, previewFile)}
               alt="Podgląd projektu"
               className="w-full max-h-96 object-contain rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 cursor-pointer"
               onClick={() => openLightbox(previewFile)}
@@ -314,7 +324,7 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
                 onClick={() => openLightbox(file)}
               >
                 <img
-                  src={`/api/uploads/${projectId}/${file.storedName}`}
+                  src={getFileUrl(projectId, file)}
                   alt={file.filename}
                   className="w-full h-32 object-cover"
                 />
@@ -340,7 +350,7 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
                     <Expand className="w-4 h-4" />
                   </button>
                   <a
-                    href={`/api/uploads/${projectId}/${file.storedName}`}
+                    href={getFileUrl(projectId, file)}
                     download={file.filename}
                     onClick={(e) => e.stopPropagation()}
                     className="p-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100"

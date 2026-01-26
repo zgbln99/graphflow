@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { Settings, Clock, Tags, FolderKanban, Mail, Bell } from 'lucide-react'
+import { Settings, Clock, Tags, FolderKanban, Mail, Bell, Cloud } from 'lucide-react'
 
 export default async function SettingsPage() {
   const session = await getSession()
@@ -49,6 +49,12 @@ export default async function SettingsPage() {
       icon: Mail,
       title: 'Konfiguracja email',
       description: 'Ustawienia SMTP i IMAP',
+    },
+    {
+      href: '/panel/settings/dropbox',
+      icon: Cloud,
+      title: 'Integracja Dropbox',
+      description: 'Przechowuj pliki w chmurze',
     },
   ]
 

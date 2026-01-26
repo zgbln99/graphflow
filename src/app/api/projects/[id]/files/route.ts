@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { notifyUsers } from '@/lib/realtime'
+import { uploadToDropbox, deleteFromDropbox, isDropboxConfigured } from '@/lib/dropbox'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 import { randomUUID } from 'crypto'
@@ -100,19 +101,41 @@ export async function POST(
       )
     }
 
-    // Utwórz folder dla projektu jeśli nie istnieje
-    const projectDir = path.join(UPLOAD_DIR, projectId)
-    await mkdir(projectDir, { recursive: true })
+    // Pobierz zawartość pliku
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
 
     // Generuj unikalną nazwę pliku
     const ext = path.extname(file.name)
     const storedName = `${randomUUID()}${ext}`
-    const filePath = path.join(projectDir, storedName)
 
-    // Zapisz plik
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
+    // Sprawdź czy Dropbox jest skonfigurowany
+    const useDropbox = await isDropboxConfigured()
+
+    let storageType = 'local'
+    let externalUrl: string | null = null
+    let dropboxPath: string | null = null
+
+    if (useDropbox) {
+      // Upload do Dropbox
+      const dropboxResult = await uploadToDropbox(buffer, project.number, storedName)
+      if (dropboxResult) {
+        storageType = 'dropbox'
+        externalUrl = dropboxResult.url
+        dropboxPath = dropboxResult.path
+      } else {
+        // Fallback do lokalnego storage jeśli Dropbox nie działa
+        console.warn('Dropbox upload failed, falling back to local storage')
+        const projectDir = path.join(UPLOAD_DIR, projectId)
+        await mkdir(projectDir, { recursive: true })
+        await writeFile(path.join(projectDir, storedName), buffer)
+      }
+    } else {
+      // Zapisz lokalnie
+      const projectDir = path.join(UPLOAD_DIR, projectId)
+      await mkdir(projectDir, { recursive: true })
+      await writeFile(path.join(projectDir, storedName), buffer)
+    }
 
     // Jeśli to preview, usuń poprzedni preview
     if (isPreview) {
@@ -121,11 +144,15 @@ export async function POST(
       })
 
       if (existingPreview) {
-        // Usuń plik z dysku
-        try {
-          await unlink(path.join(UPLOAD_DIR, projectId, existingPreview.storedName))
-        } catch (e) {
-          // Plik mógł już nie istnieć
+        // Usuń plik ze storage
+        if (existingPreview.storageType === 'dropbox' && existingPreview.dropboxPath) {
+          await deleteFromDropbox(existingPreview.dropboxPath)
+        } else {
+          try {
+            await unlink(path.join(UPLOAD_DIR, projectId, existingPreview.storedName))
+          } catch (e) {
+            // Plik mógł już nie istnieć
+          }
         }
 
         // Usuń z bazy
@@ -145,6 +172,9 @@ export async function POST(
         size: file.size,
         isPreview,
         uploadedById: session.user.id,
+        storageType,
+        externalUrl,
+        dropboxPath,
       },
       include: {
         uploadedBy: {
@@ -200,11 +230,15 @@ export async function DELETE(
     return NextResponse.json({ error: 'Plik nie istnieje' }, { status: 404 })
   }
 
-  // Usuń plik z dysku
-  try {
-    await unlink(path.join(UPLOAD_DIR, projectId, file.storedName))
-  } catch (e) {
-    // Plik mógł już nie istnieć
+  // Usuń plik ze storage
+  if (file.storageType === 'dropbox' && file.dropboxPath) {
+    await deleteFromDropbox(file.dropboxPath)
+  } else {
+    try {
+      await unlink(path.join(UPLOAD_DIR, projectId, file.storedName))
+    } catch (e) {
+      // Plik mógł już nie istnieć
+    }
   }
 
   // Usuń z bazy

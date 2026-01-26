@@ -351,13 +351,18 @@ model ProjectFile {
   projectId   String
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   filename    String    // Oryginalna nazwa pliku
-  storedName  String    // Nazwa pod jaką zapisano na dysku
+  storedName  String    // Nazwa pod jaką zapisano na dysku lub w Dropbox
   mimeType    String    // np. image/png, image/jpeg
   size        Int       // Rozmiar w bajtach
   isPreview   Boolean   @default(false) // Czy to jest główny podgląd projektu
   uploadedById String?
   uploadedBy  User?     @relation(fields: [uploadedById], references: [id])
   createdAt   DateTime  @default(now())
+
+  // Dropbox integration
+  storageType String    @default("local") // "local" | "dropbox"
+  externalUrl String?   // URL do pliku w Dropbox (dla storageType = "dropbox")
+  dropboxPath String?   // Ścieżka w Dropbox
 
   @@index([projectId])
   @@index([uploadedById])
@@ -544,4 +549,15 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@index([createdAt])
+}
+
+// ============================================
+// USTAWIENIA SYSTEMOWE
+// ============================================
+
+model SystemSetting {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  value     String?
+  updatedAt DateTime  @updatedAt
 }
