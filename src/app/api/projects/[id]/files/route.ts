@@ -83,12 +83,21 @@ export async function POST(
       return NextResponse.json({ error: 'Brak pliku' }, { status: 400 })
     }
 
-    // Max 500MB dla plików projektowych (Dropbox)
-    const maxSize = 500 * 1024 * 1024
+    // Max 2GB dla plików projektowych (Dropbox)
+    const maxSize = 2 * 1024 * 1024 * 1024
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'Maksymalny rozmiar pliku to 500MB' },
+        { error: 'Maksymalny rozmiar pliku to 2GB' },
         { status: 400 }
+      )
+    }
+
+    // Sprawdź czy Dropbox jest skonfigurowany - WYMAGANY
+    const useDropbox = await isDropboxConfigured()
+    if (!useDropbox) {
+      return NextResponse.json(
+        { error: 'Dropbox nie jest skonfigurowany. Skonfiguruj Dropbox w ustawieniach.' },
+        { status: 500 }
       )
     }
 
@@ -100,38 +109,21 @@ export async function POST(
     const ext = path.extname(file.name)
     const storedName = `${randomUUID()}${ext}`
 
-    // Sprawdź czy Dropbox jest skonfigurowany
-    const useDropbox = await isDropboxConfigured()
-    console.log('Dropbox configured:', useDropbox)
+    // Upload do Dropbox - BEZ FALLBACKU do lokalnego storage
+    console.log('Uploading to Dropbox:', project.number, storedName, `(${(file.size / (1024 * 1024)).toFixed(1)} MB)`)
+    const dropboxResult = await uploadToDropbox(buffer, project.number, storedName)
 
-    let storageType = 'local'
-    let externalUrl: string | null = null
-    let dropboxPath: string | null = null
-
-    if (useDropbox) {
-      // Upload do Dropbox
-      console.log('Attempting Dropbox upload for:', project.number, storedName)
-      const dropboxResult = await uploadToDropbox(buffer, project.number, storedName)
-      console.log('Dropbox upload result:', dropboxResult)
-      if (dropboxResult) {
-        storageType = 'dropbox'
-        externalUrl = dropboxResult.url
-        dropboxPath = dropboxResult.path
-        console.log('File uploaded to Dropbox:', dropboxPath)
-      } else {
-        // Fallback do lokalnego storage jeśli Dropbox nie działa
-        console.warn('Dropbox upload failed, falling back to local storage')
-        const projectDir = path.join(UPLOAD_DIR, projectId)
-        await mkdir(projectDir, { recursive: true })
-        await writeFile(path.join(projectDir, storedName), buffer)
-      }
-    } else {
-      // Zapisz lokalnie
-      console.log('Dropbox not configured, saving locally')
-      const projectDir = path.join(UPLOAD_DIR, projectId)
-      await mkdir(projectDir, { recursive: true })
-      await writeFile(path.join(projectDir, storedName), buffer)
+    if (!dropboxResult) {
+      return NextResponse.json(
+        { error: 'Błąd uploadu do Dropbox. Sprawdź konfigurację lub spróbuj ponownie.' },
+        { status: 500 }
+      )
     }
+
+    const storageType = 'dropbox'
+    const externalUrl = dropboxResult.url
+    const dropboxPath = dropboxResult.path
+    console.log('File uploaded to Dropbox:', dropboxPath)
 
     // Jeśli to preview, usuń poprzedni preview
     if (isPreview) {

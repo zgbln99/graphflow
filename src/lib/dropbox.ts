@@ -30,7 +30,7 @@ export async function isDropboxConfigured(): Promise<boolean> {
   return !!setting?.value
 }
 
-// Upload file to Dropbox
+// Upload file to Dropbox (supports large files up to 2GB via chunked upload)
 export async function uploadToDropbox(
   file: Buffer,
   path: string,
@@ -41,13 +41,51 @@ export async function uploadToDropbox(
 
   try {
     const fullPath = `/GraphFlow/${path}/${filename}`
+    const CHUNK_SIZE = 8 * 1024 * 1024 // 8MB chunks
 
-    // Upload file
-    const uploadResponse = await dbx.filesUpload({
-      path: fullPath,
-      contents: file,
-      mode: { '.tag': 'overwrite' },
-    })
+    let uploadResponse
+
+    // For files larger than 150MB, use chunked upload
+    if (file.length > 150 * 1024 * 1024) {
+      console.log(`Large file detected (${(file.length / (1024 * 1024)).toFixed(1)} MB), using chunked upload...`)
+
+      // Start upload session
+      const startResponse = await dbx.filesUploadSessionStart({
+        close: false,
+        contents: file.slice(0, CHUNK_SIZE),
+      })
+
+      const sessionId = startResponse.result.session_id
+      let offset = CHUNK_SIZE
+
+      // Upload remaining chunks
+      while (offset < file.length - CHUNK_SIZE) {
+        await dbx.filesUploadSessionAppendV2({
+          cursor: { session_id: sessionId, offset },
+          close: false,
+          contents: file.slice(offset, offset + CHUNK_SIZE),
+        })
+        offset += CHUNK_SIZE
+        console.log(`Uploaded ${(offset / (1024 * 1024)).toFixed(1)} MB / ${(file.length / (1024 * 1024)).toFixed(1)} MB`)
+      }
+
+      // Finish upload session
+      uploadResponse = await dbx.filesUploadSessionFinish({
+        cursor: { session_id: sessionId, offset },
+        commit: {
+          path: fullPath,
+          mode: { '.tag': 'overwrite' },
+        },
+        contents: file.slice(offset),
+      })
+    } else {
+      // Small file - simple upload
+      uploadResponse = await dbx.filesUpload({
+        path: fullPath,
+        contents: file,
+        mode: { '.tag': 'overwrite' },
+      })
+    }
 
     // Create shared link for viewing
     let sharedLink: string
