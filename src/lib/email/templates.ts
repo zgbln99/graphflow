@@ -335,6 +335,12 @@ ${APP_URL}
 // PROJECT EMAILS
 // ============================================
 
+export interface ProjectFileLink {
+  filename: string
+  url: string
+  size?: number
+}
+
 export function projectStatusChangedEmail(
   data: ProjectEmailData & { oldStatus: string; newStatus: string }
 ): { subject: string; html: string; text: string } {
@@ -390,6 +396,99 @@ ${data.submittedByName ? `Zgłosił: ${data.submittedByName}` : ''}
 Status: ${data.oldStatus} → ${data.newStatus}
 
 Link do projektu: ${projectUrl}
+
+---
+GraphFlow - System zarządzania projektami graficznymi
+${APP_URL}
+  `.trim()
+
+  return { subject, html, text }
+}
+
+function formatFileSizeForEmail(bytes?: number): string {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+}
+
+export function projectCompletedEmail(
+  data: ProjectEmailData & { oldStatus: string; files: ProjectFileLink[] }
+): { subject: string; html: string; text: string } {
+  const projectUrl = `${APP_URL}/panel/projects/${data.projectId}`
+  const subject = `[${data.projectNumber}] Projekt zakończony - pliki do pobrania`
+
+  const filesSection = data.files.length > 0 ? `
+    <div style="margin: 24px 0;">
+      <p style="margin: 0 0 16px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">PLIKI DO POBRANIA (${data.files.length})</p>
+      <div style="background: ${COLORS.athensGray}; border-radius: 8px; overflow: hidden;">
+        ${data.files.map((file, index) => `
+          <div style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} display: flex; align-items: center; justify-content: space-between;">
+            <div style="flex: 1; min-width: 0;">
+              <p style="margin: 0; font-size: 14px; color: ${COLORS.shark}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.filename}</p>
+              ${file.size ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: ${COLORS.gullGray};">${formatFileSizeForEmail(file.size)}</p>` : ''}
+            </div>
+            <a href="${file.url}" style="margin-left: 16px; padding: 8px 16px; background: ${COLORS.toryBlue}; color: ${COLORS.white}; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 500; white-space: nowrap;">Pobierz</a>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : ''
+
+  const previewSection = data.previewCid ? `
+    <div style="margin: 24px 0; text-align: center;">
+      <p style="margin: 0 0 12px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">PODGLĄD PROJEKTU</p>
+      <img src="cid:${data.previewCid}" alt="Podgląd projektu" style="max-width: 100%; max-height: 400px; border-radius: 8px; border: 1px solid ${COLORS.athensGray};" />
+    </div>
+  ` : ''
+
+  const html = getBaseTemplate(`
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Projekt zakończony!</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Twój projekt został ukończony i jest gotowy do odbioru</p>
+
+    ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
+    <p style="margin: 0 0 20px 0;">Z przyjemnością informujemy, że Twój projekt został zakończony. Poniżej znajdziesz linki do pobrania wszystkich plików projektu.</p>
+
+    ${getInfoBox(`
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">PROJEKT</p>
+      <p style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: ${COLORS.mirage};">[${data.projectNumber}] ${data.projectTitle}</p>
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">STATUS</p>
+      <p style="margin: 0;">
+        <span style="display: inline-block; padding: 4px 12px; background: #10b981; color: white; border-radius: 9999px; font-size: 13px; font-weight: 500;">Zakończony</span>
+      </p>
+    `, '#10b981')}
+
+    ${previewSection}
+    ${filesSection}
+
+    <div style="text-align: center; margin: 28px 0;">
+      ${getButton('Zobacz projekt', projectUrl, '#10b981')}
+    </div>
+
+    <p style="color: ${COLORS.gullGray}; font-size: 13px; margin: 24px 0 0 0;">
+      Dziękujemy za współpracę! Jeśli masz jakiekolwiek pytania lub potrzebujesz zmian, skontaktuj się z nami.
+    </p>
+  `)
+
+  const filesText = data.files.length > 0
+    ? `\nPLIKI DO POBRANIA:\n${data.files.map(f => `- ${f.filename}${f.size ? ` (${formatFileSizeForEmail(f.size)})` : ''}\n  ${f.url}`).join('\n')}\n`
+    : ''
+
+  const text = `
+PROJEKT ZAKOŃCZONY!
+${data.projectNumber}
+
+${data.recipientName ? `Cześć ${data.recipientName},` : ''}
+
+Z przyjemnością informujemy, że Twój projekt został zakończony.
+
+Projekt: [${data.projectNumber}] ${data.projectTitle}
+Status: Zakończony
+${filesText}
+Link do projektu: ${projectUrl}
+
+Dziękujemy za współpracę!
 
 ---
 GraphFlow - System zarządzania projektami graficznymi

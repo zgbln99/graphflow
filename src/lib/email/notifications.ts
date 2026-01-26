@@ -7,9 +7,12 @@ import {
   ticketNewCommentEmail,
   ticketDeadlineReminderEmail,
   projectStatusChangedEmail,
+  projectCompletedEmail,
   newProjectRequestEmail,
+  ProjectFileLink,
 } from './templates'
-import type { Ticket, Project, Comment, User, ClientAccount } from '@prisma/client'
+import { getDropboxClient } from '../dropbox'
+import type { Ticket, Project, Comment, User, ClientAccount, ProjectFile } from '@prisma/client'
 
 /**
  * Wysyła powiadomienie o utworzeniu ticketa do klienta
@@ -210,10 +213,79 @@ export async function sendDeadlineReminders(): Promise<void> {
 }
 
 /**
+ * Generuje linki do pobrania dla plików projektu
+ */
+async function generateFileLinks(projectId: string): Promise<ProjectFileLink[]> {
+  const files = await prisma.projectFile.findMany({
+    where: { projectId },
+  })
+
+  if (files.length === 0) return []
+
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://graphflow.eu'
+  const fileLinks: ProjectFileLink[] = []
+  const dbx = await getDropboxClient()
+
+  for (const file of files) {
+    let url: string
+
+    if (file.storageType === 'dropbox' && file.dropboxPath && dbx) {
+      // Generate Dropbox shared link
+      try {
+        // Try to get existing shared link or create new one
+        let sharedLink: string
+        try {
+          const linkResponse = await dbx.sharingCreateSharedLinkWithSettings({
+            path: file.dropboxPath,
+            settings: {
+              requested_visibility: { '.tag': 'public' },
+            },
+          })
+          sharedLink = linkResponse.result.url
+        } catch (linkError: any) {
+          // If link already exists, get existing link
+          if (linkError?.error?.error?.['.tag'] === 'shared_link_already_exists') {
+            const existingLinks = await dbx.sharingListSharedLinks({
+              path: file.dropboxPath,
+              direct_only: true,
+            })
+            if (existingLinks.result.links.length > 0) {
+              sharedLink = existingLinks.result.links[0].url
+            } else {
+              // Fallback to local download
+              sharedLink = `${APP_URL}/api/projects/${projectId}/files/${file.id}/download`
+            }
+          } else {
+            // Fallback to local download
+            sharedLink = `${APP_URL}/api/projects/${projectId}/files/${file.id}/download`
+          }
+        }
+        url = sharedLink
+      } catch (error) {
+        console.error('Error generating Dropbox link for file:', file.filename, error)
+        // Fallback to local download
+        url = `${APP_URL}/api/projects/${projectId}/files/${file.id}/download`
+      }
+    } else {
+      // Local file - use download API
+      url = `${APP_URL}/api/projects/${projectId}/files/${file.id}/download`
+    }
+
+    fileLinks.push({
+      filename: file.filename,
+      url,
+      size: file.size,
+    })
+  }
+
+  return fileLinks
+}
+
+/**
  * Wysyła powiadomienie o zmianie statusu projektu (z opcjonalnym podglądem)
  */
 export async function notifyProjectStatusChanged(
-  project: Project & { status: { name: string } },
+  project: Project & { status: { name: string; slug?: string } },
   oldStatusName: string
 ): Promise<void> {
   const clientUsers = await prisma.user.findMany({
@@ -222,6 +294,10 @@ export async function notifyProjectStatusChanged(
       isActive: true,
     },
   })
+
+  // Check if project is completed (status slug is "zakonczone" or name is "Zakończone")
+  const statusSlug = (project.status as any).slug
+  const isCompleted = statusSlug === 'zakonczone' || project.status.name.toLowerCase().includes('zakończon')
 
   // Pobierz podgląd projektu jeśli istnieje
   const previewFile = await prisma.projectFile.findFirst({
@@ -235,7 +311,7 @@ export async function notifyProjectStatusChanged(
   let attachments: Array<{ filename: string; path: string; cid?: string }> = []
   let previewCid: string | undefined
 
-  if (previewFile) {
+  if (previewFile && previewFile.storageType === 'local') {
     const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads'
     const filePath = `${UPLOAD_DIR}/${project.id}/${previewFile.storedName}`
     previewCid = 'project-preview'
@@ -246,17 +322,39 @@ export async function notifyProjectStatusChanged(
     }]
   }
 
+  // Generate file links if project is completed
+  let fileLinks: ProjectFileLink[] = []
+  if (isCompleted) {
+    fileLinks = await generateFileLinks(project.id)
+  }
+
   // Wyślij do użytkowników klienta
   for (const user of clientUsers) {
-    const emailData = projectStatusChangedEmail({
-      projectNumber: project.number,
-      projectTitle: project.title,
-      projectId: project.id,
-      recipientName: user.name,
-      oldStatus: oldStatusName,
-      newStatus: project.status.name,
-      previewCid,
-    })
+    let emailData
+
+    if (isCompleted) {
+      // Use completed project email template with file links
+      emailData = projectCompletedEmail({
+        projectNumber: project.number,
+        projectTitle: project.title,
+        projectId: project.id,
+        recipientName: user.name,
+        oldStatus: oldStatusName,
+        files: fileLinks,
+        previewCid,
+      })
+    } else {
+      // Use regular status change email
+      emailData = projectStatusChangedEmail({
+        projectNumber: project.number,
+        projectTitle: project.title,
+        projectId: project.id,
+        recipientName: user.name,
+        oldStatus: oldStatusName,
+        newStatus: project.status.name,
+        previewCid,
+      })
+    }
 
     await sendEmail({
       to: user.email,
@@ -270,14 +368,27 @@ export async function notifyProjectStatusChanged(
 
   // Wyślij do dodatkowego emaila jeśli jest ustawiony
   if ((project as any).notifyEmail) {
-    const emailData = projectStatusChangedEmail({
-      projectNumber: project.number,
-      projectTitle: project.title,
-      projectId: project.id,
-      oldStatus: oldStatusName,
-      newStatus: project.status.name,
-      previewCid,
-    })
+    let emailData
+
+    if (isCompleted) {
+      emailData = projectCompletedEmail({
+        projectNumber: project.number,
+        projectTitle: project.title,
+        projectId: project.id,
+        oldStatus: oldStatusName,
+        files: fileLinks,
+        previewCid,
+      })
+    } else {
+      emailData = projectStatusChangedEmail({
+        projectNumber: project.number,
+        projectTitle: project.title,
+        projectId: project.id,
+        oldStatus: oldStatusName,
+        newStatus: project.status.name,
+        previewCid,
+      })
+    }
 
     await sendEmail({
       to: (project as any).notifyEmail,
