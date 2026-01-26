@@ -1,14 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import type { ClientAccount, ProjectStatus, ProjectTag, TimelineTemplate } from '@prisma/client'
+import type { ClientAccount, ProjectStatus, ProjectTag, TimelineTemplate, User } from '@prisma/client'
 import { createProjectAction, updateProjectAction } from './project-actions'
 
+type ClientWithUsers = ClientAccount & {
+  users: Pick<User, 'id' | 'name' | 'email' | 'isActive'>[]
+}
+
 interface ProjectFormProps {
-  clients: ClientAccount[]
+  clients: ClientWithUsers[]
   statuses: ProjectStatus[]
   tags: ProjectTag[]
   templates: (TimelineTemplate & { stages: { name: string; order: number }[] })[]
@@ -43,8 +47,16 @@ export function ProjectForm({
     project?.tags.map((t) => t.id) || []
   )
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
+  const [selectedClientId, setSelectedClientId] = useState<string>(project?.clientAccountId || '')
 
   const isEditing = !!project
+
+  // Get users for selected client
+  const selectedClientUsers = useMemo(() => {
+    if (!selectedClientId) return []
+    const client = clients.find(c => c.id === selectedClientId)
+    return client?.users.filter(u => u.isActive) || []
+  }, [selectedClientId, clients])
 
   async function handleSubmit(formData: FormData) {
     setIsLoading(true)
@@ -103,7 +115,8 @@ export function ProjectForm({
           id="clientAccountId"
           name="clientAccountId"
           required
-          defaultValue={project?.clientAccountId || ''}
+          value={selectedClientId}
+          onChange={(e) => setSelectedClientId(e.target.value)}
           className="input"
           disabled={isEditing}
         >
@@ -115,6 +128,30 @@ export function ProjectForm({
           ))}
         </select>
       </div>
+
+      {/* Przypisany uzytkownik (tylko przy tworzeniu) */}
+      {!isEditing && selectedClientId && selectedClientUsers.length > 0 && (
+        <div>
+          <label htmlFor="createdById" className="label">
+            Przypisz do uzytkownika
+          </label>
+          <select
+            id="createdById"
+            name="createdById"
+            className="input"
+          >
+            <option value="">Nie przypisuj (admin jako tworca)</option>
+            {selectedClientUsers.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name} ({user.email})
+              </option>
+            ))}
+          </select>
+          <p className="text-sm text-gray-500 mt-1">
+            Wybierz uzytkownika, ktory bedzie widoczny jako zglaszajacy projekt
+          </p>
+        </div>
+      )}
 
       {/* Tytuł */}
       <div>

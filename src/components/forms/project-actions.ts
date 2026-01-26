@@ -43,6 +43,9 @@ export async function createProjectAction(formData: FormData) {
       where: { id: data.statusId },
     })
 
+    // Pobierz przypisanego uzytkownika (opcjonalnie)
+    const assignedUserId = formData.get('createdById') as string | null
+
     // Utwórz projekt
     const project = await prisma.project.create({
       data: {
@@ -55,7 +58,7 @@ export async function createProjectAction(formData: FormData) {
         localPath: data.localPath || null,
         dropboxPath: data.dropboxPath || null,
         dropboxLink: data.dropboxLink || null,
-        createdById: session.user.id,
+        createdById: assignedUserId || session.user.id,
         tags: data.tagIds?.length
           ? { connect: data.tagIds.map((id) => ({ id })) }
           : undefined,
