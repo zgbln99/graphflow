@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { getSession } from '@/lib/auth'
 import { getDropboxClient } from '@/lib/dropbox'
 import fs from 'fs/promises'
 import path from 'path'
@@ -8,16 +9,31 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; fileId: string }> }
 ) {
+  const session = await getSession()
+  if (!session) {
+    return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
+  }
+
   const { id: projectId, fileId } = await params
 
   try {
-    // Find the file
+    // Find the file and project
     const file = await prisma.projectFile.findFirst({
       where: {
         id: fileId,
         projectId,
       },
+      include: {
+        project: {
+          select: { clientAccountId: true },
+        },
+      },
     })
+
+    // Check access - admin or client assigned to project
+    if (file && session.user.role !== 'ADMIN' && file.project.clientAccountId !== session.user.clientAccountId) {
+      return NextResponse.json({ error: 'Brak dostępu' }, { status: 403 })
+    }
 
     if (!file) {
       return NextResponse.json({ error: 'Plik nie został znaleziony' }, { status: 404 })
@@ -59,13 +75,18 @@ export async function GET(
       }
     }
 
+    // Check if this is an image - use inline for preview, attachment for download
+    const isImage = contentType.startsWith('image/')
+    const disposition = isImage ? 'inline' : 'attachment'
+
     // Return the file with proper headers
     return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(file.filename)}"`,
+        'Content-Disposition': `${disposition}; filename="${encodeURIComponent(file.filename)}"`,
         'Content-Length': fileBuffer.length.toString(),
+        'Cache-Control': 'public, max-age=31536000, immutable',
       },
     })
   } catch (error) {

@@ -23,12 +23,10 @@ interface ProjectFilesProps {
   isAdmin: boolean
 }
 
-// Helper to get file URL (Dropbox or local)
+// Helper to get file URL - use download API for all files (handles both local and Dropbox)
 function getFileUrl(projectId: string, file: ProjectFile): string {
-  if (file.storageType === 'dropbox' && file.externalUrl) {
-    return file.externalUrl
-  }
-  return `/api/uploads/${projectId}/${file.storedName}`
+  // Use the unified download endpoint that handles both local and Dropbox storage
+  return `/api/projects/${projectId}/files/${file.id}/download`
 }
 
 export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesProps) {
