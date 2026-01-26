@@ -47,7 +47,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
     })
 
     // Loguj wysłany email
-    await prisma.emailLog.create({
+    // TODO: Remove 'as any' after running migration and regenerating Prisma client
+    await (prisma.emailLog.create as any)({
       data: {
         toEmail: Array.isArray(options.to) ? options.to.join(', ') : options.to,
         toName: options.recipientName,
@@ -63,7 +64,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
     console.error('Błąd wysyłki email:', error)
 
     // Loguj błąd
-    await prisma.emailLog.create({
+    // TODO: Remove 'as any' after running migration and regenerating Prisma client
+    await (prisma.emailLog.create as any)({
       data: {
         toEmail: Array.isArray(options.to) ? options.to.join(', ') : options.to,
         toName: options.recipientName,
