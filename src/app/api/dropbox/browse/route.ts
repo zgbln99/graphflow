@@ -22,14 +22,16 @@ export async function GET(request: NextRequest) {
       include_media_info: true,
     })
 
-    const entries = response.result.entries.map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      path: entry.path_display,
-      type: entry['.tag'], // 'file' or 'folder'
-      size: entry['.tag'] === 'file' ? (entry as any).size : null,
-      modified: entry['.tag'] === 'file' ? (entry as any).client_modified : null,
-    }))
+    const entries = response.result.entries
+      .filter((entry) => entry['.tag'] !== 'deleted')
+      .map((entry: any) => ({
+        id: entry.id || entry.path_display,
+        name: entry.name,
+        path: entry.path_display,
+        type: entry['.tag'], // 'file' or 'folder'
+        size: entry['.tag'] === 'file' ? entry.size : null,
+        modified: entry['.tag'] === 'file' ? entry.client_modified : null,
+      }))
 
     // Sort: folders first, then files
     entries.sort((a, b) => {
