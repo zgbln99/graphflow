@@ -111,6 +111,7 @@ export async function POST(
 
     // Sprawdź czy Dropbox jest skonfigurowany
     const useDropbox = await isDropboxConfigured()
+    console.log('Dropbox configured:', useDropbox)
 
     let storageType = 'local'
     let externalUrl: string | null = null
@@ -118,11 +119,14 @@ export async function POST(
 
     if (useDropbox) {
       // Upload do Dropbox
+      console.log('Attempting Dropbox upload for:', project.number, storedName)
       const dropboxResult = await uploadToDropbox(buffer, project.number, storedName)
+      console.log('Dropbox upload result:', dropboxResult)
       if (dropboxResult) {
         storageType = 'dropbox'
         externalUrl = dropboxResult.url
         dropboxPath = dropboxResult.path
+        console.log('File uploaded to Dropbox:', dropboxPath)
       } else {
         // Fallback do lokalnego storage jeśli Dropbox nie działa
         console.warn('Dropbox upload failed, falling back to local storage')
@@ -132,6 +136,7 @@ export async function POST(
       }
     } else {
       // Zapisz lokalnie
+      console.log('Dropbox not configured, saving locally')
       const projectDir = path.join(UPLOAD_DIR, projectId)
       await mkdir(projectDir, { recursive: true })
       await writeFile(path.join(projectDir, storedName), buffer)
