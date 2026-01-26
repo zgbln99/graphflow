@@ -137,7 +137,7 @@ export default async function DashboardPage() {
           value={totalProjects}
           color="blue"
           href="/panel/projects"
-          delay={100}
+          delay={0}
         />
         <AnimatedStatCard
           icon={<TrendingUp className="w-5 h-5" />}
@@ -145,15 +145,15 @@ export default async function DashboardPage() {
           value={inProgressProjects}
           color="purple"
           href="/panel/projects?status=w-trakcie"
-          delay={200}
+          delay={50}
         />
         <AnimatedStatCard
           icon={<CheckCircle className="w-5 h-5" />}
-          label="Zakonczone"
+          label="Zakończone"
           value={completedProjects}
           color="green"
           href="/panel/projects?status=zakonczone"
-          delay={300}
+          delay={100}
         />
         {isAdmin ? (
           <AnimatedStatCard
@@ -162,15 +162,15 @@ export default async function DashboardPage() {
             value={clientsCount}
             color="yellow"
             href="/panel/clients"
-            delay={400}
+            delay={150}
           />
         ) : (
           <AnimatedStatCard
             icon={<AlertTriangle className="w-5 h-5" />}
-            label="Zblizajace sie terminy"
+            label="Zbliżające się terminy"
             value={upcomingDeadlines.length}
             color="red"
-            delay={400}
+            delay={150}
           />
         )}
       </div>
@@ -179,7 +179,7 @@ export default async function DashboardPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Projects by status chart */}
         {isAdmin && projectStatusData.length > 0 && (
-          <AnimatedCard delay={500} className="p-6" withTilt>
+          <AnimatedCard delay={100} className="p-6" withTilt>
             <div className="flex items-center gap-2 mb-4">
               <BarChart3 className="w-5 h-5 text-primary-600" />
               <h2 className="font-semibold text-gray-900 dark:text-white">Projekty wg statusu</h2>
@@ -189,7 +189,7 @@ export default async function DashboardPage() {
         )}
 
         {/* Recent projects */}
-        <AnimatedCard delay={600}>
+        <AnimatedCard delay={150}>
           <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
             <h2 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Ostatnie projekty</h2>
             <Link href="/panel/projects" className="text-xs sm:text-sm link flex items-center gap-1 group whitespace-nowrap flex-shrink-0">
@@ -208,7 +208,7 @@ export default async function DashboardPage() {
                 <AnimatedProjectCard
                   key={project.id}
                   href={`/panel/projects/${project.id}`}
-                  delay={700 + index * 50}
+                  delay={0}
                 >
                   <div className="flex items-start justify-between gap-2 sm:gap-4">
                     <div className="min-w-0 flex-1">
@@ -246,7 +246,7 @@ export default async function DashboardPage() {
         </AnimatedCard>
 
         {/* Upcoming deadlines */}
-        <AnimatedCard delay={800}>
+        <AnimatedCard delay={200}>
           <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
@@ -270,7 +270,7 @@ export default async function DashboardPage() {
                     key={project.id}
                     href={`/panel/projects/${project.id}`}
                     isUrgent={isUrgent}
-                    delay={900 + index * 50}
+                    delay={0}
                   >
                     <div className="flex items-center justify-between gap-2 sm:gap-4">
                       <div className="min-w-0 flex-1">
@@ -306,7 +306,7 @@ export default async function DashboardPage() {
 
         {/* Recent activity (admin only) */}
         {isAdmin && recentActivity.length > 0 && (
-          <AnimatedCard delay={1000}>
+          <AnimatedCard delay={250}>
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-gray-400" />
@@ -318,7 +318,7 @@ export default async function DashboardPage() {
                 <AnimatedActivityItem
                   key={activity.id}
                   href={`/panel/projects/${activity.project.id}`}
-                  delay={1100 + index * 30}
+                  delay={0}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-primary-500 status-indicator" />
@@ -345,10 +345,10 @@ export default async function DashboardPage() {
       {/* Quick stats for admin */}
       {isAdmin && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <AnimatedQuickStat label="Klienci" value={clientsCount} icon={<Building2 className="w-4 h-4" />} delay={1200} />
-          <AnimatedQuickStat label="Uzytkownicy" value={usersCount} icon={<Users className="w-4 h-4" />} delay={1250} />
-          <AnimatedQuickStat label="Statusow" value={projectStatuses.length} icon={<BarChart3 className="w-4 h-4" />} delay={1300} />
-          <AnimatedQuickStat label="Aktywne projekty" value={totalProjects - completedProjects} icon={<Briefcase className="w-4 h-4" />} delay={1350} />
+          <AnimatedQuickStat label="Klienci" value={clientsCount} icon={<Building2 className="w-4 h-4" />} delay={200} />
+          <AnimatedQuickStat label="Użytkownicy" value={usersCount} icon={<Users className="w-4 h-4" />} delay={250} />
+          <AnimatedQuickStat label="Statusów" value={projectStatuses.length} icon={<BarChart3 className="w-4 h-4" />} delay={300} />
+          <AnimatedQuickStat label="Aktywne projekty" value={totalProjects - completedProjects} icon={<Briefcase className="w-4 h-4" />} delay={350} />
         </div>
       )}
     </div>

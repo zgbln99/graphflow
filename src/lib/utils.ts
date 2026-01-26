@@ -36,7 +36,7 @@ export async function generateNumber(
 }
 
 /**
- * Formatuje datę po polsku
+ * Formatuje datę po polsku (strefa czasowa: Warszawa)
  */
 export function formatDate(date: Date | string | null): string {
   if (!date) return '-'
@@ -47,11 +47,12 @@ export function formatDate(date: Date | string | null): string {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
+    timeZone: 'Europe/Warsaw',
   })
 }
 
 /**
- * Formatuje datę i czas po polsku
+ * Formatuje datę i czas po polsku (strefa czasowa: Warszawa)
  */
 export function formatDateTime(date: Date | string | null): string {
   if (!date) return '-'
@@ -64,6 +65,7 @@ export function formatDateTime(date: Date | string | null): string {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Europe/Warsaw',
   })
 }
 

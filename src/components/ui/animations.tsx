@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 // ============================================
-// FADE IN ANIMATION
+// FADE IN ANIMATION (Simple CSS-based)
 // ============================================
 
 interface FadeInProps {
@@ -18,48 +18,19 @@ interface FadeInProps {
 export function FadeIn({
   children,
   delay = 0,
-  duration = 500,
+  duration = 400,
   direction = 'up',
   className = '',
 }: FadeInProps) {
-  const [isVisible, setIsVisible] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setTimeout(() => setIsVisible(true), delay)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    if (ref.current) {
-      observer.observe(ref.current)
-    }
-
-    return () => observer.disconnect()
-  }, [delay])
-
-  const directionStyles = {
-    up: 'translate-y-8',
-    down: '-translate-y-8',
-    left: 'translate-x-8',
-    right: '-translate-x-8',
-    none: '',
-  }
+  // Simple CSS animation without visibility toggling
+  const animationName = direction === 'none' ? 'fade-in' : `fade-in-${direction}`
 
   return (
     <div
-      ref={ref}
-      className={cn(
-        'transition-all',
-        isVisible ? 'opacity-100 translate-x-0 translate-y-0' : `opacity-0 ${directionStyles[direction]}`,
-        className
-      )}
-      style={{ transitionDuration: `${duration}ms` }}
+      className={cn('animate-once', className)}
+      style={{
+        animation: `${animationName} ${duration}ms ease-out ${delay}ms both`,
+      }}
     >
       {children}
     </div>
@@ -93,7 +64,7 @@ export function StaggerChildren({
 }
 
 // ============================================
-// ANIMATED COUNTER
+// ANIMATED COUNTER (starts immediately on mount)
 // ============================================
 
 interface AnimatedCounterProps {
@@ -106,59 +77,41 @@ interface AnimatedCounterProps {
 
 export function AnimatedCounter({
   value,
-  duration = 1000,
+  duration = 800,
   prefix = '',
   suffix = '',
   className = '',
 }: AnimatedCounterProps) {
   const [displayValue, setDisplayValue] = useState(0)
-  const [hasAnimated, setHasAnimated] = useState(false)
-  const ref = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !hasAnimated) {
-          setHasAnimated(true)
-          observer.disconnect()
+    // Small delay to ensure component is mounted
+    const timeout = setTimeout(() => {
+      const startTime = Date.now()
+
+      const animate = () => {
+        const elapsed = Date.now() - startTime
+        const progress = Math.min(elapsed / duration, 1)
+
+        // Easing function (ease-out)
+        const easeOut = 1 - Math.pow(1 - progress, 3)
+
+        const currentValue = Math.floor(value * easeOut)
+        setDisplayValue(currentValue)
+
+        if (progress < 1) {
+          requestAnimationFrame(animate)
         }
-      },
-      { threshold: 0.1 }
-    )
-
-    if (ref.current) {
-      observer.observe(ref.current)
-    }
-
-    return () => observer.disconnect()
-  }, [hasAnimated])
-
-  useEffect(() => {
-    if (!hasAnimated) return
-
-    const startTime = Date.now()
-    const startValue = 0
-
-    const animate = () => {
-      const elapsed = Date.now() - startTime
-      const progress = Math.min(elapsed / duration, 1)
-
-      // Easing function (ease-out)
-      const easeOut = 1 - Math.pow(1 - progress, 3)
-
-      const currentValue = Math.floor(startValue + (value - startValue) * easeOut)
-      setDisplayValue(currentValue)
-
-      if (progress < 1) {
-        requestAnimationFrame(animate)
       }
-    }
 
-    requestAnimationFrame(animate)
-  }, [hasAnimated, value, duration])
+      requestAnimationFrame(animate)
+    }, 100)
+
+    return () => clearTimeout(timeout)
+  }, [value, duration])
 
   return (
-    <span ref={ref} className={className}>
+    <span className={className}>
       {prefix}{displayValue.toLocaleString()}{suffix}
     </span>
   )
