@@ -1,6 +1,14 @@
 import { Dropbox } from 'dropbox'
 import { prisma } from './db'
 
+// Create Dropbox client with proper fetch for Node.js environment
+function createDropboxClient(accessToken: string): Dropbox {
+  return new Dropbox({
+    accessToken,
+    fetch: globalThis.fetch,
+  })
+}
+
 // Get Dropbox client with access token from settings
 export async function getDropboxClient(): Promise<Dropbox | null> {
   const setting = await prisma.systemSetting.findUnique({
@@ -11,7 +19,7 @@ export async function getDropboxClient(): Promise<Dropbox | null> {
     return null
   }
 
-  return new Dropbox({ accessToken: setting.value })
+  return createDropboxClient(setting.value)
 }
 
 // Check if Dropbox is configured
@@ -109,7 +117,7 @@ export async function getDropboxDownloadLink(path: string): Promise<string | nul
 // Verify Dropbox token is valid
 export async function verifyDropboxToken(token: string): Promise<{ valid: boolean; email?: string; error?: string }> {
   try {
-    const dbx = new Dropbox({ accessToken: token })
+    const dbx = createDropboxClient(token)
     const response = await dbx.usersGetCurrentAccount()
     return {
       valid: true,
