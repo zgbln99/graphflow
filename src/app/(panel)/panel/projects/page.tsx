@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
-import { Plus, Search, Filter, ArrowUpDown, FolderOpen } from 'lucide-react'
+import { Plus, Search, Filter, ArrowUpDown, FolderOpen, LayoutGrid } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 export default async function ProjectsPage({
@@ -72,12 +72,20 @@ export default async function ProjectsPage({
             {isAdmin ? 'Zarządzaj wszystkimi projektami' : 'Twoje projekty'}
           </p>
         </div>
-        {isAdmin && (
-          <Link href="/panel/projects/new" className="btn-primary">
-            <Plus className="w-4 h-4 mr-2" />
-            Nowy projekt
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Link href="/panel/projects/kanban" className="btn-secondary">
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              Kanban
+            </Link>
+          )}
+          {isAdmin && (
+            <Link href="/panel/projects/new" className="btn-primary">
+              <Plus className="w-4 h-4 mr-2" />
+              Nowy projekt
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Filters */}

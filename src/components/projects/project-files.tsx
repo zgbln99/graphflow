@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import { Upload, Trash2, Image as ImageIcon, Loader2, Download, Star, Expand, FileText, FileArchive, File, FileVideo, FileAudio, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, Trash2, Image as ImageIcon, Loader2, Download, Star, Expand, FileText, FileArchive, File, FileVideo, FileAudio, X, CheckCircle, AlertCircle, History, RefreshCw } from 'lucide-react'
 import { Lightbox } from '@/components/ui/lightbox'
 
 interface ProjectFile {
@@ -15,6 +15,11 @@ interface ProjectFile {
   uploadedBy?: { name: string } | null
   storageType?: string
   externalUrl?: string | null
+  // Versioning
+  version?: number
+  parentFileId?: string | null
+  versionNote?: string | null
+  versions?: ProjectFile[]
 }
 
 interface UploadingFile {
@@ -65,19 +70,24 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
   const [error, setError] = useState<string | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [versioningFileId, setVersioningFileId] = useState<string | null>(null)
   const previewInputRef = useRef<HTMLInputElement>(null)
   const filesInputRef = useRef<HTMLInputElement>(null)
+  const versionInputRef = useRef<HTMLInputElement>(null)
   const uploadingRef = useRef(false)
 
   const isUploading = uploadQueue.some(f => f.status === 'uploading' || f.status === 'pending')
 
   // Upload single file with progress tracking
-  const uploadFileWithProgress = useCallback((uploadingFile: UploadingFile, isPreview: boolean = false): Promise<ProjectFile | null> => {
+  const uploadFileWithProgress = useCallback((uploadingFile: UploadingFile, isPreview: boolean = false, parentFileId?: string): Promise<ProjectFile | null> => {
     return new Promise((resolve) => {
       const xhr = new XMLHttpRequest()
       const formData = new FormData()
       formData.append('file', uploadingFile.file)
       formData.append('isPreview', isPreview.toString())
+      if (parentFileId) {
+        formData.append('parentFileId', parentFileId)
+      }
 
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
@@ -234,6 +244,50 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
   const removeFromQueue = useCallback((id: string) => {
     setUploadQueue(prev => prev.filter(f => f.id !== id))
   }, [])
+
+  // Handle uploading a new version of a file
+  const handleVersionUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files
+    if (fileList && fileList.length > 0 && versioningFileId) {
+      const newFiles: UploadingFile[] = Array.from(fileList).map(file => ({
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        file,
+        progress: 0,
+        status: 'pending' as const,
+      }))
+
+      setUploadQueue(prev => [...prev, ...newFiles])
+      setError(null)
+
+      // Upload as new version
+      const uploadVersion = async () => {
+        if (uploadingRef.current) return
+        uploadingRef.current = true
+
+        for (const uploadingFile of newFiles) {
+          setUploadQueue(prev => prev.map(f =>
+            f.id === uploadingFile.id ? { ...f, status: 'uploading' } : f
+          ))
+
+          const result = await uploadFileWithProgress(uploadingFile, false, versioningFileId)
+
+          if (result) {
+            setFiles(prev => [result, ...prev])
+          }
+        }
+
+        setTimeout(() => {
+          setUploadQueue(prev => prev.filter(f => f.status !== 'done'))
+        }, 2000)
+
+        uploadingRef.current = false
+      }
+
+      uploadVersion()
+    }
+    e.target.value = ''
+    setVersioningFileId(null)
+  }, [versioningFileId, uploadFileWithProgress])
 
   const previewFile = files.find(f => f.isPreview)
   const otherFiles = files.filter(f => !f.isPreview)
@@ -533,9 +587,16 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
                       </div>
                     )}
                     <div className="p-2 bg-white dark:bg-gray-800">
-                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate" title={file.filename}>
-                        {file.filename}
-                      </p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate flex-1" title={file.filename}>
+                          {file.filename}
+                        </p>
+                        {file.version && file.version > 1 && (
+                          <span className="text-[10px] bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 px-1 rounded">
+                            v{file.version}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-400 dark:text-gray-500">
                         {formatFileSize(file.size)}
                       </p>
@@ -565,16 +626,29 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
                         <Download className="w-4 h-4" />
                       </a>
                       {isAdmin && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDelete(file.id)
-                          }}
-                          className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                          title="Usuń"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setVersioningFileId(file.parentFileId || file.id)
+                              setTimeout(() => versionInputRef.current?.click(), 0)
+                            }}
+                            className="p-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100"
+                            title="Nowa wersja"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDelete(file.id)
+                            }}
+                            className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                            title="Usuń"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -593,6 +667,16 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
           onClose={() => setLightboxIndex(null)}
         />
       )}
+
+      {/* Hidden input for version uploads */}
+      <input
+        ref={versionInputRef}
+        type="file"
+        accept="*/*"
+        className="hidden"
+        onChange={handleVersionUpload}
+        disabled={isUploading}
+      />
     </div>
   )
 }

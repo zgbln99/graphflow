@@ -370,8 +370,16 @@ model ProjectFile {
   externalUrl String?   // URL do pliku w Dropbox (dla storageType = "dropbox")
   dropboxPath String?   // Ścieżka w Dropbox
 
+  // Wersjonowanie
+  version      Int           @default(1)    // Numer wersji
+  parentFileId String?                       // ID poprzedniej wersji (dla grupowania)
+  parentFile   ProjectFile?  @relation("FileVersions", fields: [parentFileId], references: [id], onDelete: SetNull)
+  versions     ProjectFile[] @relation("FileVersions")
+  versionNote  String?                       // Opcjonalna notatka o zmianach w wersji
+
   @@index([projectId])
   @@index([uploadedById])
+  @@index([parentFileId])
 }
 
 // ============================================
