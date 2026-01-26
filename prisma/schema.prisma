@@ -160,6 +160,7 @@ model Project {
   fileLocations   FileLocation[]
   files           ProjectFile[]
   emailLogs       EmailLog[]
+  corrections     ProjectCorrection[]
 
   @@index([clientAccountId])
   @@index([statusId])
@@ -569,6 +570,24 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@index([createdAt])
+}
+
+// ============================================
+// POPRAWKI PROJEKTU
+// ============================================
+
+model ProjectCorrection {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  content     String    // Treść poprawki
+  isResolved  Boolean   @default(false) // Czy poprawka została zrealizowana
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([isResolved])
 }
 
 // ============================================

@@ -30,6 +30,7 @@ import { ProjectFiles } from '@/components/projects/project-files'
 import { LiveStatusBadge, ProjectDetailClient } from '@/components/project/project-detail-client'
 import { DeleteProjectButton } from '@/components/projects/delete-project-button'
 import { CorrectionsEmailForm } from '@/components/project/corrections-email-form'
+import { CorrectionsList } from '@/components/project/corrections-list'
 
 export default async function ProjectDetailPage({
   params,
@@ -97,6 +98,9 @@ export default async function ProjectDetailPage({
         orderBy: { sentAt: 'desc' },
         take: 4,
       } : undefined,
+      corrections: {
+        orderBy: { createdAt: 'desc' },
+      },
     },
   })
 
@@ -350,6 +354,25 @@ export default async function ProjectDetailPage({
             </div>
           </div>
 
+          {/* Corrections list for client */}
+          {!isAdmin && project.corrections && project.corrections.length > 0 && (
+            <div className="card dark:bg-gray-800 dark:border-gray-700">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">
+                  Poprawki do wykonania
+                </h2>
+              </div>
+              <div className="p-4">
+                <CorrectionsList
+                  corrections={project.corrections}
+                  isAdmin={false}
+                  projectId={project.id}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Comments */}
           <div className="card dark:bg-gray-800 dark:border-gray-700">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
@@ -365,7 +388,7 @@ export default async function ProjectDetailPage({
           </div>
         </div>
 
-        {/* Right column - Admin only */}
+        {/* Right column - Admin sidebar */}
         {isAdmin && (
           <div className="space-y-6">
             {/* Send corrections email */}

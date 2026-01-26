@@ -124,6 +124,20 @@ export async function POST(
       title: title.trim(),
     }))
 
+    // Save corrections to database
+    const now = new Date()
+    await Promise.all(
+      correctionsList.map((content: string) =>
+        (prisma.projectCorrection as any).create({
+          data: {
+            projectId: project.id,
+            content: content.trim(),
+            updatedAt: now,
+          },
+        })
+      )
+    )
+
     // Send emails to contacts
     let sentCount = 0
     for (const contact of contacts) {
