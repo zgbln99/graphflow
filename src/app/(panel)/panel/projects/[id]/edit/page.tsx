@@ -27,6 +27,13 @@ export default async function EditProjectPage({
     prisma.clientAccount.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
+      include: {
+        users: {
+          where: { isActive: true },
+          select: { id: true, name: true, email: true, isActive: true },
+          orderBy: { name: 'asc' },
+        },
+      },
     }),
     prisma.projectStatus.findMany({
       where: { isActive: true },
