@@ -65,24 +65,24 @@ export default async function ProjectsPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projekty</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             {isAdmin ? 'Zarządzaj wszystkimi projektami' : 'Twoje projekty'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {isAdmin && (
-            <Link href="/panel/projects/kanban" className="btn-secondary">
-              <LayoutGrid className="w-4 h-4 mr-2" />
-              Kanban
+            <Link href="/panel/projects/kanban" className="btn-secondary text-sm sm:text-base">
+              <LayoutGrid className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Kanban</span>
             </Link>
           )}
           {isAdmin && (
-            <Link href="/panel/projects/new" className="btn-primary">
-              <Plus className="w-4 h-4 mr-2" />
-              Nowy projekt
+            <Link href="/panel/projects/new" className="btn-primary text-sm sm:text-base">
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Nowy projekt</span>
             </Link>
           )}
         </div>
@@ -90,8 +90,8 @@ export default async function ProjectsPage({
 
       {/* Filters */}
       <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
-        <form className="flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
+        <form className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0 sm:min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -104,38 +104,40 @@ export default async function ProjectsPage({
             </div>
           </div>
 
-          <select
-            name="status"
-            defaultValue={params.status || ''}
-            className="input w-auto dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          >
-            <option value="">Wszystkie statusy</option>
-            {statuses.map((status) => (
-              <option key={status.id} value={status.id}>
-                {status.name}
-              </option>
-            ))}
-          </select>
-
-          {isAdmin && (
+          <div className="flex flex-wrap gap-2 sm:gap-4">
             <select
-              name="client"
-              defaultValue={params.client || ''}
-              className="input w-auto dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              name="status"
+              defaultValue={params.status || ''}
+              className="input w-full sm:w-auto flex-1 sm:flex-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
-              <option value="">Wszyscy klienci</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
+              <option value="">Wszystkie statusy</option>
+              {statuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
                 </option>
               ))}
             </select>
-          )}
 
-          <button type="submit" className="btn-secondary">
-            <Filter className="w-4 h-4 mr-2" />
-            Filtruj
-          </button>
+            {isAdmin && (
+              <select
+                name="client"
+                defaultValue={params.client || ''}
+                className="input w-full sm:w-auto flex-1 sm:flex-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              >
+                <option value="">Wszyscy klienci</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button type="submit" className="btn-secondary w-full sm:w-auto">
+              <Filter className="w-4 h-4 mr-2" />
+              Filtruj
+            </button>
+          </div>
         </form>
       </div>
 
@@ -158,7 +160,8 @@ export default async function ProjectsPage({
         </div>
       ) : (
         <div className="card dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
             <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
               <tr>
                 <th className="table-header">Numer</th>
@@ -166,9 +169,9 @@ export default async function ProjectsPage({
                 {isAdmin && <th className="table-header">Klient</th>}
                 <th className="table-header">Zlecił</th>
                 <th className="table-header">Status</th>
-                <th className="table-header">Tickety</th>
-                <th className="table-header">Deadline</th>
-                <th className="table-header">Aktualizacja</th>
+                <th className="table-header hidden sm:table-cell">Tickety</th>
+                <th className="table-header hidden md:table-cell">Deadline</th>
+                <th className="table-header hidden lg:table-cell">Aktualizacja</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -225,19 +228,20 @@ export default async function ProjectsPage({
                       {project.status.name}
                     </span>
                   </td>
-                  <td className="table-cell text-gray-600 dark:text-gray-400">
+                  <td className="table-cell text-gray-600 dark:text-gray-400 hidden sm:table-cell">
                     {project._count.tickets}
                   </td>
-                  <td className="table-cell text-gray-600 dark:text-gray-400">
+                  <td className="table-cell text-gray-600 dark:text-gray-400 hidden md:table-cell">
                     {formatDate(project.deadline)}
                   </td>
-                  <td className="table-cell text-gray-500 dark:text-gray-400 text-sm">
+                  <td className="table-cell text-gray-500 dark:text-gray-400 text-sm hidden lg:table-cell">
                     {formatDate(project.updatedAt)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

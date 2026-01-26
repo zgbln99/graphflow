@@ -947,3 +947,122 @@
 .toast-animate-out {
   animation: toast-slide-out 0.3s ease-in forwards;
 }
+
+/* ============================================
+   MOBILE RESPONSIVENESS
+   ============================================ */
+
+/* Horizontal scroll container for tables */
+.table-scroll {
+  @apply overflow-x-auto -mx-4 px-4;
+}
+
+@media (min-width: 640px) {
+  .table-scroll {
+    @apply mx-0 px-0;
+  }
+}
+
+/* Mobile-friendly buttons - icon only on small screens */
+.btn-responsive {
+  @apply btn px-2 sm:px-4;
+}
+
+.btn-responsive .btn-text {
+  @apply hidden sm:inline;
+}
+
+.btn-responsive .btn-icon {
+  @apply sm:mr-2;
+}
+
+/* Stack buttons on mobile */
+.btn-stack-mobile {
+  @apply flex flex-col sm:flex-row gap-2;
+}
+
+/* Mobile card padding */
+.card-mobile {
+  @apply p-3 sm:p-4 lg:p-6;
+}
+
+/* Hide on mobile */
+.hide-mobile {
+  @apply hidden sm:block;
+}
+
+.hide-mobile-inline {
+  @apply hidden sm:inline;
+}
+
+/* Show only on mobile */
+.show-mobile {
+  @apply block sm:hidden;
+}
+
+/* Mobile-friendly grid */
+.grid-mobile {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4;
+}
+
+/* Mobile-friendly flex header */
+.header-mobile {
+  @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4;
+}
+
+/* Touch-friendly tap targets */
+@media (max-width: 640px) {
+  .btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost {
+    @apply min-h-[44px];
+  }
+
+  .input, select {
+    @apply min-h-[44px] text-base;
+  }
+
+  /* Larger checkboxes on mobile */
+  input[type="checkbox"] {
+    @apply w-5 h-5;
+  }
+}
+
+/* Safe area for mobile devices with notch */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Prevent text from being too small on mobile */
+@media (max-width: 640px) {
+  .table-cell, .table-header {
+    @apply text-xs px-2 py-2;
+  }
+}
+
+/* Scrollable tabs for mobile */
+.tabs-scroll {
+  @apply flex overflow-x-auto pb-2 -mb-2;
+  scroll-snap-type: x mandatory;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs-scroll > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

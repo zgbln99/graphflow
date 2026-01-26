@@ -237,7 +237,7 @@ export default async function ProjectDetailPage({
       )}
 
       {/* Info cards */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         {project.createdBy && (
           <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
             <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
@@ -341,7 +341,7 @@ export default async function ProjectDetailPage({
       </div>
 
       {/* Main content grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Left column - Timeline */}
         <div className="lg:col-span-2 space-y-6">
           {/* Timeline */}

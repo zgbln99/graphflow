@@ -530,23 +530,25 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
           <h3 className="font-semibold text-gray-900 dark:text-white">
             Pliki ({otherFiles.length})
           </h3>
-          <label className="btn btn-sm gap-1 cursor-pointer">
-            {isUploading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Upload className="w-4 h-4" />
-            )}
-            Dodaj pliki
-            <input
-              ref={filesInputRef}
-              type="file"
-              accept="*/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleInputUpload(e, false)}
-              disabled={isUploading}
-            />
-          </label>
+          {isAdmin && (
+            <label className="btn btn-sm gap-1 cursor-pointer">
+              {isUploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4" />
+              )}
+              Dodaj pliki
+              <input
+                ref={filesInputRef}
+                type="file"
+                accept="*/*"
+                multiple
+                className="hidden"
+                onChange={(e) => handleInputUpload(e, false)}
+                disabled={isUploading}
+              />
+            </label>
+          )}
         </div>
 
         {otherFiles.length === 0 ? (
