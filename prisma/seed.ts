@@ -207,10 +207,10 @@ async function main() {
   console.log('📁 Tworzę projekty...')
 
   const project1 = await prisma.project.upsert({
-    where: { number: 'PRJ-000001' },
+    where: { number: 'GF-001' },
     update: {},
     create: {
-      number: 'PRJ-000001',
+      number: 'GF-001',
       title: 'Redesign strony głównej',
       description: 'Kompleksowy redesign strony głównej wraz z nowymi animacjami i responsywnym layoutem.',
       clientAccountId: client.id,
@@ -240,10 +240,10 @@ async function main() {
   })
 
   const project2 = await prisma.project.upsert({
-    where: { number: 'PRJ-000002' },
+    where: { number: 'GF-002' },
     update: {},
     create: {
-      number: 'PRJ-000002',
+      number: 'GF-002',
       title: 'Nowe logo firmy',
       description: 'Projekt nowego logo wraz z brand guidelines.',
       clientAccountId: client.id,

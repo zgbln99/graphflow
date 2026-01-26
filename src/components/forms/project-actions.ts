@@ -36,7 +36,7 @@ export async function createProjectAction(formData: FormData) {
 
   try {
     // Generuj numer projektu
-    const projectNumber = await generateNumber('PRJ', prisma)
+    const projectNumber = await generateNumber('GF', prisma)
 
     // Pobierz nazwę statusu dla historii
     const status = await prisma.projectStatus.findUnique({
@@ -129,7 +129,7 @@ export async function createClientProjectAction(formData: FormData) {
 
   try {
     // Generuj numer projektu
-    const projectNumber = await generateNumber('PRJ', prisma)
+    const projectNumber = await generateNumber('GF', prisma)
 
     // Znajdź status "Oczekuje na akceptację" lub utwórz
     let pendingStatus = await prisma.projectStatus.findFirst({

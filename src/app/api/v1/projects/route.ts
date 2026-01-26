@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
       select: { number: true },
     })
-    const lastNum = lastProject ? parseInt(lastProject.number.replace('PRJ-', '')) : 0
-    const number = `PRJ-${String(lastNum + 1).padStart(6, '0')}`
+    const lastNum = lastProject ? parseInt(lastProject.number.match(/\d+/)?.[0] || '0') : 0
+    const number = `GF-${String(lastNum + 1).padStart(3, '0')}`
 
     const project = await prisma.project.create({
       data: {

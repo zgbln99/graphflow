@@ -111,7 +111,7 @@ model ProjectTag {
 
 model Project {
   id              String        @id @default(cuid())
-  number          String        @unique // PRJ-000001
+  number          String        @unique // GF-001
   title           String
   description     String?
   createdAt       DateTime      @default(now())
@@ -457,7 +457,7 @@ model AuditLog {
   action      AuditAction
   entityType  String      // "project" | "ticket" | "client" | "user" | "comment"
   entityId    String
-  entityName  String?     // Czytelna nazwa np. "PRJ-000001: Logo firmy"
+  entityName  String?     // Czytelna nazwa np. "GF-001: Logo firmy"
 
   // Szczegóły zmiany
   changes     String?     // JSON z polami przed/po

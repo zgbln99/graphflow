@@ -8,10 +8,10 @@ export function cn(...inputs: ClassValue[]) {
  * Generuje kolejny numer dla projektu/ticketa
  */
 export async function generateNumber(
-  prefix: 'PRJ' | 'TCK',
+  prefix: 'GF' | 'TCK',
   prisma: any
 ): Promise<string> {
-  const lastItem = prefix === 'PRJ'
+  const lastItem = prefix === 'GF'
     ? await prisma.project.findFirst({
         orderBy: { createdAt: 'desc' },
         select: { number: true },
@@ -30,7 +30,9 @@ export async function generateNumber(
     }
   }
 
-  return `${prefix}-${String(nextNum).padStart(6, '0')}`
+  // GF uses 3 digits (GF-001), TCK uses 6 digits (TCK-000001)
+  const padding = prefix === 'GF' ? 3 : 6
+  return `${prefix}-${String(nextNum).padStart(padding, '0')}`
 }
 
 /**
