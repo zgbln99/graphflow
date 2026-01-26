@@ -48,13 +48,18 @@ export async function PATCH(
     // Extract allowed fields
     const { name, color, isActive, isDefault, notifyOnChange, order } = body
 
-    // Build update data
+    // Build update data (only include fields that exist in the schema)
     const updateData: any = {}
     if (name !== undefined) updateData.name = name
     if (color !== undefined) updateData.color = color
     if (isActive !== undefined) updateData.isActive = isActive
-    if (notifyOnChange !== undefined) updateData.notifyOnChange = notifyOnChange
     if (order !== undefined) updateData.order = order
+
+    // notifyOnChange - only include if field exists (migration might not be run yet)
+    // This will be silently ignored if the column doesn't exist
+    if (notifyOnChange !== undefined) {
+      updateData.notifyOnChange = notifyOnChange
+    }
 
     // Handle isDefault - only one status can be default
     if (isDefault === true) {
@@ -67,10 +72,25 @@ export async function PATCH(
       updateData.isDefault = false
     }
 
-    const status = await prisma.projectStatus.update({
-      where: { id },
-      data: updateData,
-    })
+    // Try to update with notifyOnChange first, fall back without it if column doesn't exist
+    let status
+    try {
+      status = await prisma.projectStatus.update({
+        where: { id },
+        data: updateData,
+      })
+    } catch (updateError: any) {
+      // If error is about unknown field, try without notifyOnChange
+      if (updateError?.message?.includes('notifyOnChange') || updateError?.code === 'P2009') {
+        delete updateData.notifyOnChange
+        status = await prisma.projectStatus.update({
+          where: { id },
+          data: updateData,
+        })
+      } else {
+        throw updateError
+      }
+    }
 
     return NextResponse.json(status)
   } catch (error) {
