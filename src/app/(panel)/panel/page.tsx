@@ -3,17 +3,18 @@ import { prisma } from '@/lib/db'
 import Link from 'next/link'
 import {
   Briefcase,
-  Ticket,
   Clock,
   AlertTriangle,
-  TrendingUp,
   CheckCircle,
   ArrowRight,
   Building2,
   BarChart3,
+  TrendingUp,
+  Calendar,
+  Users,
 } from 'lucide-react'
-import { formatRelativeTime, ticketStatusLabels, ticketStatusColors } from '@/lib/utils'
-import { BarChart, DonutChart } from '@/components/dashboard/charts'
+import { formatRelativeTime, formatDate } from '@/lib/utils'
+import { DonutChart } from '@/components/dashboard/charts'
 
 export default async function DashboardPage() {
   const session = await getSession()
@@ -23,87 +24,88 @@ export default async function DashboardPage() {
   const clientAccountId = session.user.clientAccountId
 
   // Pobierz statystyki
-  const [projectStats, ticketStats, recentTickets, upcomingDeadlines, ticketsByPriority, clientsCount] = await Promise.all([
-    // Statystyki projektów
+  const [
+    projectStats,
+    recentProjects,
+    upcomingDeadlines,
+    clientsCount,
+    usersCount,
+    recentActivity,
+  ] = await Promise.all([
+    // Statystyki projektow
     prisma.project.groupBy({
       by: ['statusId'],
       _count: { id: true },
       where: isAdmin ? {} : { clientAccountId: clientAccountId! },
     }),
-    // Statystyki ticketów
-    prisma.ticket.groupBy({
-      by: ['status'],
-      _count: { id: true },
-      where: isAdmin ? {} : { clientAccountId: clientAccountId! },
-    }),
-    // Ostatnie tickety
-    prisma.ticket.findMany({
+    // Ostatnie projekty
+    prisma.project.findMany({
       where: isAdmin ? {} : { clientAccountId: clientAccountId! },
       include: {
-        clientAccount: true,
-        project: true,
+        clientAccount: { select: { name: true } },
+        status: true,
+        createdBy: { select: { name: true } },
       },
       orderBy: { updatedAt: 'desc' },
       take: 5,
     }),
-    // Zbliżające się deadline'y
-    prisma.ticket.findMany({
+    // Zblizajace sie deadline'y projektow
+    prisma.project.findMany({
       where: {
         ...(isAdmin ? {} : { clientAccountId: clientAccountId! }),
         deadline: {
           gte: new Date(),
-          lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dni
+          lte: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 dni
         },
-        status: { notIn: ['RESOLVED', 'CLOSED'] },
+        status: {
+          slug: { notIn: ['zakonczone', 'anulowane'] },
+        },
       },
       include: {
-        clientAccount: true,
+        clientAccount: { select: { name: true } },
+        status: true,
       },
       orderBy: { deadline: 'asc' },
       take: 5,
     }),
-    // Tickety wg priorytetu
-    prisma.ticket.groupBy({
-      by: ['priority'],
-      _count: { id: true },
-      where: isAdmin ? {} : { clientAccountId: clientAccountId! },
-    }),
-    // Liczba klientów (tylko admin)
+    // Liczba klientow (tylko admin)
     isAdmin ? prisma.clientAccount.count({ where: { isActive: true } }) : 0,
+    // Liczba uzytkownikow (tylko admin)
+    isAdmin ? prisma.user.count({ where: { role: 'CLIENT_USER', isActive: true } }) : 0,
+    // Ostatnia aktywnosc (historia statusow)
+    isAdmin
+      ? prisma.projectStatusHistory.findMany({
+          include: {
+            project: {
+              select: { number: true, title: true, id: true },
+            },
+          },
+          orderBy: { changedAt: 'desc' },
+          take: 10,
+        })
+      : [],
   ])
 
-  // Pobierz statusy projektów dla nazw
-  const projectStatuses = await prisma.projectStatus.findMany()
-  const statusMap = Object.fromEntries(
-    projectStatuses.map((s) => [s.id, s])
-  )
+  // Pobierz statusy projektow dla nazw
+  const projectStatuses = await prisma.projectStatus.findMany({
+    orderBy: { order: 'asc' },
+  })
+  const statusMap = Object.fromEntries(projectStatuses.map((s) => [s.id, s]))
 
   // Oblicz sumy
   const totalProjects = projectStats.reduce((acc, s) => acc + s._count.id, 0)
-  const totalTickets = ticketStats.reduce((acc, s) => acc + s._count.id, 0)
-  const openTickets = ticketStats
-    .filter((s) => !['RESOLVED', 'CLOSED'].includes(s.status))
+  const completedProjects = projectStats
+    .filter((s) => statusMap[s.statusId]?.slug === 'zakonczone')
+    .reduce((acc, s) => acc + s._count.id, 0)
+  const inProgressProjects = projectStats
+    .filter((s) => statusMap[s.statusId]?.slug === 'w-trakcie')
     .reduce((acc, s) => acc + s._count.id, 0)
 
-  // Dane do wykresów
-  const ticketStatusData = ticketStats.map((s) => ({
-    label: ticketStatusLabels[s.status] || s.status,
+  // Dane do wykresu kolowego
+  const projectStatusData = projectStats.map((s) => ({
+    label: statusMap[s.statusId]?.name || 'Nieznany',
     value: s._count.id,
-    color: s.status === 'NEW' ? '#3b82f6' :
-           s.status === 'IN_PROGRESS' ? '#8b5cf6' :
-           s.status === 'WAITING_FOR_CLIENT' ? '#f59e0b' :
-           s.status === 'WAITING_FOR_ADMIN' ? '#6366f1' :
-           s.status === 'RESOLVED' ? '#22c55e' : '#6b7280',
-  }))
-
-  const priorityData = ticketsByPriority.map((p) => ({
-    label: p.priority === 'URGENT' ? 'Pilne' :
-           p.priority === 'HIGH' ? 'Wysokie' :
-           p.priority === 'NORMAL' ? 'Normalne' : 'Niskie',
-    value: p._count.id,
-    color: p.priority === 'URGENT' ? '#ef4444' :
-           p.priority === 'HIGH' ? '#f59e0b' :
-           p.priority === 'NORMAL' ? '#3b82f6' : '#6b7280',
+    color: statusMap[s.statusId]?.color || '#6b7280',
   }))
 
   return (
@@ -112,7 +114,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          {isAdmin ? 'Przegląd wszystkich projektów i zgłoszeń' : `Witaj, ${session.user.name}!`}
+          {isAdmin ? 'Przeglad wszystkich projektow' : `Witaj, ${session.user.name}!`}
         </p>
       </div>
 
@@ -120,107 +122,104 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={<Briefcase className="w-5 h-5" />}
-          label="Projekty"
+          label="Wszystkie projekty"
           value={totalProjects}
           color="blue"
+          href="/panel/projects"
         />
         <StatCard
-          icon={<Ticket className="w-5 h-5" />}
-          label="Tickety"
-          value={totalTickets}
+          icon={<TrendingUp className="w-5 h-5" />}
+          label="W trakcie"
+          value={inProgressProjects}
           color="purple"
+          href="/panel/projects?status=w-trakcie"
         />
         <StatCard
-          icon={<Clock className="w-5 h-5" />}
-          label="Otwarte zgłoszenia"
-          value={openTickets}
-          color="yellow"
+          icon={<CheckCircle className="w-5 h-5" />}
+          label="Zakonczone"
+          value={completedProjects}
+          color="green"
+          href="/panel/projects?status=zakonczone"
         />
         {isAdmin ? (
           <StatCard
             icon={<Building2 className="w-5 h-5" />}
             label="Aktywni klienci"
             value={clientsCount}
-            color="green"
+            color="yellow"
+            href="/panel/clients"
           />
         ) : (
           <StatCard
             icon={<AlertTriangle className="w-5 h-5" />}
-            label="Do deadline'u (7 dni)"
+            label="Zblizajace sie terminy"
             value={upcomingDeadlines.length}
             color="red"
           />
         )}
       </div>
 
-      {/* Charts row (admin only) */}
-      {isAdmin && (
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Ticket status donut chart */}
+      {/* Charts and lists */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Projects by status chart */}
+        {isAdmin && projectStatusData.length > 0 && (
           <div className="card dark:bg-gray-800 dark:border-gray-700 p-6">
             <div className="flex items-center gap-2 mb-4">
               <BarChart3 className="w-5 h-5 text-primary-600" />
-              <h2 className="font-semibold text-gray-900 dark:text-white">Tickety wg statusu</h2>
+              <h2 className="font-semibold text-gray-900 dark:text-white">Projekty wg statusu</h2>
             </div>
-            <DonutChart data={ticketStatusData} />
+            <DonutChart data={projectStatusData} />
           </div>
+        )}
 
-          {/* Priority bar chart */}
-          <div className="card dark:bg-gray-800 dark:border-gray-700 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              <h2 className="font-semibold text-gray-900 dark:text-white">Tickety wg priorytetu</h2>
-            </div>
-            <BarChart data={priorityData} />
-          </div>
-        </div>
-      )}
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent tickets */}
+        {/* Recent projects */}
         <div className="card dark:bg-gray-800 dark:border-gray-700">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 dark:text-white">Ostatnie tickety</h2>
-            <Link href="/panel/tickets" className="text-sm link flex items-center gap-1">
+            <h2 className="font-semibold text-gray-900 dark:text-white">Ostatnie projekty</h2>
+            <Link href="/panel/projects" className="text-sm link flex items-center gap-1">
               Zobacz wszystkie
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
-            {recentTickets.length === 0 ? (
+            {recentProjects.length === 0 ? (
               <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                Brak ticketów
+                Brak projektow
               </div>
             ) : (
-              recentTickets.map((ticket) => (
+              recentProjects.map((project) => (
                 <Link
-                  key={ticket.id}
-                  href={`/panel/tickets/${ticket.id}`}
+                  key={project.id}
+                  href={`/panel/projects/${project.id}`}
                   className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
-                          {ticket.number}
+                          {project.number}
                         </span>
                         <span
-                          className={`badge ${ticketStatusColors[ticket.status]}`}
+                          className="badge"
+                          style={{
+                            backgroundColor: `${project.status.color}20`,
+                            color: project.status.color,
+                          }}
                         >
-                          {ticketStatusLabels[ticket.status]}
+                          {project.status.name}
                         </span>
                       </div>
                       <p className="font-medium text-gray-900 dark:text-white truncate">
-                        {ticket.title}
+                        {project.title}
                       </p>
                       {isAdmin && (
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {ticket.clientAccount.name}
+                          {project.clientAccount.name}
                         </p>
                       )}
                     </div>
                     <span className="text-xs text-gray-400 whitespace-nowrap">
-                      {formatRelativeTime(ticket.updatedAt)}
+                      {formatRelativeTime(project.updatedAt)}
                     </span>
                   </div>
                 </Link>
@@ -232,34 +231,37 @@ export default async function DashboardPage() {
         {/* Upcoming deadlines */}
         <div className="card dark:bg-gray-800 dark:border-gray-700">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 dark:text-white">Zbliżające się terminy</h2>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-gray-400" />
+              <h2 className="font-semibold text-gray-900 dark:text-white">Zblizajace sie terminy</h2>
+            </div>
           </div>
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {upcomingDeadlines.length === 0 ? (
               <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                Brak zbliżających się terminów
+                Brak zblizajacych sie terminow
               </div>
             ) : (
-              upcomingDeadlines.map((ticket) => {
+              upcomingDeadlines.map((project) => {
                 const daysLeft = Math.ceil(
-                  (ticket.deadline!.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+                  (project.deadline!.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
                 )
-                const isUrgent = daysLeft <= 2
+                const isUrgent = daysLeft <= 3
 
                 return (
                   <Link
-                    key={ticket.id}
-                    href={`/panel/tickets/${ticket.id}`}
+                    key={project.id}
+                    href={`/panel/projects/${project.id}`}
                     className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-gray-900 dark:text-white truncate">
-                          {ticket.title}
+                          {project.title}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {ticket.number}
-                          {isAdmin && ` • ${ticket.clientAccount.name}`}
+                          {project.number}
+                          {isAdmin && ` • ${project.clientAccount.name}`}
                         </p>
                       </div>
                       <div
@@ -271,7 +273,7 @@ export default async function DashboardPage() {
                       >
                         <Clock className="w-4 h-4" />
                         {daysLeft === 0
-                          ? 'Dziś!'
+                          ? 'Dzis!'
                           : daysLeft === 1
                           ? 'Jutro'
                           : `${daysLeft} dni`}
@@ -283,33 +285,52 @@ export default async function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Recent activity (admin only) */}
+        {isAdmin && recentActivity.length > 0 && (
+          <div className="card dark:bg-gray-800 dark:border-gray-700">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-gray-400" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">Ostatnia aktywnosc</h2>
+              </div>
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[300px] overflow-y-auto">
+              {recentActivity.map((activity) => (
+                <Link
+                  key={activity.id}
+                  href={`/panel/projects/${activity.project.id}`}
+                  className="block p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-primary-500" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        <span className="font-mono text-gray-500">{activity.project.number}</span>
+                        {' '}{activity.fromStatus ? `${activity.fromStatus} → ` : ''}{activity.toStatus}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {activity.project.title}
+                      </p>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {formatRelativeTime(activity.changedAt)}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Projects by status (admin only) */}
-      {isAdmin && projectStats.length > 0 && (
-        <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Projekty wg statusu</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {projectStats.map((stat) => {
-              const status = statusMap[stat.statusId]
-              if (!status) return null
-
-              return (
-                <Link
-                  key={stat.statusId}
-                  href={`/panel/projects?status=${stat.statusId}`}
-                  className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-center"
-                >
-                  <div
-                    className="w-3 h-3 rounded-full mx-auto mb-2"
-                    style={{ backgroundColor: status.color }}
-                  />
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stat._count.id}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{status.name}</p>
-                </Link>
-              )
-            })}
-          </div>
+      {/* Quick stats for admin */}
+      {isAdmin && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <QuickStat label="Klienci" value={clientsCount} icon={<Building2 className="w-4 h-4" />} />
+          <QuickStat label="Uzytkownicy" value={usersCount} icon={<Users className="w-4 h-4" />} />
+          <QuickStat label="Statusow" value={projectStatuses.length} icon={<BarChart3 className="w-4 h-4" />} />
+          <QuickStat label="Aktywne projekty" value={totalProjects - completedProjects} icon={<Briefcase className="w-4 h-4" />} />
         </div>
       )}
     </div>
@@ -321,11 +342,13 @@ function StatCard({
   label,
   value,
   color,
+  href,
 }: {
   icon: React.ReactNode
   label: string
   value: number
   color: 'blue' | 'purple' | 'yellow' | 'red' | 'green'
+  href?: string
 }) {
   const colors = {
     blue: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
@@ -335,14 +358,42 @@ function StatCard({
     green: 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400',
   }
 
+  const content = (
+    <div className="flex items-center gap-3">
+      <div className={`p-2 rounded-lg ${colors[color]}`}>{icon}</div>
+      <div>
+        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
+      </div>
+    </div>
+  )
+
+  if (href) {
+    return (
+      <Link href={href} className="card dark:bg-gray-800 dark:border-gray-700 p-4 hover:shadow-md transition-shadow">
+        {content}
+      </Link>
+    )
+  }
+
+  return <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">{content}</div>
+}
+
+function QuickStat({
+  label,
+  value,
+  icon,
+}: {
+  label: string
+  value: number
+  icon: React.ReactNode
+}) {
   return (
-    <div className="card dark:bg-gray-800 dark:border-gray-700 p-4">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${colors[color]}`}>{icon}</div>
-        <div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
-        </div>
+    <div className="card dark:bg-gray-800 dark:border-gray-700 p-3 flex items-center gap-3">
+      <div className="text-gray-400">{icon}</div>
+      <div>
+        <p className="text-lg font-semibold text-gray-900 dark:text-white">{value}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
       </div>
     </div>
   )

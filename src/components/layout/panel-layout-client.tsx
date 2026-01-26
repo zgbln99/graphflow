@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
+import { CommandPalette } from '@/components/search/command-palette'
 import type { SessionUser } from '@/lib/auth'
 
 interface PanelLayoutClientProps {
@@ -15,6 +16,7 @@ export function PanelLayoutClient({ user, children }: PanelLayoutClientProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <CommandPalette />
       <Sidebar
         user={user}
         isOpen={isMobileMenuOpen}
