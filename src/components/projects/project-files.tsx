@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import { Upload, Trash2, Image as ImageIcon, Loader2, Download, Star, Expand } from 'lucide-react'
+import { Upload, Trash2, Image as ImageIcon, Loader2, Download, Star, Expand, FileText, FileArchive, File, FileVideo, FileAudio } from 'lucide-react'
 import { Lightbox } from '@/components/ui/lightbox'
 
 interface ProjectFile {
@@ -27,6 +27,21 @@ interface ProjectFilesProps {
 function getFileUrl(projectId: string, file: ProjectFile): string {
   // Use the unified download endpoint that handles both local and Dropbox storage
   return `/api/projects/${projectId}/files/${file.id}/download`
+}
+
+// Helper to check if file is an image
+function isImageFile(file: ProjectFile): boolean {
+  return file.mimeType.startsWith('image/')
+}
+
+// Helper to get file icon based on mime type
+function getFileIcon(mimeType: string) {
+  if (mimeType.startsWith('video/')) return FileVideo
+  if (mimeType.startsWith('audio/')) return FileAudio
+  if (mimeType.includes('pdf')) return FileText
+  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('7z') || mimeType.includes('archive')) return FileArchive
+  if (mimeType.includes('document') || mimeType.includes('word') || mimeType.includes('text')) return FileText
+  return File
 }
 
 export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesProps) {
@@ -105,10 +120,8 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
     if (uploading) return
 
     const file = e.dataTransfer.files[0]
-    if (file && file.type.startsWith('image/')) {
+    if (file) {
       uploadFile(file, isPreview)
-    } else {
-      setError('Dozwolone są tylko pliki graficzne')
     }
   }, [uploading, uploadFile])
 
@@ -134,19 +147,21 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
   const previewFile = files.find(f => f.isPreview)
   const otherFiles = files.filter(f => !f.isPreview)
 
-  // Prepare images for lightbox
-  const allImages = files.map(f => ({
+  // Prepare images for lightbox (only actual images)
+  const imageFiles = files.filter(f => isImageFile(f))
+  const allImages = imageFiles.map(f => ({
     src: getFileUrl(projectId, f),
     alt: f.filename,
     filename: f.filename,
   }))
 
   const openLightbox = useCallback((file: ProjectFile) => {
-    const index = files.findIndex(f => f.id === file.id)
+    if (!isImageFile(file)) return
+    const index = imageFiles.findIndex(f => f.id === file.id)
     if (index !== -1) {
       setLightboxIndex(index)
     }
-  }, [files])
+  }, [imageFiles])
 
   function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
@@ -175,7 +190,7 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
               {previewFile ? 'Zmień' : 'Dodaj'}
               <input
                 type="file"
-                accept="image/*"
+                accept="*/*"
                 className="hidden"
                 onChange={(e) => handleInputUpload(e, true)}
                 disabled={uploading}
@@ -251,7 +266,7 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
             <input
               ref={previewInputRef}
               type="file"
-              accept="image/*"
+              accept="*/*"
               className="hidden"
               onChange={(e) => handleInputUpload(e, true)}
               disabled={uploading}
@@ -283,7 +298,7 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
             <input
               ref={filesInputRef}
               type="file"
-              accept="image/*"
+              accept="*/*"
               className="hidden"
               onChange={(e) => handleInputUpload(e, false)}
               disabled={uploading}
@@ -315,62 +330,75 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {otherFiles.map((file) => (
-              <div
-                key={file.id}
-                className="relative group rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer"
-                onClick={() => openLightbox(file)}
-              >
-                <img
-                  src={getFileUrl(projectId, file)}
-                  alt={file.filename}
-                  className="w-full h-32 object-cover"
-                />
-                <div className="p-2 bg-white dark:bg-gray-800">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate" title={file.filename}>
-                    {file.filename}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    {formatFileSize(file.size)}
-                  </p>
-                </div>
+            {otherFiles.map((file) => {
+              const isImage = isImageFile(file)
+              const FileIcon = getFileIcon(file.mimeType)
 
-                {/* Actions overlay */}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openLightbox(file)
-                    }}
-                    className="p-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100"
-                    title="Powiększ"
-                  >
-                    <Expand className="w-4 h-4" />
-                  </button>
-                  <a
-                    href={getFileUrl(projectId, file)}
-                    download={file.filename}
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100"
-                    title="Pobierz"
-                  >
-                    <Download className="w-4 h-4" />
-                  </a>
-                  {isAdmin && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDelete(file.id)
-                      }}
-                      className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                      title="Usuń"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+              return (
+                <div
+                  key={file.id}
+                  className="relative group rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer"
+                  onClick={() => isImage ? openLightbox(file) : window.open(getFileUrl(projectId, file), '_blank')}
+                >
+                  {isImage ? (
+                    <img
+                      src={getFileUrl(projectId, file)}
+                      alt={file.filename}
+                      className="w-full h-32 object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-32 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                      <FileIcon className="w-12 h-12 text-gray-400 dark:text-gray-500" />
+                    </div>
                   )}
+                  <div className="p-2 bg-white dark:bg-gray-800">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 truncate" title={file.filename}>
+                      {file.filename}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      {formatFileSize(file.size)}
+                    </p>
+                  </div>
+
+                  {/* Actions overlay */}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    {isImage && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openLightbox(file)
+                        }}
+                        className="p-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100"
+                        title="Powiększ"
+                      >
+                        <Expand className="w-4 h-4" />
+                      </button>
+                    )}
+                    <a
+                      href={getFileUrl(projectId, file)}
+                      download={file.filename}
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100"
+                      title="Pobierz"
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDelete(file.id)
+                        }}
+                        className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                        title="Usuń"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

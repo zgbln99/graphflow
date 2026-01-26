@@ -83,17 +83,8 @@ export async function POST(
       return NextResponse.json({ error: 'Brak pliku' }, { status: 400 })
     }
 
-    // Sprawdź typ pliku (tylko obrazy)
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Dozwolone są tylko pliki graficzne (JPEG, PNG, GIF, WebP)' },
-        { status: 400 }
-      )
-    }
-
-    // Max 10MB
-    const maxSize = 10 * 1024 * 1024
+    // Max 100MB dla plików projektowych
+    const maxSize = 100 * 1024 * 1024
     if (file.size > maxSize) {
       return NextResponse.json(
         { error: 'Maksymalny rozmiar pliku to 10MB' },
