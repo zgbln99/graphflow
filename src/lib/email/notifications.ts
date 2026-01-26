@@ -290,8 +290,8 @@ export async function notifyProjectStatusChanged(
   oldStatusName: string
 ): Promise<void> {
   // Pobierz kontakty projektu (jeśli nie zostały przekazane)
-  let contacts = project.contacts
-  if (!contacts) {
+  let contacts: Array<{ id: string; name: string; email: string }> = project.contacts || []
+  if (contacts.length === 0) {
     // TODO: Remove 'as any' after running migration and regenerating Prisma client
     // Migration file: sql/add_project_contacts.sql
     const projectWithContacts = await (prisma.project.findUnique as any)({
