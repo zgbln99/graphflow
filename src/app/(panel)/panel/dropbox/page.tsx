@@ -1,14 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import {
   Folder,
-  File,
   ArrowLeft,
   Home,
   Link as LinkIcon,
-  Copy,
   Check,
   Loader2,
   Image,
@@ -17,8 +14,12 @@ import {
   Music,
   Archive,
   ChevronRight,
-  ExternalLink,
   AlertCircle,
+  Eye,
+  X,
+  Download,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react'
 
 interface DropboxEntry {
@@ -28,6 +29,12 @@ interface DropboxEntry {
   type: 'file' | 'folder'
   size: number | null
   modified: string | null
+}
+
+interface PreviewData {
+  url: string
+  name: string
+  directUrl: string
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -52,6 +59,35 @@ function getFileIcon(name: string) {
   return FileText
 }
 
+function isImageFile(name: string): boolean {
+  const ext = name.split('.').pop()?.toLowerCase()
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')
+}
+
+// Fallback clipboard copy
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    // Fallback for when clipboard API fails
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.select()
+    try {
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      return true
+    } catch {
+      document.body.removeChild(textarea)
+      return false
+    }
+  }
+}
+
 export default function DropboxBrowserPage() {
   const [entries, setEntries] = useState<DropboxEntry[]>([])
   const [currentPath, setCurrentPath] = useState('')
@@ -59,6 +95,9 @@ export default function DropboxBrowserPage() {
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [generatingLink, setGeneratingLink] = useState<string | null>(null)
+  const [preview, setPreview] = useState<PreviewData | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [zoom, setZoom] = useState(1)
 
   const fetchEntries = useCallback(async (path: string) => {
     setLoading(true)
@@ -83,6 +122,18 @@ export default function DropboxBrowserPage() {
     fetchEntries('')
   }, [fetchEntries])
 
+  // Handle escape key for preview
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && preview) {
+        setPreview(null)
+        setZoom(1)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [preview])
+
   const navigateToFolder = (path: string) => {
     fetchEntries(path)
   }
@@ -92,8 +143,12 @@ export default function DropboxBrowserPage() {
     fetchEntries(parentPath)
   }
 
-  const generateLink = async (entry: DropboxEntry) => {
-    setGeneratingLink(entry.id)
+  const generateLink = async (entry: DropboxEntry, showPreview = false) => {
+    if (showPreview) {
+      setPreviewLoading(true)
+    } else {
+      setGeneratingLink(entry.id)
+    }
 
     try {
       const res = await fetch('/api/dropbox/share', {
@@ -105,14 +160,28 @@ export default function DropboxBrowserPage() {
 
       if (!res.ok) throw new Error(data.error)
 
-      // Copy to clipboard
-      await navigator.clipboard.writeText(data.url)
-      setCopiedId(entry.id)
-      setTimeout(() => setCopiedId(null), 2000)
+      if (showPreview) {
+        setPreview({
+          url: data.url,
+          directUrl: data.directUrl,
+          name: entry.name,
+        })
+        setZoom(1)
+      } else {
+        // Copy to clipboard
+        const success = await copyToClipboard(data.url)
+        if (success) {
+          setCopiedId(entry.id)
+          setTimeout(() => setCopiedId(null), 2000)
+        } else {
+          setError('Nie udało się skopiować linku')
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Błąd tworzenia linku')
     } finally {
       setGeneratingLink(null)
+      setPreviewLoading(false)
     }
   }
 
@@ -133,6 +202,9 @@ export default function DropboxBrowserPage() {
         <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
           {error}
+          <button onClick={() => setError(null)} className="ml-auto">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -192,9 +264,7 @@ export default function DropboxBrowserPage() {
 
             {entries.map((entry) => {
               const FileIcon = entry.type === 'folder' ? Folder : getFileIcon(entry.name)
-              const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(
-                entry.name.split('.').pop()?.toLowerCase() || ''
-              )
+              const isImage = isImageFile(entry.name)
 
               return (
                 <div
@@ -247,29 +317,44 @@ export default function DropboxBrowserPage() {
                   </div>
 
                   {entry.type === 'file' && (
-                    <button
-                      onClick={() => generateLink(entry)}
-                      disabled={generatingLink === entry.id}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        copiedId === entry.id
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                          : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50'
-                      }`}
-                    >
-                      {generatingLink === entry.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : copiedId === entry.id ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          Skopiowano!
-                        </>
-                      ) : (
-                        <>
-                          <LinkIcon className="w-4 h-4" />
-                          Kopiuj link
-                        </>
+                    <div className="flex items-center gap-2">
+                      {/* Preview button for images */}
+                      {isImage && (
+                        <button
+                          onClick={() => generateLink(entry, true)}
+                          disabled={previewLoading}
+                          className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors"
+                          title="Podgląd"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </button>
                       )}
-                    </button>
+
+                      {/* Copy link button */}
+                      <button
+                        onClick={() => generateLink(entry)}
+                        disabled={generatingLink === entry.id}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                          copiedId === entry.id
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                            : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50'
+                        }`}
+                      >
+                        {generatingLink === entry.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : copiedId === entry.id ? (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Skopiowano!
+                          </>
+                        ) : (
+                          <>
+                            <LinkIcon className="w-4 h-4" />
+                            Kopiuj link
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
               )
@@ -277,6 +362,96 @@ export default function DropboxBrowserPage() {
           </div>
         )}
       </div>
+
+      {/* Preview Modal */}
+      {(preview || previewLoading) && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
+          <div className="absolute inset-0" onClick={() => { setPreview(null); setZoom(1); }} />
+
+          {/* Top toolbar */}
+          <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-10">
+            <div className="text-white">
+              {preview && <span className="text-sm">{preview.name}</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setZoom(z => Math.max(z - 0.25, 0.5))}
+                className="p-2 text-white/75 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                title="Pomniejsz"
+              >
+                <ZoomOut className="w-5 h-5" />
+              </button>
+              <span className="text-white/75 text-sm min-w-[3rem] text-center">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                onClick={() => setZoom(z => Math.min(z + 0.25, 3))}
+                className="p-2 text-white/75 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                title="Powiększ"
+              >
+                <ZoomIn className="w-5 h-5" />
+              </button>
+              {preview && (
+                <>
+                  <a
+                    href={preview.directUrl}
+                    download={preview.name}
+                    className="p-2 text-white/75 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                    title="Pobierz"
+                  >
+                    <Download className="w-5 h-5" />
+                  </a>
+                  <button
+                    onClick={async () => {
+                      const success = await copyToClipboard(preview.url)
+                      if (success) {
+                        setCopiedId('preview')
+                        setTimeout(() => setCopiedId(null), 2000)
+                      }
+                    }}
+                    className={`p-2 rounded-lg transition-colors ${
+                      copiedId === 'preview'
+                        ? 'text-green-400 bg-green-900/30'
+                        : 'text-white/75 hover:text-white hover:bg-white/10'
+                    }`}
+                    title="Kopiuj link"
+                  >
+                    {copiedId === 'preview' ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <LinkIcon className="w-5 h-5" />
+                    )}
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => { setPreview(null); setZoom(1); }}
+                className="p-2 text-white/75 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                title="Zamknij (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Image */}
+          <div className="relative max-w-[90vw] max-h-[85vh] overflow-auto">
+            {previewLoading ? (
+              <div className="flex items-center justify-center p-20">
+                <Loader2 className="w-10 h-10 animate-spin text-white" />
+              </div>
+            ) : preview ? (
+              <img
+                src={preview.directUrl}
+                alt={preview.name}
+                className="max-w-none transition-transform duration-200"
+                style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
