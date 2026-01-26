@@ -50,7 +50,9 @@ export async function createProjectAction(formData: FormData) {
     const contactIds = formData.getAll('contactIds') as string[]
 
     // Utwórz projekt
-    const project = await prisma.project.create({
+    // TODO: Remove 'as any' after running migration and regenerating Prisma client
+    // Migration file: sql/add_project_contacts.sql
+    const project = await (prisma.project.create as any)({
       data: {
         number: projectNumber,
         title: data.title,
@@ -369,7 +371,9 @@ export async function updateProjectAction(projectId: string, formData: FormData)
     const contactIds = formData.getAll('contactIds') as string[]
 
     // Aktualizuj projekt
-    const project = await prisma.project.update({
+    // TODO: Remove 'as any' after running migration and regenerating Prisma client
+    // Migration file: sql/add_project_contacts.sql
+    const project = await (prisma.project.update as any)({
       where: { id: projectId },
       data: {
         title: data.title,

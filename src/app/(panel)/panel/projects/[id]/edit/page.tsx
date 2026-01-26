@@ -18,7 +18,9 @@ export default async function EditProjectPage({
   const { id } = await params
 
   const [project, clients, statuses, tags, templates] = await Promise.all([
-    prisma.project.findUnique({
+    // TODO: Remove 'as any' after running migration and regenerating Prisma client
+    // Migration file: sql/add_project_contacts.sql
+    (prisma.project.findUnique as any)({
       where: { id },
       include: {
         tags: { select: { id: true } },

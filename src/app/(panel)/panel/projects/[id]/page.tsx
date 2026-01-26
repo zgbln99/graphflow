@@ -40,7 +40,9 @@ export default async function ProjectDetailPage({
   const { id } = await params
   const isAdmin = session.user.role === 'ADMIN'
 
-  const project = await prisma.project.findUnique({
+  // TODO: Remove 'as any' after running migration and regenerating Prisma client
+  // Migration file: sql/add_project_contacts.sql
+  const project = await (prisma.project.findUnique as any)({
     where: { id },
     include: {
       status: true,

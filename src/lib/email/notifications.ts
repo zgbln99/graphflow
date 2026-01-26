@@ -292,7 +292,9 @@ export async function notifyProjectStatusChanged(
   // Pobierz kontakty projektu (jeśli nie zostały przekazane)
   let contacts = project.contacts
   if (!contacts) {
-    const projectWithContacts = await prisma.project.findUnique({
+    // TODO: Remove 'as any' after running migration and regenerating Prisma client
+    // Migration file: sql/add_project_contacts.sql
+    const projectWithContacts = await (prisma.project.findUnique as any)({
       where: { id: project.id },
       include: { contacts: { where: { isActive: true } } },
     })
