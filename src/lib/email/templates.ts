@@ -344,7 +344,7 @@ export function projectStatusChangedEmail(
   data: ProjectEmailData & { oldStatus: string; newStatus: string; files?: ProjectFileLink[] }
 ): { subject: string; html: string; text: string } {
   const projectUrl = `${APP_URL}/panel/projects/${data.projectId}`
-  const subject = `[${data.projectNumber}] Zmiana statusu projektu: ${data.newStatus}`
+  const subject = `[${data.projectNumber}] ${data.projectTitle} - ${data.newStatus}`
 
   const filesSection = data.files && data.files.length > 0 ? `
     <div style="margin: 24px 0;">
@@ -364,19 +364,13 @@ export function projectStatusChangedEmail(
   ` : ''
 
   const html = getBaseTemplate(`
-    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Zmiana statusu projektu</h1>
-    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Status Twojego projektu został zaktualizowany</p>
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">${data.projectTitle}</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">${data.projectNumber} - Zmiana statusu projektu</p>
 
     ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
-    <p style="margin: 0 0 20px 0;">Informujemy o zmianie statusu Twojego projektu w systemie GraphFlow.</p>
+    <p style="margin: 0 0 20px 0;">Informujemy o zmianie statusu projektu <strong>${data.projectTitle}</strong>.</p>
 
     ${getInfoBox(`
-      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">PROJEKT</p>
-      <p style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: ${COLORS.mirage};">[${data.projectNumber}] ${data.projectTitle}</p>
-      ${data.submittedByName ? `
-        <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZGŁOSIŁ</p>
-        <p style="margin: 0 0 16px 0; font-size: 14px; color: ${COLORS.shark};">${data.submittedByName}</p>
-      ` : ''}
       <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">ZMIANA STATUSU</p>
       <p style="margin: 0;">
         <span style="color: ${COLORS.gullGray}; text-decoration: line-through;">${data.oldStatus}</span>
@@ -430,7 +424,7 @@ export function projectCompletedEmail(
   data: ProjectEmailData & { oldStatus: string; files: ProjectFileLink[] }
 ): { subject: string; html: string; text: string } {
   const projectUrl = `${APP_URL}/panel/projects/${data.projectId}`
-  const subject = `[${data.projectNumber}] Projekt zakończony - pliki do pobrania`
+  const subject = `[${data.projectNumber}] ${data.projectTitle} - Zakończony`
 
   const filesSection = data.files.length > 0 ? `
     <div style="margin: 24px 0;">
@@ -450,15 +444,13 @@ export function projectCompletedEmail(
   ` : ''
 
   const html = getBaseTemplate(`
-    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">Projekt zakończony!</h1>
-    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">Twój projekt został ukończony i jest gotowy do odbioru</p>
+    <h1 style="color: ${COLORS.mirage}; font-size: 24px; margin: 0 0 8px 0;">${data.projectTitle}</h1>
+    <p style="color: ${COLORS.gullGray}; font-size: 14px; margin: 0 0 24px 0;">${data.projectNumber} - Projekt zakończony</p>
 
     ${data.recipientName ? `<p style="margin: 0 0 16px 0;">Cześć <strong>${data.recipientName}</strong>,</p>` : ''}
-    <p style="margin: 0 0 20px 0;">Z przyjemnością informujemy, że Twój projekt został zakończony. Poniżej znajdziesz linki do pobrania wszystkich plików projektu.</p>
+    <p style="margin: 0 0 20px 0;">Z przyjemnością informujemy, że projekt <strong>${data.projectTitle}</strong> został zakończony. Poniżej znajdziesz linki do pobrania wszystkich plików.</p>
 
     ${getInfoBox(`
-      <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">PROJEKT</p>
-      <p style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: ${COLORS.mirage};">[${data.projectNumber}] ${data.projectTitle}</p>
       <p style="margin: 0 0 8px 0; font-size: 13px; color: ${COLORS.gullGray};">STATUS</p>
       <p style="margin: 0;">
         <span style="display: inline-block; padding: 4px 12px; background: #10b981; color: white; border-radius: 9999px; font-size: 13px; font-weight: 500;">Zakończony</span>
