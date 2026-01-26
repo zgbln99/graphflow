@@ -43,21 +43,25 @@ export async function GET(
     let contentType = file.mimeType
 
     if (file.storageType === 'dropbox' && file.dropboxPath) {
-      // Download from Dropbox
+      // Download from Dropbox using temporary link
       const dbx = await getDropboxClient()
       if (!dbx) {
         return NextResponse.json({ error: 'Dropbox nie jest skonfigurowany' }, { status: 500 })
       }
 
       try {
-        const response = await dbx.filesDownload({ path: file.dropboxPath })
-        // The fileBinary is in the result as a Buffer
-        const result = response.result as any
-        if (result.fileBinary) {
-          fileBuffer = Buffer.from(result.fileBinary)
-        } else {
-          return NextResponse.json({ error: 'Nie udało się pobrać pliku z Dropbox' }, { status: 500 })
+        // Get temporary download link
+        const linkResponse = await dbx.filesGetTemporaryLink({ path: file.dropboxPath })
+        const downloadUrl = linkResponse.result.link
+
+        // Fetch file from temporary link
+        const downloadResponse = await fetch(downloadUrl)
+        if (!downloadResponse.ok) {
+          throw new Error(`Failed to download: ${downloadResponse.status}`)
         }
+
+        const arrayBuffer = await downloadResponse.arrayBuffer()
+        fileBuffer = Buffer.from(arrayBuffer)
       } catch (error) {
         console.error('Dropbox download error:', error)
         return NextResponse.json({ error: 'Błąd pobierania z Dropbox' }, { status: 500 })
