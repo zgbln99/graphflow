@@ -48,13 +48,39 @@ function isImageFile(file: ProjectFile): boolean {
 }
 
 // Helper to get file icon based on mime type
-function getFileIcon(mimeType: string) {
+function getFileIcon(mimeType: string, filename?: string) {
   if (mimeType.startsWith('video/')) return FileVideo
   if (mimeType.startsWith('audio/')) return FileAudio
   if (mimeType.includes('pdf')) return FileText
   if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('7z') || mimeType.includes('archive')) return FileArchive
   if (mimeType.includes('document') || mimeType.includes('word') || mimeType.includes('text')) return FileText
+  // Check by extension for design files
+  if (filename) {
+    const ext = filename.toLowerCase().split('.').pop()
+    if (['psd', 'ai', 'eps', 'indd', 'sketch', 'fig', 'xd'].includes(ext || '')) return ImageIcon
+  }
   return File
+}
+
+// Helper to check if file is a design file (PSD, AI, etc.)
+function isDesignFile(file: ProjectFile): boolean {
+  const ext = file.filename.toLowerCase().split('.').pop()
+  return ['psd', 'ai', 'eps', 'indd', 'sketch', 'fig', 'xd'].includes(ext || '')
+}
+
+// Helper to get design file type label
+function getDesignFileLabel(filename: string): string | null {
+  const ext = filename.toLowerCase().split('.').pop()
+  const labels: Record<string, string> = {
+    'psd': 'Photoshop',
+    'ai': 'Illustrator',
+    'eps': 'EPS',
+    'indd': 'InDesign',
+    'sketch': 'Sketch',
+    'fig': 'Figma',
+    'xd': 'Adobe XD',
+  }
+  return labels[ext || ''] || null
 }
 
 function formatFileSize(bytes: number): string {
@@ -567,7 +593,9 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {otherFiles.map((file) => {
                 const isImage = isImageFile(file)
-                const FileIcon = getFileIcon(file.mimeType)
+                const isDesign = isDesignFile(file)
+                const designLabel = getDesignFileLabel(file.filename)
+                const FileIcon = getFileIcon(file.mimeType, file.filename)
 
                 return (
                   <div
@@ -582,8 +610,13 @@ export function ProjectFiles({ projectId, initialFiles, isAdmin }: ProjectFilesP
                         className="w-full h-32 object-cover"
                       />
                     ) : (
-                      <div className="w-full h-32 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                      <div className="w-full h-32 bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center relative">
                         <FileIcon className="w-12 h-12 text-gray-400 dark:text-gray-500" />
+                        {designLabel && (
+                          <span className="mt-2 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 rounded">
+                            {designLabel}
+                          </span>
+                        )}
                       </div>
                     )}
                     <div className="p-2 bg-white dark:bg-gray-800">
