@@ -349,17 +349,19 @@ export function projectStatusChangedEmail(
   const filesSection = data.files && data.files.length > 0 ? `
     <div style="margin: 24px 0;">
       <p style="margin: 0 0 16px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">PLIKI DO POBRANIA (${data.files.length})</p>
-      <div style="background: ${COLORS.athensGray}; border-radius: 8px; overflow: hidden;">
+      <table style="width: 100%; background: ${COLORS.athensGray}; border-radius: 8px; border-collapse: collapse;">
         ${data.files.map((file, index) => `
-          <div style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} display: flex; align-items: center; justify-content: space-between;">
-            <div style="flex: 1; min-width: 0;">
-              <p style="margin: 0; font-size: 14px; color: ${COLORS.shark}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.filename}</p>
+          <tr>
+            <td style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} vertical-align: middle;">
+              <p style="margin: 0; font-size: 14px; color: ${COLORS.shark}; word-break: break-word;">${file.filename}</p>
               ${file.size ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: ${COLORS.gullGray};">${formatFileSizeForEmail(file.size)}</p>` : ''}
-            </div>
-            <a href="${file.url}" style="margin-left: 16px; padding: 8px 16px; background: ${COLORS.toryBlue}; color: ${COLORS.white}; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 500; white-space: nowrap;">Pobierz</a>
-          </div>
+            </td>
+            <td style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} vertical-align: middle; text-align: right; width: 100px;">
+              <a href="${file.url}" style="display: inline-block; padding: 8px 16px; background: ${COLORS.toryBlue}; color: ${COLORS.white}; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 500; white-space: nowrap;">Pobierz</a>
+            </td>
+          </tr>
         `).join('')}
-      </div>
+      </table>
     </div>
   ` : ''
 
@@ -429,17 +431,19 @@ export function projectCompletedEmail(
   const filesSection = data.files.length > 0 ? `
     <div style="margin: 24px 0;">
       <p style="margin: 0 0 16px 0; font-size: 13px; color: ${COLORS.gullGray}; text-transform: uppercase;">PLIKI DO POBRANIA (${data.files.length})</p>
-      <div style="background: ${COLORS.athensGray}; border-radius: 8px; overflow: hidden;">
+      <table style="width: 100%; background: ${COLORS.athensGray}; border-radius: 8px; border-collapse: collapse;">
         ${data.files.map((file, index) => `
-          <div style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} display: flex; align-items: center; justify-content: space-between;">
-            <div style="flex: 1; min-width: 0;">
-              <p style="margin: 0; font-size: 14px; color: ${COLORS.shark}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.filename}</p>
+          <tr>
+            <td style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} vertical-align: middle;">
+              <p style="margin: 0; font-size: 14px; color: ${COLORS.shark}; word-break: break-word;">${file.filename}</p>
               ${file.size ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: ${COLORS.gullGray};">${formatFileSizeForEmail(file.size)}</p>` : ''}
-            </div>
-            <a href="${file.url}" style="margin-left: 16px; padding: 8px 16px; background: ${COLORS.toryBlue}; color: ${COLORS.white}; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 500; white-space: nowrap;">Pobierz</a>
-          </div>
+            </td>
+            <td style="padding: 12px 16px; ${index > 0 ? `border-top: 1px solid ${COLORS.white};` : ''} vertical-align: middle; text-align: right; width: 100px;">
+              <a href="${file.url}" style="display: inline-block; padding: 8px 16px; background: ${COLORS.toryBlue}; color: ${COLORS.white}; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 500; white-space: nowrap;">Pobierz</a>
+            </td>
+          </tr>
         `).join('')}
-      </div>
+      </table>
     </div>
   ` : ''
 
