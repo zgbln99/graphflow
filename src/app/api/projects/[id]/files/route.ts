@@ -78,29 +78,9 @@ export async function POST(
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const isPreview = formData.get('isPreview') === 'true'
-    const parentFileId = formData.get('parentFileId') as string | null
 
     if (!file) {
       return NextResponse.json({ error: 'Brak pliku' }, { status: 400 })
-    }
-
-    // Calculate version number if this is a new version
-    let version = 1
-    if (parentFileId) {
-      const parentFile = await (prisma.projectFile.findFirst as any)({
-        where: {
-          OR: [
-            { id: parentFileId },
-            { parentFileId: parentFileId }
-          ],
-          projectId,
-        },
-        orderBy: { version: 'desc' },
-        select: { version: true },
-      })
-      if (parentFile) {
-        version = (parentFile.version || 1) + 1
-      }
     }
 
     // Max 2GB dla plików projektowych (Dropbox)
@@ -171,8 +151,7 @@ export async function POST(
     }
 
     // Zapisz do bazy
-    // TODO: Remove 'as any' after running migration and regenerating Prisma client
-    const projectFile = await (prisma.projectFile.create as any)({
+    const projectFile = await prisma.projectFile.create({
       data: {
         projectId,
         filename: file.name,
@@ -184,8 +163,6 @@ export async function POST(
         storageType,
         externalUrl,
         dropboxPath,
-        version,
-        parentFileId: parentFileId || undefined,
       },
       include: {
         uploadedBy: {

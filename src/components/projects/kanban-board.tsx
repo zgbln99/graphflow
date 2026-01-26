@@ -1,8 +1,20 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Calendar, MessageSquare, FileText, GripVertical, Filter } from 'lucide-react'
+import {
+  Calendar,
+  MessageSquare,
+  FileText,
+  GripVertical,
+  Filter,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  MoreHorizontal,
+  ExternalLink,
+  User
+} from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 interface Status {
@@ -18,6 +30,7 @@ interface Project {
   title: string
   statusId: string
   deadline: Date | null
+  updatedAt: Date
   status: Status
   clientAccount: { id: string; name: string }
   tags: { id: string; name: string; color: string }[]
@@ -35,12 +48,28 @@ interface KanbanBoardProps {
   clients: Client[]
 }
 
+// Check if deadline is soon (within 3 days)
+function isDeadlineSoon(deadline: Date | null): boolean {
+  if (!deadline) return false
+  const now = new Date()
+  const deadlineDate = new Date(deadline)
+  const diffDays = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  return diffDays <= 3 && diffDays >= 0
+}
+
+// Check if deadline is overdue
+function isDeadlineOverdue(deadline: Date | null): boolean {
+  if (!deadline) return false
+  return new Date(deadline) < new Date()
+}
+
 export function KanbanBoard({ statuses, projects: initialProjects, clients }: KanbanBoardProps) {
   const [projects, setProjects] = useState(initialProjects)
   const [draggedProject, setDraggedProject] = useState<Project | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [selectedClient, setSelectedClient] = useState<string>('')
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState<string | null>(null)
   const dragCounter = useRef<{ [key: string]: number }>({})
 
   // Filter projects by client
@@ -61,18 +90,20 @@ export function KanbanBoard({ statuses, projects: initialProjects, clients }: Ka
     setDraggedProject(project)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', project.id)
-    // Add dragging class after a small delay
-    setTimeout(() => {
-      const el = document.getElementById(`project-${project.id}`)
-      if (el) el.classList.add('opacity-50')
-    }, 0)
+
+    // Create custom drag image
+    const el = document.getElementById(`project-${project.id}`)
+    if (el) {
+      const clone = el.cloneNode(true) as HTMLElement
+      clone.style.transform = 'rotate(3deg)'
+      clone.style.opacity = '0.9'
+      document.body.appendChild(clone)
+      e.dataTransfer.setDragImage(clone, 150, 50)
+      setTimeout(() => clone.remove(), 0)
+    }
   }
 
   const handleDragEnd = () => {
-    if (draggedProject) {
-      const el = document.getElementById(`project-${draggedProject.id}`)
-      if (el) el.classList.remove('opacity-50')
-    }
     setDraggedProject(null)
     setDragOverStatus(null)
     dragCounter.current = {}
@@ -114,7 +145,7 @@ export function KanbanBoard({ statuses, projects: initialProjects, clients }: Ka
     const oldStatusId = draggedProject.statusId
     const newStatus = statuses.find((s) => s.id === newStatusId)
 
-    // Optimistic update
+    // Optimistic update with animation
     setProjects((prev) =>
       prev.map((p) =>
         p.id === projectId
@@ -135,6 +166,10 @@ export function KanbanBoard({ statuses, projects: initialProjects, clients }: Ka
       if (!response.ok) {
         throw new Error('Failed to update status')
       }
+
+      // Show success animation
+      setShowSuccessAnimation(projectId)
+      setTimeout(() => setShowSuccessAnimation(null), 1500)
     } catch (error) {
       console.error('Error updating project status:', error)
       // Revert on error
@@ -152,156 +187,284 @@ export function KanbanBoard({ statuses, projects: initialProjects, clients }: Ka
 
   return (
     <div className="space-y-4">
-      {/* Filter */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-gray-400" />
-          <select
-            value={selectedClient}
-            onChange={(e) => setSelectedClient(e.target.value)}
-            className="input w-auto text-sm dark:bg-gray-700 dark:border-gray-600"
-          >
-            <option value="">Wszyscy klienci</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
+      {/* Filter Bar */}
+      <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gray-400" />
+            <select
+              value={selectedClient}
+              onChange={(e) => setSelectedClient(e.target.value)}
+              className="input w-auto text-sm dark:bg-gray-700 dark:border-gray-600 rounded-lg"
+            >
+              <option value="">Wszyscy klienci</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          {filteredProjects.length} projektów
-        </span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-500 dark:text-gray-400">
+              {filteredProjects.length} projektów
+            </span>
+            <span className="text-gray-300 dark:text-gray-600">|</span>
+            <span className="text-gray-500 dark:text-gray-400">
+              {statuses.length} kolumn
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {statuses.map((status) => (
-          <div
-            key={status.id}
-            className={`flex-shrink-0 w-80 rounded-lg transition-colors ${
-              dragOverStatus === status.id
-                ? 'bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500'
-                : 'bg-gray-100 dark:bg-gray-800'
-            }`}
-            onDragEnter={(e) => handleDragEnter(e, status.id)}
-            onDragLeave={(e) => handleDragLeave(e, status.id)}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, status.id)}
-          >
-            {/* Column Header */}
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: status.color }}
-                  />
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    {status.name}
-                  </h3>
+      {/* Kanban Board */}
+      <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
+        {statuses.map((status, statusIndex) => {
+          const statusProjects = projectsByStatus[status.id] || []
+          const isDropTarget = dragOverStatus === status.id && draggedProject?.statusId !== status.id
+
+          return (
+            <div
+              key={status.id}
+              className={`
+                flex-shrink-0 w-80 rounded-xl transition-all duration-300 ease-out
+                ${isDropTarget
+                  ? 'ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900 bg-primary-50/50 dark:bg-primary-900/20 scale-[1.02]'
+                  : 'bg-gray-50 dark:bg-gray-800/50'
+                }
+              `}
+              onDragEnter={(e) => handleDragEnter(e, status.id)}
+              onDragLeave={(e) => handleDragLeave(e, status.id)}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, status.id)}
+              style={{
+                animationDelay: `${statusIndex * 50}ms`,
+              }}
+            >
+              {/* Column Header */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-3 h-3 rounded-full ring-2 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-800"
+                      style={{
+                        backgroundColor: status.color,
+                        ringColor: status.color,
+                      }}
+                    />
+                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                      {status.name}
+                    </h3>
+                  </div>
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2.5 py-1 rounded-full">
+                    {statusProjects.length}
+                  </span>
                 </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">
-                  {projectsByStatus[status.id]?.length || 0}
-                </span>
+
+                {/* Column Progress Bar */}
+                <div className="mt-3 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full transition-all duration-500 ease-out rounded-full"
+                    style={{
+                      width: `${(statusProjects.length / Math.max(filteredProjects.length, 1)) * 100}%`,
+                      backgroundColor: status.color,
+                    }}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Cards */}
-            <div className="p-2 space-y-2 min-h-[200px]">
-              {projectsByStatus[status.id]?.map((project) => (
-                <div
-                  key={project.id}
-                  id={`project-${project.id}`}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, project)}
-                  onDragEnd={handleDragEnd}
-                  className={`bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-3 cursor-grab active:cursor-grabbing transition-all hover:shadow-md ${
-                    isUpdating === project.id ? 'opacity-70' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <GripVertical className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      {/* Project number and client */}
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="text-xs font-mono text-primary-600 dark:text-primary-400">
-                          {project.number}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {project.clientAccount.name}
-                        </span>
-                      </div>
+              {/* Cards Container */}
+              <div className="p-3 space-y-3 min-h-[300px] max-h-[calc(100vh-300px)] overflow-y-auto">
+                {statusProjects.map((project, projectIndex) => {
+                  const isDragging = draggedProject?.id === project.id
+                  const isBeingUpdated = isUpdating === project.id
+                  const showSuccess = showSuccessAnimation === project.id
+                  const deadlineSoon = isDeadlineSoon(project.deadline)
+                  const deadlineOverdue = isDeadlineOverdue(project.deadline)
 
-                      {/* Title */}
-                      <Link
-                        href={`/panel/projects/${project.id}`}
-                        className="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 block truncate"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {project.title}
-                      </Link>
-
-                      {/* Tags */}
-                      {project.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {project.tags.slice(0, 3).map((tag) => (
-                            <span
-                              key={tag.id}
-                              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs"
-                              style={{
-                                backgroundColor: `${tag.color}20`,
-                                color: tag.color,
-                              }}
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
-                          {project.tags.length > 3 && (
-                            <span className="text-xs text-gray-500">
-                              +{project.tags.length - 3}
-                            </span>
-                          )}
+                  return (
+                    <div
+                      key={project.id}
+                      id={`project-${project.id}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, project)}
+                      onDragEnd={handleDragEnd}
+                      className={`
+                        group relative bg-white dark:bg-gray-900 rounded-xl shadow-sm
+                        border border-gray-200 dark:border-gray-700
+                        transition-all duration-200 ease-out
+                        ${isDragging ? 'opacity-40 scale-95 rotate-2' : 'opacity-100'}
+                        ${isBeingUpdated ? 'animate-pulse' : ''}
+                        ${showSuccess ? 'ring-2 ring-green-500 ring-offset-2' : ''}
+                        hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600
+                        hover:-translate-y-0.5
+                        cursor-grab active:cursor-grabbing
+                      `}
+                      style={{
+                        animationDelay: `${projectIndex * 30}ms`,
+                      }}
+                    >
+                      {/* Success Checkmark Animation */}
+                      {showSuccess && (
+                        <div className="absolute -top-2 -right-2 z-10">
+                          <div className="bg-green-500 text-white rounded-full p-1 shadow-lg animate-bounce">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </div>
                         </div>
                       )}
 
-                      {/* Footer */}
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                          {project._count.tickets > 0 && (
-                            <span className="flex items-center gap-1">
-                              <MessageSquare className="w-3 h-3" />
-                              {project._count.tickets}
-                            </span>
-                          )}
-                          {project._count.files > 0 && (
-                            <span className="flex items-center gap-1">
-                              <FileText className="w-3 h-3" />
-                              {project._count.files}
+                      {/* Card Content */}
+                      <div className="p-4">
+                        {/* Header with drag handle and actions */}
+                        <div className="flex items-start gap-2 mb-3">
+                          <div className="mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
+                            <GripVertical className="w-4 h-4 text-gray-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            {/* Project number and client */}
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-xs font-mono font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-2 py-0.5 rounded">
+                                {project.number}
+                              </span>
+                              <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                <User className="w-3 h-3" />
+                                <span className="truncate max-w-[100px]">{project.clientAccount.name}</span>
+                              </div>
+                            </div>
+
+                            {/* Title */}
+                            <Link
+                              href={`/panel/projects/${project.id}`}
+                              className="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 block line-clamp-2 transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {project.title}
+                            </Link>
+                          </div>
+                        </div>
+
+                        {/* Tags */}
+                        {project.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {project.tags.slice(0, 3).map((tag) => (
+                              <span
+                                key={tag.id}
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-transform hover:scale-105"
+                                style={{
+                                  backgroundColor: `${tag.color}15`,
+                                  color: tag.color,
+                                  border: `1px solid ${tag.color}30`,
+                                }}
+                              >
+                                {tag.name}
+                              </span>
+                            ))}
+                            {project.tags.length > 3 && (
+                              <span className="text-xs text-gray-400 dark:text-gray-500 px-1">
+                                +{project.tags.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800">
+                          {/* Stats */}
+                          <div className="flex items-center gap-3">
+                            {project._count.tickets > 0 && (
+                              <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>{project._count.tickets}</span>
+                              </span>
+                            )}
+                            {project._count.files > 0 && (
+                              <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>{project._count.files}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Deadline */}
+                          {project.deadline && (
+                            <span
+                              className={`
+                                flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors
+                                ${deadlineOverdue
+                                  ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                  : deadlineSoon
+                                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                                }
+                              `}
+                            >
+                              {deadlineOverdue ? (
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                              ) : deadlineSoon ? (
+                                <Clock className="w-3.5 h-3.5" />
+                              ) : (
+                                <Calendar className="w-3.5 h-3.5" />
+                              )}
+                              <span>{formatDate(project.deadline)}</span>
                             </span>
                           )}
                         </div>
-                        {project.deadline && (
-                          <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                            <Calendar className="w-3 h-3" />
-                            {formatDate(project.deadline)}
-                          </span>
-                        )}
                       </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
 
-              {/* Empty state */}
-              {(!projectsByStatus[status.id] || projectsByStatus[status.id].length === 0) && (
-                <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
-                  Przeciągnij projekt tutaj
-                </div>
-              )}
+                      {/* Quick Action Button */}
+                      <Link
+                        href={`/panel/projects/${project.id}`}
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all p-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Otwórz projekt"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                      </Link>
+                    </div>
+                  )
+                })}
+
+                {/* Empty state */}
+                {statusProjects.length === 0 && (
+                  <div
+                    className={`
+                      flex flex-col items-center justify-center py-12 text-center
+                      border-2 border-dashed rounded-xl transition-all duration-200
+                      ${isDropTarget
+                        ? 'border-primary-400 bg-primary-50/50 dark:bg-primary-900/20'
+                        : 'border-gray-200 dark:border-gray-700'
+                      }
+                    `}
+                  >
+                    <div className={`
+                      w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors
+                      ${isDropTarget
+                        ? 'bg-primary-100 dark:bg-primary-900/40'
+                        : 'bg-gray-100 dark:bg-gray-800'
+                      }
+                    `}>
+                      <GripVertical className={`w-5 h-5 ${isDropTarget ? 'text-primary-500' : 'text-gray-400'}`} />
+                    </div>
+                    <p className={`text-sm font-medium ${isDropTarget ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                      {isDropTarget ? 'Upuść tutaj!' : 'Brak projektów'}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      {isDropTarget ? '' : 'Przeciągnij projekt do tej kolumny'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
+      </div>
+
+      {/* Keyboard shortcut hint */}
+      <div className="text-center text-xs text-gray-400 dark:text-gray-500 mt-4">
+        <span className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Przeciągnij i upuść</span>
+        {' '}aby zmienić status projektu
       </div>
     </div>
   )
