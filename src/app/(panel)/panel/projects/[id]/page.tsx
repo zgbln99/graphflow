@@ -93,7 +93,7 @@ export default async function ProjectDetailPage({
       },
       emailLogs: isAdmin ? {
         orderBy: { sentAt: 'desc' },
-        take: 20,
+        take: 4,
       } : undefined,
     },
   })
