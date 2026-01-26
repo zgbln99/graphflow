@@ -89,14 +89,15 @@ model ClientAccount {
 // ============================================
 
 model ProjectStatus {
-  id          String    @id @default(cuid())
-  name        String    // Np. "Nowe", "W trakcie", "Do akceptacji"
-  slug        String    @unique
-  color       String    @default("#6366f1") // Kolor HEX
-  order       Int       @default(0)
-  isDefault   Boolean   @default(false)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  id              String    @id @default(cuid())
+  name            String    // Np. "Nowe", "W trakcie", "Do akceptacji"
+  slug            String    @unique
+  color           String    @default("#6366f1") // Kolor HEX
+  order           Int       @default(0)
+  isDefault       Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  notifyOnChange  Boolean   @default(true)  // Czy wysyłać powiadomienia przy zmianie na ten status
+  createdAt       DateTime  @default(now())
 
   projects    Project[]
 }

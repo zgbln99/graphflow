@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { ArrowLeft, Plus, GripVertical, Star } from 'lucide-react'
+import { ArrowLeft, Plus, GripVertical, Star, Bell, BellOff } from 'lucide-react'
 
 export default async function StatusesSettingsPage() {
   const session = await getSession()
@@ -77,6 +77,14 @@ export default async function StatusesSettingsPage() {
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {status._count.projects} projektów
                   </p>
+                </div>
+                {/* Notification indicator */}
+                <div className="flex items-center" title={(status as any).notifyOnChange !== false ? 'Powiadomienia włączone' : 'Powiadomienia wyłączone'}>
+                  {(status as any).notifyOnChange !== false ? (
+                    <Bell className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <BellOff className="w-4 h-4 text-gray-400" />
+                  )}
                 </div>
               </Link>
             ))}

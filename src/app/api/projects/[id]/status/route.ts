@@ -65,12 +65,14 @@ export async function PATCH(
       include: { status: true },
     })
 
-    // Send notification about status change
-    try {
-      await notifyProjectStatusChanged(project, currentProject.status.name, correctionsList)
-    } catch (error) {
-      console.error('Error sending status change notification:', error)
-      // Don't fail the request if notification fails
+    // Send notification about status change (only if notifyOnChange is enabled for this status)
+    if ((newStatus as any).notifyOnChange !== false) {
+      try {
+        await notifyProjectStatusChanged(project, currentProject.status.name, correctionsList)
+      } catch (error) {
+        console.error('Error sending status change notification:', error)
+        // Don't fail the request if notification fails
+      }
     }
 
     return NextResponse.json({ success: true, project })
