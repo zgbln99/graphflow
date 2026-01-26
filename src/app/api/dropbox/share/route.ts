@@ -21,7 +21,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Brak ścieżki pliku' }, { status: 400 })
     }
 
-    // Try to create a new shared link
+    // Get temporary link for direct access (works for previews)
+    const tempLinkResponse = await dbx.filesGetTemporaryLink({ path })
+    const temporaryUrl = tempLinkResponse.result.link
+
+    // Try to create a new shared link for sharing
     let sharedLink: string
     try {
       const linkResponse = await dbx.sharingCreateSharedLinkWithSettings({
@@ -50,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       url: sharedLink,
-      directUrl: sharedLink.replace('?dl=0', '?raw=1'),
+      directUrl: temporaryUrl, // Use temporary link for direct access
     })
   } catch (error: any) {
     console.error('Dropbox share error:', error)

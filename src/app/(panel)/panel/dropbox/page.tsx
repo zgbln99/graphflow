@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Folder,
   ArrowLeft,
@@ -20,6 +20,10 @@ import {
   Download,
   ZoomIn,
   ZoomOut,
+  Upload,
+  Trash2,
+  FolderPlus,
+  MoreVertical,
 } from 'lucide-react'
 
 interface DropboxEntry {
@@ -70,7 +74,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
     await navigator.clipboard.writeText(text)
     return true
   } catch {
-    // Fallback for when clipboard API fails
     const textarea = document.createElement('textarea')
     textarea.value = text
     textarea.style.position = 'fixed'
@@ -99,6 +102,24 @@ export default function DropboxBrowserPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [zoom, setZoom] = useState(1)
 
+  // Upload state
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Delete state
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<DropboxEntry | null>(null)
+
+  // Create folder state
+  const [showNewFolder, setShowNewFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [creatingFolder, setCreatingFolder] = useState(false)
+
+  // Context menu
+  const [contextMenu, setContextMenu] = useState<{ entry: DropboxEntry; x: number; y: number } | null>(null)
+
   const fetchEntries = useCallback(async (path: string) => {
     setLoading(true)
     setError(null)
@@ -112,7 +133,7 @@ export default function DropboxBrowserPage() {
       setEntries(data.entries)
       setCurrentPath(path)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Błąd ładowania')
+      setError(err instanceof Error ? err.message : 'Blad ladowania')
     } finally {
       setLoading(false)
     }
@@ -122,17 +143,38 @@ export default function DropboxBrowserPage() {
     fetchEntries('')
   }, [fetchEntries])
 
-  // Handle escape key for preview
+  // Handle escape key for preview and context menu
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && preview) {
-        setPreview(null)
-        setZoom(1)
+      if (e.key === 'Escape') {
+        if (preview) {
+          setPreview(null)
+          setZoom(1)
+        }
+        if (contextMenu) {
+          setContextMenu(null)
+        }
+        if (confirmDelete) {
+          setConfirmDelete(null)
+        }
+        if (showNewFolder) {
+          setShowNewFolder(false)
+          setNewFolderName('')
+        }
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [preview])
+  }, [preview, contextMenu, confirmDelete, showNewFolder])
+
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null)
+    if (contextMenu) {
+      document.addEventListener('click', handleClick)
+      return () => document.removeEventListener('click', handleClick)
+    }
+  }, [contextMenu])
 
   const navigateToFolder = (path: string) => {
     fetchEntries(path)
@@ -168,35 +210,200 @@ export default function DropboxBrowserPage() {
         })
         setZoom(1)
       } else {
-        // Copy to clipboard
         const success = await copyToClipboard(data.url)
         if (success) {
           setCopiedId(entry.id)
           setTimeout(() => setCopiedId(null), 2000)
         } else {
-          setError('Nie udało się skopiować linku')
+          setError('Nie udalo sie skopiowac linku')
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Błąd tworzenia linku')
+      setError(err instanceof Error ? err.message : 'Blad tworzenia linku')
     } finally {
       setGeneratingLink(null)
       setPreviewLoading(false)
     }
   }
 
-  const breadcrumbs = currentPath
-    ? currentPath.split('/').filter(Boolean)
-    : []
+  // Upload files
+  const handleUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    setUploading(true)
+    setError(null)
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        setUploadProgress(`Wysylanie ${i + 1}/${files.length}: ${file.name}`)
+
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('path', currentPath)
+
+        const res = await fetch('/api/dropbox/upload', {
+          method: 'POST',
+          body: formData,
+        })
+        const data = await res.json()
+
+        if (!res.ok) throw new Error(data.error)
+      }
+
+      // Refresh entries
+      await fetchEntries(currentPath)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Blad uploadu')
+    } finally {
+      setUploading(false)
+      setUploadProgress(null)
+    }
+  }
+
+  // Drag & drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    handleUpload(e.dataTransfer.files)
+  }
+
+  // Delete entry
+  const handleDelete = async (entry: DropboxEntry) => {
+    setConfirmDelete(null)
+    setDeleting(entry.id)
+
+    try {
+      const res = await fetch('/api/dropbox/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: entry.path }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error)
+
+      // Remove from list
+      setEntries((prev) => prev.filter((e) => e.id !== entry.id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Blad usuwania')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  // Create folder
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return
+
+    setCreatingFolder(true)
+
+    try {
+      const res = await fetch('/api/dropbox/folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: currentPath,
+          name: newFolderName.trim(),
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error)
+
+      // Add to list and sort
+      setEntries((prev) => {
+        const newEntries = [...prev, data.entry]
+        return newEntries.sort((a, b) => {
+          if (a.type === 'folder' && b.type !== 'folder') return -1
+          if (a.type !== 'folder' && b.type === 'folder') return 1
+          return a.name.localeCompare(b.name)
+        })
+      })
+
+      setShowNewFolder(false)
+      setNewFolderName('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Blad tworzenia folderu')
+    } finally {
+      setCreatingFolder(false)
+    }
+  }
+
+  const breadcrumbs = currentPath ? currentPath.split('/').filter(Boolean) : []
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Przeglądarka Dropbox</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Przeglądaj pliki i generuj linki do udostępnienia
-        </p>
+    <div
+      className="space-y-6"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="fixed inset-0 z-50 bg-primary-500/20 border-4 border-dashed border-primary-500 flex items-center justify-center pointer-events-none">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-lg text-center">
+            <Upload className="w-16 h-16 mx-auto text-primary-500 mb-4" />
+            <p className="text-xl font-medium text-gray-900 dark:text-white">
+              Upusc pliki tutaj
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Przegladarka Dropbox</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Przegladaj pliki, uploaduj i generuj linki do udostepnienia
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowNewFolder(true)}
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            <FolderPlus className="w-4 h-4" />
+            Nowy folder
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+          >
+            {uploading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
+            {uploading ? 'Wysylanie...' : 'Upload'}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => handleUpload(e.target.files)}
+          />
+        </div>
       </div>
+
+      {uploadProgress && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg flex items-center gap-2">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          {uploadProgress}
+        </div>
+      )}
 
       {error && (
         <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg flex items-center gap-2">
@@ -214,7 +421,7 @@ export default function DropboxBrowserPage() {
           <button
             onClick={() => fetchEntries('')}
             className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            title="Folder główny"
+            title="Folder glowny"
           >
             <Home className="w-4 h-4" />
           </button>
@@ -242,10 +449,11 @@ export default function DropboxBrowserPage() {
           <div className="p-8 flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
           </div>
-        ) : entries.length === 0 ? (
+        ) : entries.length === 0 && !showNewFolder ? (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">
             <Folder className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p>Folder jest pusty</p>
+            <p className="text-sm mt-2">Przeciagnij pliki tutaj lub kliknij Upload</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -262,14 +470,57 @@ export default function DropboxBrowserPage() {
               </button>
             )}
 
+            {/* New folder input */}
+            {showNewFolder && (
+              <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50">
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <FolderPlus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateFolder()
+                    if (e.key === 'Escape') {
+                      setShowNewFolder(false)
+                      setNewFolderName('')
+                    }
+                  }}
+                  placeholder="Nazwa folderu..."
+                  className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  autoFocus
+                />
+                <button
+                  onClick={handleCreateFolder}
+                  disabled={creatingFolder || !newFolderName.trim()}
+                  className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                >
+                  {creatingFolder ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Utworz'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowNewFolder(false)
+                    setNewFolderName('')
+                  }}
+                  className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             {entries.map((entry) => {
               const FileIcon = entry.type === 'folder' ? Folder : getFileIcon(entry.name)
               const isImage = isImageFile(entry.name)
+              const isDeleting = deleting === entry.id
 
               return (
                 <div
                   key={entry.id}
-                  className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  className={`flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                    isDeleting ? 'opacity-50' : ''
+                  }`}
                 >
                   {entry.type === 'folder' ? (
                     <button
@@ -316,52 +567,105 @@ export default function DropboxBrowserPage() {
                     )}
                   </div>
 
-                  {entry.type === 'file' && (
-                    <div className="flex items-center gap-2">
-                      {/* Preview button for images */}
-                      {isImage && (
-                        <button
-                          onClick={() => generateLink(entry, true)}
-                          disabled={previewLoading}
-                          className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors"
-                          title="Podgląd"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
-                      )}
-
-                      {/* Copy link button */}
-                      <button
-                        onClick={() => generateLink(entry)}
-                        disabled={generatingLink === entry.id}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                          copiedId === entry.id
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                            : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50'
-                        }`}
-                      >
-                        {generatingLink === entry.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : copiedId === entry.id ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Skopiowano!
-                          </>
-                        ) : (
-                          <>
-                            <LinkIcon className="w-4 h-4" />
-                            Kopiuj link
-                          </>
+                  <div className="flex items-center gap-1">
+                    {entry.type === 'file' && (
+                      <>
+                        {/* Preview button for images */}
+                        {isImage && (
+                          <button
+                            onClick={() => generateLink(entry, true)}
+                            disabled={previewLoading}
+                            className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors"
+                            title="Podglad"
+                          >
+                            <Eye className="w-5 h-5" />
+                          </button>
                         )}
-                      </button>
-                    </div>
-                  )}
+
+                        {/* Copy link button */}
+                        <button
+                          onClick={() => generateLink(entry)}
+                          disabled={generatingLink === entry.id}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                            copiedId === entry.id
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                              : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50'
+                          }`}
+                        >
+                          {generatingLink === entry.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : copiedId === entry.id ? (
+                            <>
+                              <Check className="w-4 h-4" />
+                              Skopiowano!
+                            </>
+                          ) : (
+                            <>
+                              <LinkIcon className="w-4 h-4" />
+                              Link
+                            </>
+                          )}
+                        </button>
+                      </>
+                    )}
+
+                    {/* Delete button */}
+                    <button
+                      onClick={() => setConfirmDelete(entry)}
+                      disabled={isDeleting}
+                      className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      title="Usun"
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               )
             })}
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Potwierdz usuniecie
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Czy na pewno chcesz usunac{' '}
+              <span className="font-medium text-gray-900 dark:text-white">
+                {confirmDelete.name}
+              </span>
+              ?
+              {confirmDelete.type === 'folder' && (
+                <span className="block mt-1 text-sm text-red-600 dark:text-red-400">
+                  Uwaga: Folder zostanie usuniety wraz z cala zawartoscia!
+                </span>
+              )}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDelete)}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Usun
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Preview Modal */}
       {(preview || previewLoading) && (
@@ -387,7 +691,7 @@ export default function DropboxBrowserPage() {
               <button
                 onClick={() => setZoom(z => Math.min(z + 0.25, 3))}
                 className="p-2 text-white/75 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                title="Powiększ"
+                title="Powieksz"
               >
                 <ZoomIn className="w-5 h-5" />
               </button>
