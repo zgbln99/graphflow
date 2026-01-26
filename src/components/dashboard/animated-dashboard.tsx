@@ -145,7 +145,7 @@ export function AnimatedProjectCard({ children, href, delay = 0 }: AnimatedProje
     <FadeIn delay={delay} direction="left">
       <Link
         href={href}
-        className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 hover:translate-x-1"
+        className="block p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 hover:translate-x-1"
       >
         {children}
       </Link>
@@ -170,7 +170,7 @@ export function AnimatedDeadlineCard({ children, href, isUrgent, delay = 0 }: An
       <Link
         href={href}
         className={cn(
-          'block p-4 transition-all duration-200',
+          'block p-3 sm:p-4 transition-all duration-200',
           'hover:bg-gray-50 dark:hover:bg-gray-700/50',
           isUrgent && 'animate-pulse-soft'
         )}

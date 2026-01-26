@@ -190,11 +190,12 @@ export default async function DashboardPage() {
 
         {/* Recent projects */}
         <AnimatedCard delay={600}>
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 dark:text-white">Ostatnie projekty</h2>
-            <Link href="/panel/projects" className="text-sm link flex items-center gap-1 group">
-              Zobacz wszystkie
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+          <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
+            <h2 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Ostatnie projekty</h2>
+            <Link href="/panel/projects" className="text-xs sm:text-sm link flex items-center gap-1 group whitespace-nowrap flex-shrink-0">
+              <span className="hidden sm:inline">Zobacz wszystkie</span>
+              <span className="sm:hidden">Więcej</span>
+              <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -209,14 +210,14 @@ export default async function DashboardPage() {
                   href={`/panel/projects/${project.id}`}
                   delay={700 + index * 50}
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start justify-between gap-2 sm:gap-4">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-1 sm:gap-2 mb-1 flex-wrap">
+                        <span className="text-[10px] sm:text-xs font-mono text-gray-500 dark:text-gray-400">
                           {project.number}
                         </span>
                         <span
-                          className="badge"
+                          className="badge text-[10px] sm:text-xs"
                           style={{
                             backgroundColor: `${project.status.color}20`,
                             color: project.status.color,
@@ -225,16 +226,16 @@ export default async function DashboardPage() {
                           {project.status.name}
                         </span>
                       </div>
-                      <p className="font-medium text-gray-900 dark:text-white truncate">
+                      <p className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">
                         {project.title}
                       </p>
                       {isAdmin && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
                           {project.clientAccount.name}
                         </p>
                       )}
                     </div>
-                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                    <span className="text-[10px] sm:text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
                       {formatRelativeTime(project.updatedAt)}
                     </span>
                   </div>
@@ -246,10 +247,10 @@ export default async function DashboardPage() {
 
         {/* Upcoming deadlines */}
         <AnimatedCard delay={800}>
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-gray-400" />
-              <h2 className="font-semibold text-gray-900 dark:text-white">Zblizajace sie terminy</h2>
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+              <h2 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Zbliżające się terminy</h2>
             </div>
           </div>
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -271,26 +272,26 @@ export default async function DashboardPage() {
                     isUrgent={isUrgent}
                     delay={900 + index * 50}
                   >
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center justify-between gap-2 sm:gap-4">
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900 dark:text-white truncate">
+                        <p className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">
                           {project.title}
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
                           {project.number}
                           {isAdmin && ` • ${project.clientAccount.name}`}
                         </p>
                       </div>
                       <div
-                        className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-medium transition-all ${
+                        className={`flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium transition-all flex-shrink-0 ${
                           isUrgent
                             ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 animate-pulse'
                             : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                         }`}
                       >
-                        <Clock className="w-4 h-4" />
+                        <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
                         {daysLeft === 0
-                          ? 'Dzis!'
+                          ? 'Dziś!'
                           : daysLeft === 1
                           ? 'Jutro'
                           : `${daysLeft} dni`}
