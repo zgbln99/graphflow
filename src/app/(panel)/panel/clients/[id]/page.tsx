@@ -8,13 +8,13 @@ import {
   Plus,
   Users,
   FolderOpen,
-  Ticket,
   Mail,
   Phone,
   MapPin,
 } from 'lucide-react'
-import { formatDate, formatRelativeTime } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { DeleteClientButton } from '@/components/clients/delete-client-button'
+import { UserActions } from '@/components/client/user-actions-dropdown'
 
 export default async function ClientDetailPage({
   params,
@@ -37,15 +37,6 @@ export default async function ClientDetailPage({
       projects: {
         include: {
           status: true,
-        },
-        orderBy: { updatedAt: 'desc' },
-        take: 5,
-      },
-      tickets: {
-        include: {
-          createdBy: {
-            select: { name: true },
-          },
         },
         orderBy: { updatedAt: 'desc' },
         take: 5,
@@ -175,29 +166,36 @@ export default async function ClientDetailPage({
               Brak użytkowników
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
               {client.users.map((user) => (
                 <div key={user.id} className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary-700">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      user.isActive
+                        ? 'bg-primary-100 dark:bg-primary-900/50'
+                        : 'bg-gray-100 dark:bg-gray-700'
+                    }`}>
+                      <span className={`text-sm font-medium ${
+                        user.isActive
+                          ? 'text-primary-700 dark:text-primary-400'
+                          : 'text-gray-500 dark:text-gray-400'
+                      }`}>
                         {user.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">{user.name}</p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-gray-900 dark:text-white">{user.name}</p>
+                        {!user.isActive && (
+                          <span className="badge bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                            Nieaktywny
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
                     </div>
                   </div>
-                  <span
-                    className={`badge ${
-                      user.isActive
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {user.isActive ? 'Aktywny' : 'Nieaktywny'}
-                  </span>
+                  <UserActions userId={user.id} clientId={id} isActive={user.isActive} />
                 </div>
               ))}
             </div>
@@ -261,46 +259,6 @@ export default async function ClientDetailPage({
         </div>
       </div>
 
-      {/* Recent tickets */}
-      <div className="card">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Ticket className="w-5 h-5 text-gray-400" />
-            <h2 className="font-semibold text-gray-900">Ostatnie tickety</h2>
-          </div>
-          <Link
-            href={`/panel/tickets?client=${client.id}`}
-            className="text-sm link"
-          >
-            Zobacz wszystkie →
-          </Link>
-        </div>
-        {client.tickets.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">Brak ticketów</div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {client.tickets.map((ticket) => (
-              <Link
-                key={ticket.id}
-                href={`/panel/tickets/${ticket.id}`}
-                className="block p-4 hover:bg-gray-50"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-mono text-gray-500 mr-2">
-                      {ticket.number}
-                    </span>
-                    <span className="font-medium text-gray-900">{ticket.title}</span>
-                    <p className="text-sm text-gray-500">
-                      {ticket.createdBy.name} • {formatRelativeTime(ticket.updatedAt)}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   )
 }
