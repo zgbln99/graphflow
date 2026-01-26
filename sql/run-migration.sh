@@ -16,10 +16,17 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
+# Find psql
+PSQL=$(which psql 2>/dev/null || echo "/usr/bin/psql")
+if [ ! -x "$PSQL" ]; then
+  echo "Error: psql not found. Install with: apt install postgresql-client"
+  exit 1
+fi
+
 echo "Running migration: add_project_contacts..."
 echo ""
 
-psql "$DATABASE_URL" -f sql/add_project_contacts.sql
+$PSQL "$DATABASE_URL" -f sql/add_project_contacts.sql
 
 if [ $? -eq 0 ]; then
   echo ""
