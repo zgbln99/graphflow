@@ -207,7 +207,7 @@ export default async function ProjectDetailPage({
       {/* Tags */}
       {project.tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {project.tags.map((tag) => (
+          {project.tags.map((tag: { id: string; name: string; color: string }) => (
             <span
               key={tag.id}
               className="badge"
@@ -404,7 +404,7 @@ export default async function ProjectDetailPage({
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {project.statusHistory.map((history) => (
+                  {project.statusHistory.map((history: { id: string; fromStatus: string | null; toStatus: string; changedAt: Date }) => (
                     <div key={history.id} className="p-3 text-sm">
                       <p className="text-gray-900 dark:text-white">
                         {history.fromStatus && (
@@ -436,7 +436,7 @@ export default async function ProjectDetailPage({
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {project.contacts.map((contact) => (
+                  {project.contacts.map((contact: { id: string; name: string; email: string }) => (
                     <div key={contact.id} className="p-3 text-sm flex items-center gap-2">
                       <Mail className="w-4 h-4 text-gray-400" />
                       <div>
@@ -462,7 +462,7 @@ export default async function ProjectDetailPage({
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {project.emailLogs.map((log) => (
+                    {project.emailLogs.map((log: { id: string; toName: string | null; toEmail: string; subject: string; status: string; sentAt: Date; error: string | null }) => (
                       <div key={log.id} className="p-3 text-sm">
                         <p className="font-medium text-gray-900 dark:text-white">
                           {log.toName || log.toEmail}
