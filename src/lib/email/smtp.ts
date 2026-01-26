@@ -28,6 +28,7 @@ interface SendEmailOptions {
   ticketId?: string
   projectId?: string
   attachments?: EmailAttachment[]
+  recipientName?: string // Nazwa odbiorcy do logów
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
@@ -49,6 +50,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
     await prisma.emailLog.create({
       data: {
         toEmail: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+        toName: options.recipientName,
         subject: options.subject,
         status: 'sent',
         ticketId: options.ticketId,
@@ -64,6 +66,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
     await prisma.emailLog.create({
       data: {
         toEmail: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+        toName: options.recipientName,
         subject: options.subject,
         status: 'failed',
         error: error instanceof Error ? error.message : 'Nieznany błąd',

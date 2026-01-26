@@ -283,17 +283,37 @@ async function generateFileLinks(projectId: string): Promise<ProjectFileLink[]> 
 
 /**
  * Wysyła powiadomienie o zmianie statusu projektu
+ * Powiadomienia idą tylko do kontaktów przypisanych do projektu
  */
 export async function notifyProjectStatusChanged(
-  project: Project & { status: { name: string; slug?: string } },
+  project: Project & { status: { name: string; slug?: string }; contacts?: User[] },
   oldStatusName: string
 ): Promise<void> {
-  const clientUsers = await prisma.user.findMany({
-    where: {
-      clientAccountId: project.clientAccountId,
-      isActive: true,
-    },
-  })
+  // Pobierz kontakty projektu (jeśli nie zostały przekazane)
+  let contacts = project.contacts
+  if (!contacts) {
+    const projectWithContacts = await prisma.project.findUnique({
+      where: { id: project.id },
+      include: { contacts: { where: { isActive: true } } },
+    })
+    contacts = projectWithContacts?.contacts || []
+  }
+
+  // Jeśli brak kontaktów, użyj twórcy projektu
+  if (contacts.length === 0 && project.createdById) {
+    const creator = await prisma.user.findUnique({
+      where: { id: project.createdById, isActive: true },
+    })
+    if (creator) {
+      contacts = [creator]
+    }
+  }
+
+  // Jeśli nadal brak kontaktów, nie wysyłaj
+  if (contacts.length === 0) {
+    console.log(`No contacts for project ${project.number}, skipping notification`)
+    return
+  }
 
   // Check status type
   const statusSlug = (project.status as any).slug
@@ -306,8 +326,8 @@ export async function notifyProjectStatusChanged(
     fileLinks = await generateFileLinks(project.id)
   }
 
-  // Wyślij do użytkowników klienta
-  for (const user of clientUsers) {
+  // Wyślij do kontaktów projektu
+  for (const contact of contacts) {
     let emailData
 
     if (isCompleted) {
@@ -316,7 +336,7 @@ export async function notifyProjectStatusChanged(
         projectNumber: project.number,
         projectTitle: project.title,
         projectId: project.id,
-        recipientName: user.name,
+        recipientName: contact.name,
         oldStatus: oldStatusName,
         files: fileLinks,
       })
@@ -326,7 +346,7 @@ export async function notifyProjectStatusChanged(
         projectNumber: project.number,
         projectTitle: project.title,
         projectId: project.id,
-        recipientName: user.name,
+        recipientName: contact.name,
         oldStatus: oldStatusName,
         newStatus: project.status.name,
         files: isForApproval ? fileLinks : undefined,
@@ -334,11 +354,12 @@ export async function notifyProjectStatusChanged(
     }
 
     await sendEmail({
-      to: user.email,
+      to: contact.email,
       subject: emailData.subject,
       html: emailData.html,
       text: emailData.text,
       projectId: project.id,
+      recipientName: contact.name,
     })
   }
 

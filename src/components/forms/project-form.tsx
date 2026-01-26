@@ -29,6 +29,7 @@ interface ProjectFormProps {
     dropboxLink: string | null
     notifyEmail?: string | null
     tags: { id: string }[]
+    contacts?: { id: string }[]
   }
 }
 
@@ -45,6 +46,9 @@ export function ProjectForm({
   const [error, setError] = useState<string | null>(null)
   const [selectedTags, setSelectedTags] = useState<string[]>(
     project?.tags.map((t) => t.id) || []
+  )
+  const [selectedContacts, setSelectedContacts] = useState<string[]>(
+    project?.contacts?.map((c) => c.id) || []
   )
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [selectedClientId, setSelectedClientId] = useState<string>(project?.clientAccountId || '')
@@ -65,6 +69,11 @@ export function ProjectForm({
     // Dodaj wybrane tagi
     selectedTags.forEach((tagId) => {
       formData.append('tagIds', tagId)
+    })
+
+    // Dodaj wybrane kontakty do powiadomień
+    selectedContacts.forEach((contactId) => {
+      formData.append('contactIds', contactId)
     })
 
     // Dodaj szablon timeline
@@ -332,12 +341,56 @@ export function ProjectForm({
         </div>
       </div>
 
-      {/* Dodatkowy email do powiadomień */}
+      {/* Powiadomienia - wybór kontaktów */}
       <div className="border-t border-gray-200 pt-6">
-        <h3 className="font-medium text-gray-900 mb-4">Powiadomienia</h3>
+        <h3 className="font-medium text-gray-900 mb-4">Powiadomienia email</h3>
+
+        {/* Kontakty do powiadomień */}
+        {selectedClientId && selectedClientUsers.length > 0 && (
+          <div className="mb-4">
+            <label className="label">
+              Kontakty do powiadomień
+            </label>
+            <p className="text-sm text-gray-500 mb-3">
+              Wybierz osoby, które mają otrzymywać powiadomienia o zmianach w projekcie
+            </p>
+            <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+              {selectedClientUsers.map((user) => (
+                <label
+                  key={user.id}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedContacts.includes(user.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedContacts(prev => [...prev, user.id])
+                      } else {
+                        setSelectedContacts(prev => prev.filter(id => id !== user.id))
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900">{user.name}</p>
+                    <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            {selectedContacts.length === 0 && (
+              <p className="text-sm text-amber-600 mt-2">
+                Brak wybranych kontaktów - powiadomienia nie będą wysyłane
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Dodatkowy email */}
         <div>
           <label htmlFor="notifyEmail" className="label">
-            Dodatkowy email do powiadomień
+            Dodatkowy email (opcjonalny)
           </label>
           <input
             id="notifyEmail"
@@ -348,7 +401,7 @@ export function ProjectForm({
             placeholder="np. szef@firma.pl"
           />
           <p className="text-sm text-gray-500 mt-1">
-            Ten email otrzyma powiadomienie po zakończeniu projektu (oprócz standardowych użytkowników)
+            Ten adres otrzyma powiadomienia dodatkowo (np. osoba spoza systemu)
           </p>
         </div>
       </div>

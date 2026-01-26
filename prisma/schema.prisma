@@ -38,6 +38,7 @@ model User {
   comments          Comment[]
   createdTickets    Ticket[]  @relation("TicketCreator")
   createdProjects   Project[] @relation("ProjectCreator")
+  contactForProjects Project[] @relation("ProjectContacts") // Projekty, dla których user otrzymuje powiadomienia
   emailMessages     EmailMessage[]
   sessions          Session[]
   notifications     Notification[]
@@ -146,6 +147,9 @@ model Project {
   // Dodatkowy email do powiadomień przy zakończeniu projektu
   notifyEmail     String?
 
+  // Kontakty do powiadomień (użytkownicy, którzy otrzymują emaile o tym projekcie)
+  contacts        User[]        @relation("ProjectContacts")
+
   // Relacje
   tickets         Ticket[]
   timelineStages  TimelineStage[]
@@ -155,6 +159,7 @@ model Project {
   notes           Note[]
   fileLocations   FileLocation[]
   files           ProjectFile[]
+  emailLogs       EmailLog[]
 
   @@index([clientAccountId])
   @@index([statusId])
@@ -263,6 +268,7 @@ model Ticket {
   comments        Comment[]
   emailMessages   EmailMessage[]
   notes           Note[]
+  emailLogs       EmailLog[]
 
   @@index([clientAccountId])
   @@index([projectId])
@@ -424,6 +430,7 @@ model NotificationSetting {
 model EmailLog {
   id          String    @id @default(cuid())
   toEmail     String
+  toName      String?   // Nazwa odbiorcy
   subject     String
   templateId  String?
   status      String    // "sent" | "failed"
@@ -432,10 +439,15 @@ model EmailLog {
 
   // Powiązania (opcjonalne)
   ticketId    String?
+  ticket      Ticket?   @relation(fields: [ticketId], references: [id], onDelete: SetNull)
   projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([toEmail])
   @@index([status])
+  @@index([projectId])
+  @@index([ticketId])
+  @@index([sentAt])
 }
 
 // ============================================

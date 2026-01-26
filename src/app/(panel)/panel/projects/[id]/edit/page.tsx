@@ -22,6 +22,7 @@ export default async function EditProjectPage({
       where: { id },
       include: {
         tags: { select: { id: true } },
+        contacts: { select: { id: true } },
       },
     }),
     prisma.clientAccount.findMany({

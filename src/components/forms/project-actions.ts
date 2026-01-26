@@ -46,6 +46,9 @@ export async function createProjectAction(formData: FormData) {
     // Pobierz przypisanego uzytkownika (opcjonalnie)
     const assignedUserId = formData.get('createdById') as string | null
 
+    // Pobierz kontakty do powiadomień
+    const contactIds = formData.getAll('contactIds') as string[]
+
     // Utwórz projekt
     const project = await prisma.project.create({
       data: {
@@ -61,6 +64,9 @@ export async function createProjectAction(formData: FormData) {
         createdById: assignedUserId || session.user.id,
         tags: data.tagIds?.length
           ? { connect: data.tagIds.map((id) => ({ id })) }
+          : undefined,
+        contacts: contactIds.length
+          ? { connect: contactIds.map((id) => ({ id })) }
           : undefined,
         statusHistory: {
           create: {
@@ -359,6 +365,9 @@ export async function updateProjectAction(projectId: string, formData: FormData)
     // Pobierz notifyEmail z formData (poza walidacją)
     const notifyEmail = (formData.get('notifyEmail') as string) || null
 
+    // Pobierz kontakty do powiadomień
+    const contactIds = formData.getAll('contactIds') as string[]
+
     // Aktualizuj projekt
     const project = await prisma.project.update({
       where: { id: projectId },
@@ -373,6 +382,9 @@ export async function updateProjectAction(projectId: string, formData: FormData)
         notifyEmail: notifyEmail || null,
         tags: {
           set: data.tagIds?.map((id) => ({ id })) || [],
+        },
+        contacts: {
+          set: contactIds.map((id) => ({ id })),
         },
         ...(statusChanged && newStatus
           ? {
