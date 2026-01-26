@@ -6,10 +6,20 @@ import { Send, Lock, Loader2 } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 import { addCommentAction } from './comment-actions'
 import { useRealtime } from '@/hooks/use-realtime'
-import type { User, UserRole, Comment } from '@prisma/client'
+type UserRole = 'ADMIN' | 'CLIENT_USER'
+
+interface CommentType {
+  id: string
+  content: string
+  visibility: 'PUBLIC' | 'INTERNAL'
+  createdAt: Date | string
+  authorId: string
+  ticketId?: string | null
+  projectId?: string | null
+}
 
 interface CommentsListProps {
-  comments: (Comment & { author: { id: string; name: string; role: UserRole } })[]
+  comments: (CommentType & { author: { id: string; name: string; role: UserRole } })[]
   ticketId?: string
   projectId?: string
   isAdmin: boolean

@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     ])
 
     return apiResponse({
-      data: projects.map((p) => ({
+      data: projects.map((p: typeof projects[number]) => ({
         id: p.id,
         number: p.number,
         title: p.title,

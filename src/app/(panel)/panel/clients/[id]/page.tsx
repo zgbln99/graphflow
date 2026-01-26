@@ -135,7 +135,7 @@ export default async function ClientDetailPage({
         <div className="card p-4">
           <h2 className="font-semibold text-gray-900 mb-2">Dozwolone domeny email</h2>
           <div className="flex flex-wrap gap-2">
-            {client.emailDomains.split(',').map((domain) => (
+            {client.emailDomains.split(',').map((domain: string) => (
               <span key={domain} className="badge bg-gray-100 text-gray-700">
                 @{domain.trim()}
               </span>
@@ -167,7 +167,7 @@ export default async function ClientDetailPage({
             </div>
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-700">
-              {client.users.map((user) => (
+              {client.users.map((user: typeof client.users[number]) => (
                 <div key={user.id} className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -221,7 +221,7 @@ export default async function ClientDetailPage({
             <div className="p-8 text-center text-gray-500">Brak projektów</div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {client.projects.map((project) => (
+              {client.projects.map((project: typeof client.projects[number]) => (
                 <Link
                   key={project.id}
                   href={`/panel/projects/${project.id}`}

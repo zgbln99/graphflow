@@ -14,7 +14,61 @@ import {
   CorrectionItem,
 } from './templates'
 import { getDropboxClient } from '../dropbox'
-import type { Ticket, Project, Comment, User, ClientAccount, ProjectFile } from '@prisma/client'
+// Local type definitions (instead of importing from Prisma)
+interface Ticket {
+  id: string
+  number: string
+  title: string
+  description: string | null
+  priority: string
+  status: string
+  clientAccountId: string
+  createdById: string
+  projectId: string | null
+  replyToken: string
+  deadline: Date | null
+}
+
+interface Project {
+  id: string
+  number: string
+  title: string
+  description: string | null
+  clientAccountId: string
+  statusId: string
+  localPath: string | null
+  dropboxPath: string | null
+  dropboxLink: string | null
+  createdById: string | null
+}
+
+interface Comment {
+  id: string
+  content: string
+  visibility: string
+  authorId: string
+}
+
+interface User {
+  id: string
+  email: string
+  name: string
+  role: string
+}
+
+interface ClientAccount {
+  id: string
+  name: string
+}
+
+interface ProjectFile {
+  id: string
+  filename: string
+  storedName: string
+  storageType: string
+  externalUrl: string | null
+  dropboxPath: string | null
+}
 
 /**
  * Wysyła powiadomienie o utworzeniu ticketa do klienta

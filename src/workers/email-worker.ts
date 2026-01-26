@@ -122,7 +122,7 @@ async function processEmail(mail: any): Promise<void> {
 
     if (ticket) {
       // Sprawdź czy email należy do użytkownika klienta
-      const clientEmails = ticket.clientAccount.users.map((u) => u.email.toLowerCase())
+      const clientEmails = ticket.clientAccount.users.map((u: typeof ticket.clientAccount.users[number]) => u.email.toLowerCase())
       if (clientEmails.includes(fromEmail)) {
         senderAllowed = true
       }
@@ -131,7 +131,7 @@ async function processEmail(mail: any): Promise<void> {
       if (!senderAllowed && ticket.clientAccount.emailDomains) {
         const allowedDomains = ticket.clientAccount.emailDomains
           .split(',')
-          .map((d) => d.trim().toLowerCase())
+          .map((d: string) => d.trim().toLowerCase())
         const senderDomain = fromEmail.split('@')[1]
         if (allowedDomains.includes(senderDomain)) {
           senderAllowed = true

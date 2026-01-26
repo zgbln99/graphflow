@@ -179,7 +179,7 @@ export default async function TicketsPage({
               className="input w-auto dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Wszyscy klienci</option>
-              {clients.map((client) => (
+              {clients.map((client: typeof clients[number]) => (
                 <option key={client.id} value={client.id}>
                   {client.name}
                 </option>
@@ -194,7 +194,7 @@ export default async function TicketsPage({
               className="input w-auto dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Wszystkie projekty</option>
-              {projects.map((project) => (
+              {projects.map((project: typeof projects[number]) => (
                 <option key={project.id} value={project.id}>
                   {project.number} - {project.title}
                 </option>
@@ -263,7 +263,7 @@ export default async function TicketsPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {tickets.map((ticket) => (
+                {tickets.map((ticket: typeof tickets[number]) => (
                   <tr key={ticket.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="table-cell">
                       <Link

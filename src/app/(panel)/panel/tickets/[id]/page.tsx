@@ -232,7 +232,7 @@ export default async function TicketDetailPage({
                   <h2 className="font-semibold text-gray-900 dark:text-white">Historia maili</h2>
                 </div>
                 <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-64 overflow-y-auto">
-                  {ticket.emailMessages.map((email) => (
+                  {ticket.emailMessages.map((email: typeof ticket.emailMessages[number]) => (
                     <div key={email.id} className="p-3 text-sm">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-gray-900 dark:text-white truncate">

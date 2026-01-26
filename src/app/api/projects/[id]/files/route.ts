@@ -178,7 +178,7 @@ export async function POST(
     })
 
     if (clientAccount && clientAccount.users.length > 0) {
-      const clientUserIds = clientAccount.users.map(u => u.id)
+      const clientUserIds = clientAccount.users.map((u: typeof clientAccount.users[number]) => u.id)
       notifyUsers(clientUserIds, {
         type: 'FILES_UPDATED',
         projectId,
@@ -247,7 +247,7 @@ export async function DELETE(
     })
 
     if (clientAccount && clientAccount.users.length > 0) {
-      const clientUserIds = clientAccount.users.map(u => u.id)
+      const clientUserIds = clientAccount.users.map((u: typeof clientAccount.users[number]) => u.id)
       notifyUsers(clientUserIds, {
         type: 'FILES_UPDATED',
         projectId,

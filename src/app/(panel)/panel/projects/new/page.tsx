@@ -42,7 +42,7 @@ export default async function NewProjectPage() {
       }),
     ])
 
-    const defaultStatus = statuses.find((s) => s.isDefault) || statuses[0]
+    const defaultStatus = statuses.find((s: typeof statuses[number]) => s.isDefault) || statuses[0]
 
     return (
       <div className="max-w-3xl mx-auto">

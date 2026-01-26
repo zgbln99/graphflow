@@ -4,11 +4,43 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import type { ClientAccount, ProjectStatus, ProjectTag, TimelineTemplate, User } from '@prisma/client'
 import { createProjectAction, updateProjectAction } from './project-actions'
 
+interface ClientAccount {
+  id: string
+  name: string
+  slug: string
+}
+
+interface ProjectStatus {
+  id: string
+  name: string
+  slug: string
+  color: string
+  isDefault: boolean
+}
+
+interface ProjectTag {
+  id: string
+  name: string
+  color: string
+}
+
+interface TimelineTemplate {
+  id: string
+  name: string
+  isDefault: boolean
+}
+
+interface UserInfo {
+  id: string
+  name: string
+  email: string
+  isActive: boolean
+}
+
 type ClientWithUsers = ClientAccount & {
-  users: Pick<User, 'id' | 'name' | 'email' | 'isActive'>[]
+  users: UserInfo[]
 }
 
 interface ProjectFormProps {

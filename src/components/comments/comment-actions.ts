@@ -105,10 +105,10 @@ export async function addCommentAction(formData: FormData) {
             where: { role: 'ADMIN', isActive: true },
             select: { id: true },
           })
-          usersToNotify.push(...admins.map(a => a.id))
+          usersToNotify.push(...admins.map((a: typeof admins[number]) => a.id))
         } else {
           // Powiadom użytkowników klienta (oprócz autora)
-          usersToNotify.push(...ticket.clientAccount.users.map(u => u.id).filter(id => id !== session.user.id))
+          usersToNotify.push(...ticket.clientAccount.users.map((u: typeof ticket.clientAccount.users[number]) => u.id).filter((id: string) => id !== session.user.id))
         }
 
         if (usersToNotify.length > 0) {
@@ -150,11 +150,11 @@ export async function addCommentAction(formData: FormData) {
             where: { role: 'ADMIN', isActive: true },
             select: { id: true },
           })
-          usersToNotify.push(...admins.map(a => a.id))
+          usersToNotify.push(...admins.map((a: typeof admins[number]) => a.id))
 
           // Utwórz powiadomienie w bazie dla adminów
           await prisma.notification.createMany({
-            data: admins.map(admin => ({
+            data: admins.map((admin: typeof admins[number]) => ({
               type: 'COMMENT_ADDED' as const,
               title: 'Nowy komentarz',
               message: `${comment.author.name} dodał komentarz do projektu ${project.number}`,
@@ -165,11 +165,11 @@ export async function addCommentAction(formData: FormData) {
           })
         } else {
           // Komentarz od admina - powiadom użytkowników klienta
-          usersToNotify.push(...project.clientAccount.users.map(u => u.id))
+          usersToNotify.push(...project.clientAccount.users.map((u: typeof project.clientAccount.users[number]) => u.id))
 
           // Utwórz powiadomienie w bazie dla użytkowników klienta
           await prisma.notification.createMany({
-            data: project.clientAccount.users.map(user => ({
+            data: project.clientAccount.users.map((user: typeof project.clientAccount.users[number]) => ({
               type: 'COMMENT_ADDED' as const,
               title: 'Nowy komentarz',
               message: `${comment.author.name} dodał komentarz do projektu ${project.number}`,

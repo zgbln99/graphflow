@@ -1,5 +1,6 @@
 import { prisma } from './db'
-import { AuditAction } from '@prisma/client'
+
+type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE' | 'COMMENT_ADD' | 'LOGIN' | 'LOGOUT'
 
 interface AuditLogInput {
   action: AuditAction

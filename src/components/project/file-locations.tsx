@@ -2,9 +2,15 @@
 
 import { useState } from 'react'
 import { Copy, Check, ExternalLink, Plus, Folder, Trash2 } from 'lucide-react'
-import type { FileLocation } from '@prisma/client'
 import { addFileLocationAction, deleteFileLocationAction } from './file-location-actions'
 import { useRouter } from 'next/navigation'
+
+interface FileLocation {
+  id: string
+  type: 'LOCAL' | 'DROPBOX' | 'GOOGLE_DRIVE' | 'OTHER'
+  path: string
+  label?: string | null
+}
 
 interface FileLocationsListProps {
   projectId: string

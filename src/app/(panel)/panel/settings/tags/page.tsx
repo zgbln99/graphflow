@@ -48,7 +48,7 @@ export default async function TagsSettingsPage() {
           </div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
-            {tags.map((tag) => (
+            {tags.map((tag: typeof tags[number]) => (
               <Link
                 key={tag.id}
                 href={`/panel/settings/tags/${tag.id}`}

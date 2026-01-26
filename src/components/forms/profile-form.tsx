@@ -3,11 +3,23 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, User, Lock, Mail, Building2 } from 'lucide-react'
-import type { User as UserType, ClientAccount } from '@prisma/client'
 import { updateProfileAction, changePasswordAction } from './profile-actions'
 
+interface UserType {
+  id: string
+  email: string
+  name: string
+  role: 'ADMIN' | 'CLIENT_USER'
+  isActive: boolean
+}
+
+interface ClientAccountType {
+  id: string
+  name: string
+}
+
 interface ProfileFormProps {
-  user: UserType & { clientAccount: ClientAccount | null }
+  user: UserType & { clientAccount: ClientAccountType | null }
 }
 
 export function ProfileForm({ user }: ProfileFormProps) {

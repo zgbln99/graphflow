@@ -22,7 +22,7 @@ export async function GET() {
   })
 
   // Mark current session
-  const sessionsWithCurrent = sessions.map((s) => ({
+  const sessionsWithCurrent = sessions.map((s: typeof sessions[number]) => ({
     id: s.id,
     createdAt: s.createdAt,
     expiresAt: s.expiresAt,

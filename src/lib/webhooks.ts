@@ -38,7 +38,7 @@ export async function triggerWebhook(event: WebhookEvent, data: Record<string, u
 
     // Send webhooks in parallel
     const results = await Promise.allSettled(
-      webhooks.map(async (webhook) => {
+      webhooks.map(async (webhook: typeof webhooks[number]) => {
         const payloadString = JSON.stringify(payload)
 
         // Create signature

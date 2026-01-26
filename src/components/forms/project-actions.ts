@@ -89,7 +89,7 @@ export async function createProjectAction(formData: FormData) {
 
       if (template) {
         await prisma.timelineStage.createMany({
-          data: template.stages.map((stage, index) => ({
+          data: template.stages.map((stage: typeof template.stages[number], index: number) => ({
             projectId: project.id,
             name: stage.name,
             order: index,
@@ -199,7 +199,7 @@ export async function createClientProjectAction(formData: FormData) {
 
     if (admins.length > 0) {
       await prisma.notification.createMany({
-        data: admins.map(admin => ({
+        data: admins.map((admin: typeof admins[number]) => ({
           type: 'PROJECT_CREATED',
           title: 'Nowy projekt do akceptacji',
           message: `${project.clientAccount.name} zgłosił nowy projekt: ${project.title}`,
@@ -211,7 +211,7 @@ export async function createClientProjectAction(formData: FormData) {
 
       // Send real-time notification to admins
       notifyUsers(
-        admins.map(a => a.id),
+        admins.map((a: typeof admins[number]) => a.id),
         {
           type: 'PROJECT_CREATED',
           title: 'Nowy projekt do akceptacji',
@@ -416,10 +416,10 @@ export async function updateProjectAction(projectId: string, formData: FormData)
       })
 
       if (clientAccount && clientAccount.users.length > 0) {
-        const clientUserIds = clientAccount.users.map(u => u.id)
+        const clientUserIds = clientAccount.users.map((u: typeof clientAccount.users[number]) => u.id)
 
         await prisma.notification.createMany({
-          data: clientUserIds.map(userId => ({
+          data: clientUserIds.map((userId: string) => ({
             type: 'PROJECT_STATUS_CHANGE' as const,
             title: 'Zmiana statusu projektu',
             message: `Status projektu ${currentProject.number} zmieniono na: ${newStatus.name}`,
@@ -449,7 +449,7 @@ export async function updateProjectAction(projectId: string, formData: FormData)
       })
 
       if (clientAccount && clientAccount.users.length > 0) {
-        const clientUserIds = clientAccount.users.map(u => u.id)
+        const clientUserIds = clientAccount.users.map((u: typeof clientAccount.users[number]) => u.id)
         notifyUsers(clientUserIds, {
           type: 'PROJECT_UPDATED',
           projectId,
@@ -510,11 +510,11 @@ export async function updateProjectStatusAction(projectId: string, statusId: str
     await notifyProjectStatusChanged(project, currentProject.status.name)
 
     // Utwórz powiadomienie w bazie i wyślij realtime notification do użytkowników klienta
-    const clientUserIds = currentProject.clientAccount.users.map(u => u.id)
+    const clientUserIds = currentProject.clientAccount.users.map((u: typeof currentProject.clientAccount.users[number]) => u.id)
 
     if (clientUserIds.length > 0) {
       await prisma.notification.createMany({
-        data: clientUserIds.map(userId => ({
+        data: clientUserIds.map((userId: string) => ({
           type: 'PROJECT_STATUS_CHANGE' as const,
           title: 'Zmiana statusu projektu',
           message: `Status projektu ${currentProject.number} zmieniono na: ${newStatus.name}`,

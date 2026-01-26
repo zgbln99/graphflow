@@ -1,8 +1,17 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { prisma } from './db'
-import type { User, UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+
+type UserRole = 'ADMIN' | 'CLIENT_USER'
+
+interface User {
+  id: string
+  email: string
+  name: string
+  role: UserRole
+  clientAccountId: string | null
+}
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'default-secret-change-me')
 const COOKIE_NAME = 'graphflow-session'

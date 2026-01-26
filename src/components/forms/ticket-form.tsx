@@ -4,9 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import type { ClientAccount, Project } from '@prisma/client'
 import { createTicketAction, updateTicketAction } from './ticket-actions'
 import { priorityLabels } from '@/lib/utils'
+
+interface ClientAccount {
+  id: string
+  name: string
+}
 
 interface TicketFormProps {
   clients: ClientAccount[]

@@ -2,7 +2,6 @@
 
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { TicketStatus } from '@prisma/client'
 
 export async function bulkTicketAction(
   action: string,
@@ -18,21 +17,21 @@ export async function bulkTicketAction(
       case 'close':
         await prisma.ticket.updateMany({
           where: { id: { in: ticketIds } },
-          data: { status: TicketStatus.CLOSED },
+          data: { status: 'CLOSED' },
         })
         break
 
       case 'resolve':
         await prisma.ticket.updateMany({
           where: { id: { in: ticketIds } },
-          data: { status: TicketStatus.RESOLVED },
+          data: { status: 'RESOLVED' },
         })
         break
 
       case 'in_progress':
         await prisma.ticket.updateMany({
           where: { id: { in: ticketIds } },
-          data: { status: TicketStatus.IN_PROGRESS },
+          data: { status: 'IN_PROGRESS' },
         })
         break
 

@@ -64,7 +64,7 @@ export default async function ClientUsersPage({
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {client.users.map((user) => (
+            {client.users.map((user: typeof client.users[number]) => (
               <div
                 key={user.id}
                 className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"

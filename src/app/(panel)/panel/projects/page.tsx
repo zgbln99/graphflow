@@ -111,7 +111,7 @@ export default async function ProjectsPage({
               className="input w-full sm:w-auto flex-1 sm:flex-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Wszystkie statusy</option>
-              {statuses.map((status) => (
+              {statuses.map((status: typeof statuses[number]) => (
                 <option key={status.id} value={status.id}>
                   {status.name}
                 </option>
@@ -125,7 +125,7 @@ export default async function ProjectsPage({
                 className="input w-full sm:w-auto flex-1 sm:flex-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               >
                 <option value="">Wszyscy klienci</option>
-                {clients.map((client) => (
+                {clients.map((client: typeof clients[number]) => (
                   <option key={client.id} value={client.id}>
                     {client.name}
                   </option>
@@ -175,7 +175,7 @@ export default async function ProjectsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {projects.map((project) => (
+              {projects.map((project: typeof projects[number]) => (
                 <tr key={project.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="table-cell">
                     <Link
@@ -194,7 +194,7 @@ export default async function ProjectsPage({
                     </Link>
                     {project.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {project.tags.map((tag) => (
+                        {project.tags.map((tag: typeof project.tags[number]) => (
                           <span
                             key={tag.id}
                             className="inline-flex items-center px-2 py-0.5 rounded text-xs"

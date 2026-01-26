@@ -16,7 +16,7 @@ async function notifyTimelineUpdate(projectId: string) {
   })
 
   if (project && project.clientAccount.users.length > 0) {
-    const clientUserIds = project.clientAccount.users.map(u => u.id)
+    const clientUserIds = project.clientAccount.users.map((u: typeof project.clientAccount.users[number]) => u.id)
     notifyUsers(clientUserIds, {
       type: 'TIMELINE_UPDATED',
       projectId,
@@ -141,7 +141,7 @@ export async function applyTemplateAction(projectId: string, templateId: string)
 
     // Utwórz nowe etapy z szablonu
     await prisma.timelineStage.createMany({
-      data: template.stages.map((stage) => ({
+      data: template.stages.map((stage: typeof template.stages[number]) => ({
         projectId,
         name: stage.name,
         order: stage.order,

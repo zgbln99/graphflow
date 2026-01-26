@@ -92,7 +92,7 @@ export default async function ClientsPage({
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clients.map((client) => (
+          {clients.map((client: typeof clients[number]) => (
             <Link
               key={client.id}
               href={`/panel/clients/${client.id}`}

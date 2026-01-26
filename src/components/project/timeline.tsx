@@ -3,7 +3,16 @@
 import { CheckCircle, Circle, Clock } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import type { TimelineStage } from '@prisma/client'
+interface TimelineStage {
+  id: string
+  name: string
+  order: number
+  plannedDate?: Date | null
+  actualDate?: Date | null
+  isCurrent: boolean
+  isCompleted: boolean
+  description?: string | null
+}
 
 interface TimelineProps {
   stages: TimelineStage[]

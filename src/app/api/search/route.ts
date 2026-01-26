@@ -37,7 +37,7 @@ export async function GET(request: Request) {
       orderBy: { updatedAt: 'desc' },
     })
 
-    projects.forEach(project => {
+    projects.forEach((project: typeof projects[number]) => {
       results.push({
         id: project.id,
         type: 'project',
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
         orderBy: { name: 'asc' },
       })
 
-      clients.forEach(client => {
+      clients.forEach((client: typeof clients[number]) => {
         results.push({
           id: client.id,
           type: 'client',
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
         orderBy: { name: 'asc' },
       })
 
-      users.forEach(user => {
+      users.forEach((user: typeof users[number]) => {
         results.push({
           id: user.id,
           type: 'user',

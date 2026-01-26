@@ -45,7 +45,7 @@ export async function GET(
 
         csv = 'Numer;Tytuł;Klient;Status;Tagi;Deadline;Utworzono;Aktualizacja\n'
         for (const p of projects) {
-          csv += `${p.number};${escape(p.title)};${escape(p.clientAccount.name)};${p.status.name};${p.tags.map((t) => t.name).join(', ')};${p.deadline?.toISOString().split('T')[0] || ''};${p.createdAt.toISOString().split('T')[0]};${p.updatedAt.toISOString().split('T')[0]}\n`
+          csv += `${p.number};${escape(p.title)};${escape(p.clientAccount.name)};${p.status.name};${p.tags.map((t: typeof p.tags[number]) => t.name).join(', ')};${p.deadline?.toISOString().split('T')[0] || ''};${p.createdAt.toISOString().split('T')[0]};${p.updatedAt.toISOString().split('T')[0]}\n`
         }
         filename = `projekty_${new Date().toISOString().split('T')[0]}.csv`
         break
@@ -116,7 +116,7 @@ export async function GET(
         csv = '=== PROJEKTY ===\n'
         csv += 'Numer;Tytuł;Klient;Status;Tagi;Liczba ticketów;Deadline;Utworzono\n'
         for (const p of projects) {
-          csv += `${p.number};${escape(p.title)};${escape(p.clientAccount.name)};${p.status.name};${p.tags.map((t) => t.name).join(', ')};${p.tickets.length};${p.deadline?.toISOString().split('T')[0] || ''};${p.createdAt.toISOString().split('T')[0]}\n`
+          csv += `${p.number};${escape(p.title)};${escape(p.clientAccount.name)};${p.status.name};${p.tags.map((t: typeof p.tags[number]) => t.name).join(', ')};${p.tickets.length};${p.deadline?.toISOString().split('T')[0] || ''};${p.createdAt.toISOString().split('T')[0]}\n`
         }
 
         // Tickety

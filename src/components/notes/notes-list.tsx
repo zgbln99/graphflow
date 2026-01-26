@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 import { addNoteAction, deleteNoteAction } from './note-actions'
-import type { Note } from '@prisma/client'
+interface Note {
+  id: string
+  content: string
+  createdAt: Date | string
+  ticketId?: string | null
+  projectId?: string | null
+}
 
 interface NotesListProps {
   notes: Note[]

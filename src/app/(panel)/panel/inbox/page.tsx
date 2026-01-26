@@ -102,7 +102,7 @@ export default async function InboxPage({
         </div>
       ) : (
         <div className="space-y-4">
-          {emails.map((email) => (
+          {emails.map((email: typeof emails[number]) => (
             <div key={email.id} className="card dark:bg-gray-800 dark:border-gray-700 p-4">
               <div className="flex items-start gap-4">
                 <div

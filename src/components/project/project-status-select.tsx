@@ -3,8 +3,15 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, Loader2 } from 'lucide-react'
-import type { ProjectStatus } from '@prisma/client'
 import { updateProjectStatusAction } from '@/components/forms/project-actions'
+
+interface ProjectStatus {
+  id: string
+  name: string
+  slug: string
+  color: string
+  order: number
+}
 
 interface ProjectStatusSelectProps {
   projectId: string

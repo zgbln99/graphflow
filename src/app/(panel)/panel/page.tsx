@@ -99,19 +99,20 @@ export default async function DashboardPage() {
   const projectStatuses = await prisma.projectStatus.findMany({
     orderBy: { order: 'asc' },
   })
-  const statusMap = Object.fromEntries(projectStatuses.map((s) => [s.id, s]))
+  const statusMap = Object.fromEntries(projectStatuses.map((s: typeof projectStatuses[number]) => [s.id, s]))
 
   // Oblicz sumy
-  const totalProjects = projectStats.reduce((acc, s) => acc + s._count.id, 0)
+  type ProjectStat = typeof projectStats[number]
+  const totalProjects = projectStats.reduce((acc: number, s: ProjectStat) => acc + s._count.id, 0)
   const completedProjects = projectStats
-    .filter((s) => statusMap[s.statusId]?.slug === 'zakonczone')
-    .reduce((acc, s) => acc + s._count.id, 0)
+    .filter((s: ProjectStat) => statusMap[s.statusId]?.slug === 'zakonczone')
+    .reduce((acc: number, s: ProjectStat) => acc + s._count.id, 0)
   const inProgressProjects = projectStats
-    .filter((s) => statusMap[s.statusId]?.slug === 'w-trakcie')
-    .reduce((acc, s) => acc + s._count.id, 0)
+    .filter((s: ProjectStat) => statusMap[s.statusId]?.slug === 'w-trakcie')
+    .reduce((acc: number, s: ProjectStat) => acc + s._count.id, 0)
 
   // Dane do wykresu kolowego
-  const projectStatusData = projectStats.map((s) => ({
+  const projectStatusData = projectStats.map((s: ProjectStat) => ({
     label: statusMap[s.statusId]?.name || 'Nieznany',
     value: s._count.id,
     color: statusMap[s.statusId]?.color || '#6b7280',
@@ -204,7 +205,7 @@ export default async function DashboardPage() {
                 Brak projektow
               </div>
             ) : (
-              recentProjects.map((project, index) => (
+              recentProjects.map((project: typeof recentProjects[number], index: number) => (
                 <AnimatedProjectCard
                   key={project.id}
                   href={`/panel/projects/${project.id}`}
@@ -259,7 +260,7 @@ export default async function DashboardPage() {
                 Brak zblizajacych sie terminow
               </div>
             ) : (
-              upcomingDeadlines.map((project, index) => {
+              upcomingDeadlines.map((project: typeof upcomingDeadlines[number], index: number) => {
                 const daysLeft = Math.ceil(
                   (project.deadline!.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
                 )
@@ -314,7 +315,7 @@ export default async function DashboardPage() {
               </div>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[300px] overflow-y-auto">
-              {recentActivity.map((activity, index) => (
+              {recentActivity.map((activity: typeof recentActivity[number], index: number) => (
                 <AnimatedActivityItem
                   key={activity.id}
                   href={`/panel/projects/${activity.project.id}`}

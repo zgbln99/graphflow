@@ -5,7 +5,17 @@ import { useRouter } from 'next/navigation'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { createClientAction, updateClientAction } from './client-actions'
-import type { ClientAccount } from '@prisma/client'
+interface ClientAccount {
+  id: string
+  name: string
+  slug: string
+  email?: string | null
+  phone?: string | null
+  address?: string | null
+  notes?: string | null
+  isActive: boolean
+  emailDomains?: string | null
+}
 
 interface ClientFormProps {
   client?: ClientAccount

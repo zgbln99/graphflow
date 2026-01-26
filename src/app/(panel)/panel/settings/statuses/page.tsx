@@ -48,7 +48,7 @@ export default async function StatusesSettingsPage() {
           </div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
-            {statuses.map((status) => (
+            {statuses.map((status: typeof statuses[number]) => (
               <Link
                 key={status.id}
                 href={`/panel/settings/statuses/${status.id}`}

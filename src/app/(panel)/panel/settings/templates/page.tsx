@@ -48,7 +48,7 @@ export default async function TemplatesSettingsPage() {
           </div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
-            {templates.map((template) => (
+            {templates.map((template: typeof templates[number]) => (
               <Link
                 key={template.id}
                 href={`/panel/settings/templates/${template.id}`}
@@ -65,7 +65,7 @@ export default async function TemplatesSettingsPage() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 ml-8">
-                  {template.stages.map((stage, index) => (
+                  {template.stages.map((stage: typeof template.stages[number], index: number) => (
                     <span key={stage.id} className="text-sm text-gray-500 dark:text-gray-400">
                       {stage.name}
                       {index < template.stages.length - 1 && (

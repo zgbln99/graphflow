@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     ])
 
     return apiResponse({
-      data: tickets.map((t) => ({
+      data: tickets.map((t: typeof tickets[number]) => ({
         id: t.id,
         number: t.number,
         title: t.title,

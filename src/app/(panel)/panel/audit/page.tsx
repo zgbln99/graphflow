@@ -127,7 +127,7 @@ export default async function AuditLogPage({
                   </td>
                 </tr>
               ) : (
-                logs.map((log) => {
+                logs.map((log: typeof logs[number]) => {
                   const entityLink = getEntityLink(log.entityType, log.entityId)
                   const changes = log.changes ? JSON.parse(log.changes) : null
 
