@@ -14,7 +14,6 @@
     "email:worker": "tsx src/workers/email-worker.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -33,6 +32,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@prisma/client": "^5.22.0",
     "@tailwindcss/forms": "^0.5.9",
     "@tailwindcss/typography": "^0.5.19",
     "@types/bcryptjs": "^2.4.6",
