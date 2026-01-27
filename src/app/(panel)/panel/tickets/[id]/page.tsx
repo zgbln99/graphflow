@@ -46,7 +46,7 @@ export default async function TicketDetailPage({
         include: {
           users: {
             where: { isActive: true },
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true, email: true, avatarUrl: true },
           },
         },
       },
@@ -60,10 +60,13 @@ export default async function TicketDetailPage({
         where: isAdmin ? {} : { visibility: 'PUBLIC' },
         include: {
           author: {
-            select: { id: true, name: true, role: true },
+            select: { id: true, name: true, role: true, avatarUrl: true },
           },
           emailMessage: {
             select: { fromEmail: true },
+          },
+          reactions: {
+            select: { emoji: true, userId: true },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -217,6 +220,13 @@ export default async function TicketDetailPage({
               ticketId={ticket.id}
               isAdmin={isAdmin}
               currentUserId={session.user.id}
+              currentUserName={session.user.name}
+              users={ticket.clientAccount.users.map((u: { id: string; name: string; email: string; avatarUrl?: string | null }) => ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                avatarUrl: u.avatarUrl,
+              }))}
             />
           </div>
         </div>

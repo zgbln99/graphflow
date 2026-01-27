@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { updateProjectStatusAction } from '@/components/forms/project-actions'
+import { SuccessConfetti } from '@/components/ui/confetti'
 
 interface ProjectStatus {
   id: string
@@ -19,6 +20,9 @@ interface ProjectStatusSelectProps {
   statuses: ProjectStatus[]
 }
 
+// Statusy, które wywołują confetti (zakończone, zaakceptowane, gotowe itp.)
+const CELEBRATION_SLUGS = ['zakonczone', 'gotowe', 'zaakceptowane', 'completed', 'done', 'accepted']
+
 export function ProjectStatusSelect({
   projectId,
   currentStatusId,
@@ -27,20 +31,36 @@ export function ProjectStatusSelect({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isOpen, setIsOpen] = useState(false)
+  const [showConfetti, setShowConfetti] = useState(false)
 
   const currentStatus = statuses.find((s) => s.id === currentStatusId)
 
   async function handleStatusChange(statusId: string) {
     setIsOpen(false)
 
+    // Sprawdź czy nowy status to "zakończone" lub podobny
+    const newStatus = statuses.find((s) => s.id === statusId)
+    const shouldCelebrate = newStatus && CELEBRATION_SLUGS.includes(newStatus.slug.toLowerCase())
+
     startTransition(async () => {
       await updateProjectStatusAction(projectId, statusId)
+
+      if (shouldCelebrate) {
+        setShowConfetti(true)
+      }
+
       router.refresh()
     })
   }
 
   return (
     <div className="relative">
+      {/* Confetti on completion */}
+      <SuccessConfetti
+        trigger={showConfetti}
+        onComplete={() => setShowConfetti(false)}
+      />
+
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isPending}
@@ -69,20 +89,20 @@ export function ProjectStatusSelect({
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+          <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
             {statuses.map((status) => (
               <button
                 key={status.id}
                 onClick={() => handleStatusChange(status.id)}
-                className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50 ${
-                  status.id === currentStatusId ? 'bg-gray-50' : ''
+                className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                  status.id === currentStatusId ? 'bg-gray-50 dark:bg-gray-700' : ''
                 }`}
               >
                 <div
                   className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: status.color }}
                 />
-                {status.name}
+                <span className="text-gray-900 dark:text-white">{status.name}</span>
               </button>
             ))}
           </div>

@@ -53,7 +53,7 @@ export default async function ProjectDetailPage({
         include: {
           users: {
             where: { isActive: true },
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true, email: true, avatarUrl: true },
           },
         },
       },
@@ -68,7 +68,10 @@ export default async function ProjectDetailPage({
         where: isAdmin ? {} : { visibility: 'PUBLIC' },
         include: {
           author: {
-            select: { id: true, name: true, role: true },
+            select: { id: true, name: true, role: true, avatarUrl: true },
+          },
+          reactions: {
+            select: { emoji: true, userId: true },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -392,6 +395,13 @@ export default async function ProjectDetailPage({
               projectId={project.id}
               isAdmin={isAdmin}
               currentUserId={session.user.id}
+              currentUserName={session.user.name}
+              users={project.clientAccount.users.map((u: { id: string; name: string; email: string; avatarUrl?: string | null }) => ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                avatarUrl: u.avatarUrl,
+              }))}
             />
           </div>
         </div>

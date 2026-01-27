@@ -311,9 +311,26 @@ model Comment {
   emailMessageId String? @unique
   emailMessage   EmailMessage? @relation(fields: [emailMessageId], references: [id])
 
+  // Reakcje emoji
+  reactions   CommentReaction[]
+
   @@index([ticketId])
   @@index([projectId])
   @@index([authorId])
+}
+
+// Reakcje emoji na komentarzach
+model CommentReaction {
+  id          String    @id @default(cuid())
+  emoji       String    // np. "👍", "❤️", "🎉"
+  commentId   String
+  comment     Comment   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime  @default(now())
+
+  @@unique([commentId, userId, emoji]) // Jeden user może dodać jedną reakcję danym emoji
+  @@index([commentId])
+  @@index([userId])
 }
 
 model Note {
