@@ -1303,3 +1303,213 @@
     transform: translateY(-6px);
   }
 }
+
+/* ============================================
+   SLIDE ANIMATIONS (for banners/toasts)
+   ============================================ */
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.3s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out forwards;
+}
+
+/* ============================================
+   SAFE AREA (for PWA/mobile)
+   ============================================ */
+
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* ============================================
+   OFFLINE STATE STYLES
+   ============================================ */
+
+.offline-blur {
+  @apply opacity-50 pointer-events-none select-none;
+  filter: grayscale(0.5);
+}
+
+.offline-badge {
+  @apply inline-flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium rounded-full;
+}
+
+/* ============================================
+   NETWORK STATUS INDICATOR
+   ============================================ */
+
+.network-indicator {
+  @apply fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-80 z-50;
+}
+
+.network-indicator-online {
+  @apply bg-green-500 text-white;
+}
+
+.network-indicator-offline {
+  @apply bg-red-500 text-white;
+}
+
+/* ============================================
+   PWA INSTALL BANNER
+   ============================================ */
+
+.install-banner {
+  @apply fixed bottom-20 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50;
+  @apply bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700;
+}
+
+/* ============================================
+   BOTTOM NAVIGATION (mobile)
+   ============================================ */
+
+.bottom-nav {
+  @apply fixed bottom-0 left-0 right-0 z-40;
+  @apply bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.bottom-nav-item {
+  @apply flex flex-col items-center justify-center flex-1 py-2 transition-colors;
+}
+
+.bottom-nav-item-active {
+  @apply text-primary-600 dark:text-primary-400;
+}
+
+.bottom-nav-item-inactive {
+  @apply text-gray-500 dark:text-gray-400;
+}
+
+/* ============================================
+   PULL TO REFRESH
+   ============================================ */
+
+.pull-indicator {
+  @apply flex flex-col items-center justify-center py-4 text-gray-500 dark:text-gray-400;
+}
+
+.pull-indicator-ready {
+  @apply text-primary-600 dark:text-primary-400;
+}
+
+/* ============================================
+   ATTACHMENT STYLES
+   ============================================ */
+
+.attachment-card {
+  @apply flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg;
+  @apply hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors;
+}
+
+.attachment-icon {
+  @apply w-10 h-10 rounded-lg flex items-center justify-center;
+}
+
+.attachment-icon-image {
+  @apply bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400;
+}
+
+.attachment-icon-document {
+  @apply bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400;
+}
+
+.attachment-icon-video {
+  @apply bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400;
+}
+
+.attachment-icon-archive {
+  @apply bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400;
+}
+
+/* ============================================
+   RICH TEXT EDITOR
+   ============================================ */
+
+.rich-text-toolbar {
+  @apply flex flex-wrap items-center gap-0.5 p-2 border-b border-gray-200 dark:border-gray-700;
+  @apply bg-gray-50 dark:bg-gray-800/50;
+}
+
+.rich-text-toolbar-btn {
+  @apply p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors;
+}
+
+.rich-text-toolbar-btn-active {
+  @apply bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400;
+}
+
+.rich-text-content {
+  @apply p-3 min-h-[150px] max-h-[400px] overflow-y-auto;
+  @apply prose prose-sm dark:prose-invert max-w-none;
+}
+
+/* ============================================
+   MENTIONS
+   ============================================ */
+
+.mention {
+  @apply inline-flex items-center px-1 py-0.5 rounded;
+  @apply bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400;
+  @apply font-medium;
+}
+
+.mention-suggestion {
+  @apply w-full flex items-center gap-3 px-3 py-2 text-left transition-colors;
+}
+
+.mention-suggestion-active {
+  @apply bg-primary-50 dark:bg-primary-900/30;
+}
+
+.mention-suggestion:hover {
+  @apply bg-gray-50 dark:bg-gray-700;
+}
