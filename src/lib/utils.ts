@@ -38,7 +38,7 @@ export async function generateNumber(
 /**
  * Formatuje datę po polsku (strefa czasowa: Warszawa)
  */
-export function formatDate(date: Date | string | null): string {
+export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return '-'
 
   const d = typeof date === 'string' ? new Date(date) : date
@@ -54,7 +54,7 @@ export function formatDate(date: Date | string | null): string {
 /**
  * Formatuje datę i czas po polsku (strefa czasowa: Warszawa)
  */
-export function formatDateTime(date: Date | string | null): string {
+export function formatDateTime(date: Date | string | null | undefined): string {
   if (!date) return '-'
 
   const d = typeof date === 'string' ? new Date(date) : date

@@ -1,8 +1,8 @@
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
-import { Plus, Search, Filter, ArrowUpDown, FolderOpen, LayoutGrid } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { Plus, Search, Filter, FolderOpen, LayoutGrid } from 'lucide-react'
+import { ProjectsListClient } from '@/components/projects/projects-list-client'
 
 export default async function ProjectsPage({
   searchParams,
@@ -159,90 +159,7 @@ export default async function ProjectsPage({
           )}
         </div>
       ) : (
-        <div className="card dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <th className="table-header">Numer</th>
-                <th className="table-header">Tytuł</th>
-                {isAdmin && <th className="table-header">Klient</th>}
-                <th className="table-header">Zlecił</th>
-                <th className="table-header">Status</th>
-                <th className="table-header hidden sm:table-cell">Tickety</th>
-                <th className="table-header hidden md:table-cell">Deadline</th>
-                <th className="table-header hidden lg:table-cell">Aktualizacja</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {projects.map((project: typeof projects[number]) => (
-                <tr key={project.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="table-cell">
-                    <Link
-                      href={`/panel/projects/${project.id}`}
-                      className="font-mono text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700"
-                    >
-                      {project.number}
-                    </Link>
-                  </td>
-                  <td className="table-cell">
-                    <Link
-                      href={`/panel/projects/${project.id}`}
-                      className="font-medium text-gray-900 dark:text-white hover:text-primary-600"
-                    >
-                      {project.title}
-                    </Link>
-                    {project.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {project.tags.map((tag: typeof project.tags[number]) => (
-                          <span
-                            key={tag.id}
-                            className="inline-flex items-center px-2 py-0.5 rounded text-xs"
-                            style={{
-                              backgroundColor: `${tag.color}20`,
-                              color: tag.color,
-                            }}
-                          >
-                            {tag.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  {isAdmin && (
-                    <td className="table-cell text-gray-600 dark:text-gray-400">
-                      {project.clientAccount.name}
-                    </td>
-                  )}
-                  <td className="table-cell text-gray-600 dark:text-gray-400">
-                    {project.createdBy?.name || '-'}
-                  </td>
-                  <td className="table-cell">
-                    <span
-                      className="badge"
-                      style={{
-                        backgroundColor: `${project.status.color}20`,
-                        color: project.status.color,
-                      }}
-                    >
-                      {project.status.name}
-                    </span>
-                  </td>
-                  <td className="table-cell text-gray-600 dark:text-gray-400 hidden sm:table-cell">
-                    {project._count.tickets}
-                  </td>
-                  <td className="table-cell text-gray-600 dark:text-gray-400 hidden md:table-cell">
-                    {formatDate(project.deadline)}
-                  </td>
-                  <td className="table-cell text-gray-500 dark:text-gray-400 text-sm hidden lg:table-cell">
-                    {formatDate(project.updatedAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
+        <ProjectsListClient projects={projects} isAdmin={isAdmin} />
       )}
     </div>
   )

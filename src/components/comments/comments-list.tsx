@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, Lock, Loader2 } from 'lucide-react'
-import { formatRelativeTime } from '@/lib/utils'
+import { Send, Lock, Loader2, Paperclip, X, FileText } from 'lucide-react'
+import { formatRelativeTime, formatFileSize } from '@/lib/utils'
 import { addCommentAction } from './comment-actions'
 import { useRealtime } from '@/hooks/use-realtime'
 import { EmojiReactions, Reaction } from '@/components/ui/emoji-reactions'
 import { MentionsInput, MentionHighlight, MentionUser } from '@/components/ui/mentions-input'
 import { Avatar } from '@/components/ui/avatar-upload'
 import { TypingIndicator } from '@/components/ui/typing-indicator'
+import { AttachmentDropzone, AttachmentList, Attachment } from '@/components/ui/attachments'
 
 type UserRole = 'ADMIN' | 'CLIENT_USER'
 
@@ -55,6 +56,7 @@ export function CommentsList({
   const [isInternal, setIsInternal] = useState(false)
   const [reactionsMap, setReactionsMap] = useState<Record<string, Reaction[]>>({})
   const [typingUsers, setTypingUsers] = useState<Array<{ name: string; avatarUrl?: string | null }>>([])
+  const [attachments, setAttachments] = useState<File[]>([])
 
   // Simulate typing indicator (in production, this would come from WebSocket)
   useEffect(() => {
@@ -179,9 +181,17 @@ export function CommentsList({
 
   useRealtime(handleRealtimeEvent)
 
+  const handleFilesSelect = (files: File[]) => {
+    setAttachments(prev => [...prev, ...files].slice(0, 5)) // max 5 files
+  }
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
+  }
+
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault()
-    if (!content.trim()) return
+    if (!content.trim() && attachments.length === 0) return
 
     setIsLoading(true)
 
@@ -192,8 +202,14 @@ export function CommentsList({
       if (ticketId) formData.append('ticketId', ticketId)
       if (projectId) formData.append('projectId', projectId)
 
+      // Append attachments
+      attachments.forEach((file, index) => {
+        formData.append(`attachment_${index}`, file)
+      })
+
       await addCommentAction(formData)
       setContent('')
+      setAttachments([])
       router.refresh()
     } catch (error) {
       console.error('Error adding comment:', error)
@@ -214,23 +230,60 @@ export function CommentsList({
           onSubmit={handleSubmit}
           disabled={isLoading}
         />
+
+        {/* Attached files preview */}
+        {attachments.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {attachments.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm"
+              >
+                <FileText className="w-4 h-4 text-gray-400" />
+                <span className="max-w-[150px] truncate text-gray-700 dark:text-gray-300">
+                  {file.name}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {formatFileSize(file.size)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(index)}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-center justify-between mt-3">
-          {isAdmin && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={isInternal}
-                onChange={(e) => setIsInternal(e.target.checked)}
-                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-              />
-              <Lock className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-600 dark:text-gray-400">Notatka wewnętrzna (niewidoczna dla klienta)</span>
-            </label>
-          )}
-          {!isAdmin && <div />}
+          <div className="flex items-center gap-3">
+            {/* Attachment button */}
+            <AttachmentDropzone
+              onFilesSelect={handleFilesSelect}
+              maxFiles={5 - attachments.length}
+              compact
+              disabled={attachments.length >= 5}
+            />
+
+            {isAdmin && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={isInternal}
+                  onChange={(e) => setIsInternal(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <Lock className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-600 dark:text-gray-400 hidden sm:inline">Notatka wewnętrzna</span>
+              </label>
+            )}
+          </div>
           <button
             type="submit"
-            disabled={isLoading || !content.trim()}
+            disabled={isLoading || (!content.trim() && attachments.length === 0)}
             className="btn-primary btn-sm"
           >
             {isLoading ? (
