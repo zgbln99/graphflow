@@ -399,20 +399,44 @@ export default async function ProjectDetailPage({
         {/* Right column - Admin sidebar */}
         {isAdmin && (
           <div className="space-y-6">
-            {/* Send corrections email */}
+            {/* Corrections checklist */}
             <div className="card dark:bg-gray-800 dark:border-gray-700">
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-red-500" />
-                <h2 className="font-semibold text-gray-900 dark:text-white">Wyślij email z poprawkami</h2>
+                <h2 className="font-semibold text-gray-900 dark:text-white">
+                  Poprawki
+                  {corrections.length > 0 && (
+                    <span className="ml-2 text-sm font-normal text-gray-500">
+                      ({corrections.filter((c: { isResolved: boolean }) => c.isResolved).length}/{corrections.length})
+                    </span>
+                  )}
+                </h2>
               </div>
               <div className="p-4">
-                <CorrectionsEmailForm
+                <CorrectionsList
+                  corrections={corrections}
+                  isAdmin={true}
                   projectId={project.id}
-                  projectTitle={project.title}
-                  filesCount={project.files?.length || 0}
                 />
               </div>
             </div>
+
+            {/* Send corrections email */}
+            {corrections.length > 0 && (
+              <div className="card dark:bg-gray-800 dark:border-gray-700">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-gray-400" />
+                  <h2 className="font-semibold text-gray-900 dark:text-white">Wyślij email z poprawkami</h2>
+                </div>
+                <div className="p-4">
+                  <CorrectionsEmailForm
+                    projectId={project.id}
+                    projectTitle={project.title}
+                    filesCount={project.files?.length || 0}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* File locations */}
             <div className="card dark:bg-gray-800 dark:border-gray-700">
