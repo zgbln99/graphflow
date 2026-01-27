@@ -151,3 +151,16 @@ export const priorityColors: Record<string, string> = {
   HIGH: 'bg-orange-100 text-orange-800',
   URGENT: 'bg-red-100 text-red-800',
 }
+
+/**
+ * Formatuje rozmiar pliku do czytelnej postaci
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B'
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const k = 1024
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${units[i]}`
+}
