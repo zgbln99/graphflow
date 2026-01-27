@@ -22,6 +22,7 @@ export interface SessionUser {
   name: string
   role: UserRole
   clientAccountId: string | null
+  avatarUrl?: string | null
 }
 
 export interface Session {
@@ -86,9 +87,10 @@ export async function getSession(): Promise<Session | null> {
       user: {
         id: payload.userId as string,
         email: payload.email as string,
-        name: payload.name as string,
+        name: session.user.name || payload.name as string,
         role: payload.role as UserRole,
         clientAccountId: payload.clientAccountId as string | null,
+        avatarUrl: session.user.avatarUrl,
       },
     }
   } catch {

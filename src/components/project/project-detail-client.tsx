@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRealtime } from '@/hooks/use-realtime'
+import { WhosViewing, usePresence, Viewer } from '@/components/ui/whos-viewing'
 
 interface ProjectStatus {
   id: string
@@ -12,16 +13,30 @@ interface ProjectStatus {
 interface ProjectDetailClientProps {
   projectId: string
   initialStatus: ProjectStatus
+  currentUserId: string
+  currentUserName: string
+  currentUserAvatar?: string | null
   children: React.ReactNode
 }
 
 export function ProjectDetailClient({
   projectId,
   initialStatus,
+  currentUserId,
+  currentUserName,
+  currentUserAvatar,
   children,
 }: ProjectDetailClientProps) {
   const [status, setStatus] = useState(initialStatus)
   const isReloading = useRef(false)
+
+  // Track who's viewing this project
+  const { viewers } = usePresence({
+    projectId,
+    userId: currentUserId,
+    userName: currentUserName,
+    userAvatar: currentUserAvatar,
+  })
 
   // Update status when props change
   useEffect(() => {
@@ -65,7 +80,21 @@ export function ProjectDetailClient({
 
   useRealtime(handleRealtimeEvent)
 
-  return <>{children}</>
+  return (
+    <>
+      {/* Who's viewing banner */}
+      {viewers.length > 1 && (
+        <div className="mb-4">
+          <WhosViewing
+            viewers={viewers}
+            currentUserId={currentUserId}
+            variant="inline"
+          />
+        </div>
+      )}
+      {children}
+    </>
+  )
 }
 
 // Component to display status that can be updated in real-time

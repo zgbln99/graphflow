@@ -9,6 +9,7 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { EmojiReactions, Reaction } from '@/components/ui/emoji-reactions'
 import { MentionsInput, MentionHighlight, MentionUser } from '@/components/ui/mentions-input'
 import { Avatar } from '@/components/ui/avatar-upload'
+import { TypingIndicator } from '@/components/ui/typing-indicator'
 
 type UserRole = 'ADMIN' | 'CLIENT_USER'
 
@@ -53,6 +54,15 @@ export function CommentsList({
   const [content, setContent] = useState('')
   const [isInternal, setIsInternal] = useState(false)
   const [reactionsMap, setReactionsMap] = useState<Record<string, Reaction[]>>({})
+  const [typingUsers, setTypingUsers] = useState<Array<{ name: string; avatarUrl?: string | null }>>([])
+
+  // Simulate typing indicator (in production, this would come from WebSocket)
+  useEffect(() => {
+    // Clear typing when user submits
+    if (content.length > 0) {
+      // Broadcast that current user is typing (would use WebSocket)
+    }
+  }, [content])
 
   // Update comments when props change
   useEffect(() => {
@@ -234,6 +244,11 @@ export function CommentsList({
           </button>
         </div>
       </form>
+
+      {/* Typing indicator */}
+      {typingUsers.length > 0 && (
+        <TypingIndicator users={typingUsers} className="px-4 py-2 border-b border-gray-100 dark:border-gray-800" />
+      )}
 
       {/* Comments list */}
       {comments.length === 0 ? (

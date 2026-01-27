@@ -70,18 +70,22 @@ function EmojiPicker({ onSelect, onClose, existingEmojis }: EmojiPickerProps) {
   return (
     <div
       ref={ref}
-      className="absolute bottom-full left-0 mb-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 animate-pop-in"
+      className="absolute left-0 top-full mt-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-[100] animate-pop-in"
+      style={{ minWidth: '200px' }}
     >
       <div className="grid grid-cols-6 gap-1">
         {EMOJI_OPTIONS.map(({ emoji, label }) => (
           <button
             key={emoji}
-            onClick={() => {
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
               onSelect(emoji)
               onClose()
             }}
             className={cn(
-              'w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all hover:scale-125',
+              'w-8 h-8 flex items-center justify-center rounded-lg text-lg transition-all hover:scale-110',
               existingEmojis.includes(emoji)
                 ? 'bg-primary-100 dark:bg-primary-900/30'
                 : 'hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -177,9 +181,14 @@ export function EmojiReactions({
       ))}
 
       {/* Add reaction button */}
-      <div className="relative">
+      <div className="relative inline-block">
         <button
-          onClick={() => setShowPicker(!showPicker)}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setShowPicker(!showPicker)
+          }}
           className={cn(
             'inline-flex items-center justify-center rounded-full border border-dashed transition-all',
             size === 'sm' ? 'w-6 h-6' : 'w-8 h-8',

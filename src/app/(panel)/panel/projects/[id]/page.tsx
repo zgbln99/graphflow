@@ -135,6 +135,9 @@ export default async function ProjectDetailPage({
     <ProjectDetailClient
       projectId={project.id}
       initialStatus={{ id: project.status.id, name: project.status.name, color: project.status.color }}
+      currentUserId={session.user.id}
+      currentUserName={session.user.name}
+      currentUserAvatar={session.user.avatarUrl}
     >
     <div className="space-y-6">
       {/* Header */}
