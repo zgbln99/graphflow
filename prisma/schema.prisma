@@ -26,6 +26,9 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  // Avatar
+  avatarUrl         String?   // URL do avatara (local lub external)
+
   // Powiązanie z firmą klienta (null dla admina)
   clientAccountId   String?
   clientAccount     ClientAccount? @relation(fields: [clientAccountId], references: [id])
