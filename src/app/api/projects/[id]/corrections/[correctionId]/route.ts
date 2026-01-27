@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 
+/**
+ * PATCH /api/projects/[id]/corrections/[correctionId]
+ * Update a correction (toggle resolved or update content)
+ */
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string; correctionId: string }> }
@@ -13,7 +17,8 @@ export async function PATCH(
     }
 
     const { id, correctionId } = await context.params
-    const { isResolved } = await request.json()
+    const body = await request.json()
+    const { isResolved, content } = body
 
     // Verify project exists
     const project = await prisma.project.findUnique({
@@ -24,13 +29,22 @@ export async function PATCH(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
+    // Build update data
+    const updateData: { isResolved?: boolean; resolvedAt?: Date | null; content?: string } = {}
+
+    if (typeof isResolved === 'boolean') {
+      updateData.isResolved = isResolved
+      updateData.resolvedAt = isResolved ? new Date() : null
+    }
+
+    if (typeof content === 'string' && content.trim()) {
+      updateData.content = content.trim()
+    }
+
     // Update correction
     const correction = await (prisma as any).projectCorrection.update({
       where: { id: correctionId },
-      data: {
-        isResolved,
-        resolvedAt: isResolved ? new Date() : null,
-      },
+      data: updateData,
     })
 
     return NextResponse.json(correction)
@@ -43,6 +57,10 @@ export async function PATCH(
   }
 }
 
+/**
+ * DELETE /api/projects/[id]/corrections/[correctionId]
+ * Delete a correction
+ */
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string; correctionId: string }> }
@@ -53,7 +71,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id, correctionId } = await context.params
+    const { correctionId } = await context.params
 
     await (prisma as any).projectCorrection.delete({
       where: { id: correctionId },
