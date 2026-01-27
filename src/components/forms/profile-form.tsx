@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, User, Lock, Mail, Building2 } from 'lucide-react'
 import { updateProfileAction, changePasswordAction } from './profile-actions'
+import { AvatarUpload } from '@/components/ui/avatar-upload'
 
 interface UserType {
   id: string
@@ -11,6 +12,7 @@ interface UserType {
   name: string
   role: 'ADMIN' | 'CLIENT_USER'
   isActive: boolean
+  avatarUrl?: string | null
 }
 
 interface ClientAccountType {
@@ -27,6 +29,35 @@ export function ProfileForm({ user }: ProfileFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  async function handleAvatarUpload(file: File) {
+    const formData = new FormData()
+    formData.append('avatar', file)
+
+    const res = await fetch('/api/users/avatar', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || 'Błąd podczas przesyłania')
+    }
+
+    router.refresh()
+  }
+
+  async function handleAvatarRemove() {
+    const res = await fetch('/api/users/avatar', {
+      method: 'DELETE',
+    })
+
+    if (!res.ok) {
+      throw new Error('Błąd podczas usuwania avatara')
+    }
+
+    router.refresh()
+  }
 
   async function handleProfileSubmit(formData: FormData) {
     setIsLoading(true)
@@ -85,26 +116,34 @@ export function ProfileForm({ user }: ProfileFormProps) {
       )}
 
       {/* Info o koncie */}
-      <div className="card p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-            <User className="w-6 h-6 text-primary-600" />
-          </div>
+      <div className="card dark:bg-gray-800 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-4 mb-4">
+          <AvatarUpload
+            currentAvatar={user.avatarUrl}
+            name={user.name}
+            onUpload={handleAvatarUpload}
+            onRemove={handleAvatarRemove}
+            size="lg"
+            editable={true}
+          />
           <div>
-            <h2 className="font-semibold text-gray-900">{user.name}</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="font-semibold text-gray-900 dark:text-white">{user.name}</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {user.role === 'ADMIN' ? 'Administrator' : 'Klient'}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              Kliknij na avatar, aby zmienić
             </p>
           </div>
         </div>
 
         <div className="grid gap-4 text-sm">
-          <div className="flex items-center gap-2 text-gray-600">
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
             <Mail className="w-4 h-4" />
             {user.email}
           </div>
           {user.clientAccount && (
-            <div className="flex items-center gap-2 text-gray-600">
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
               <Building2 className="w-4 h-4" />
               {user.clientAccount.name}
             </div>
@@ -113,8 +152,8 @@ export function ProfileForm({ user }: ProfileFormProps) {
       </div>
 
       {/* Edycja profilu */}
-      <form action={handleProfileSubmit} className="card p-6 space-y-4">
-        <h3 className="font-semibold text-gray-900">Dane profilu</h3>
+      <form action={handleProfileSubmit} className="card dark:bg-gray-800 dark:border-gray-700 p-6 space-y-4">
+        <h3 className="font-semibold text-gray-900 dark:text-white">Dane profilu</h3>
 
         <div>
           <label htmlFor="name" className="label">
