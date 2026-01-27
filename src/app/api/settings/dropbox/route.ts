@@ -1,37 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { verifyDropboxToken, isDropboxConfigured } from '@/lib/dropbox'
+import { verifyDropboxToken } from '@/lib/dropbox'
+import {
+  isDropboxConnected,
+  isOAuthConfigured,
+  revokeTokens,
+  saveTokens,
+  DROPBOX_KEYS,
+} from '@/lib/dropbox-oauth'
 
-// GET /api/settings/dropbox - get Dropbox status
+/**
+ * GET /api/settings/dropbox - get Dropbox connection status
+ */
 export async function GET() {
   const session = await getSession()
   if (!session || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Brak uprawnień' }, { status: 403 })
   }
 
-  const configured = await isDropboxConfigured()
+  const status = await isDropboxConnected()
+  const oauthConfigured = isOAuthConfigured()
 
-  let email: string | null = null
-  if (configured) {
+  // Get connection details if connected
+  let connectedAt: string | null = null
+  if (status.connected) {
     const setting = await prisma.systemSetting.findUnique({
-      where: { key: 'dropbox_access_token' },
+      where: { key: DROPBOX_KEYS.CONNECTED_AT },
     })
-    if (setting?.value) {
-      const verification = await verifyDropboxToken(setting.value)
-      if (verification.valid) {
-        email = verification.email || null
-      }
-    }
+    connectedAt = setting?.value || null
   }
 
   return NextResponse.json({
-    configured,
-    email,
+    connected: status.connected,
+    email: status.email,
+    needsReconnect: status.needsReconnect,
+    oauthConfigured,
+    connectedAt,
   })
 }
 
-// POST /api/settings/dropbox - save Dropbox token
+/**
+ * POST /api/settings/dropbox - save Dropbox token (legacy manual method)
+ *
+ * This endpoint supports both:
+ * 1. Legacy manual token entry (just accessToken)
+ * 2. Full OAuth token save (accessToken + refreshToken + expiresAt)
+ */
 export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session || session.user.role !== 'ADMIN') {
@@ -39,7 +54,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { accessToken } = await request.json()
+    const body = await request.json()
+    const { accessToken, refreshToken, expiresAt } = body
 
     if (!accessToken) {
       return NextResponse.json({ error: 'Brak tokenu' }, { status: 400 })
@@ -54,16 +70,18 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Save to database
-    await prisma.systemSetting.upsert({
-      where: { key: 'dropbox_access_token' },
-      update: { value: accessToken },
-      create: { key: 'dropbox_access_token', value: accessToken },
+    // Save tokens
+    await saveTokens({
+      accessToken,
+      refreshToken: refreshToken || null,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      email: verification.email || null,
     })
 
     return NextResponse.json({
       success: true,
       email: verification.email,
+      hasRefreshToken: !!refreshToken,
     })
   } catch (error) {
     console.error('Error saving Dropbox token:', error)
@@ -71,7 +89,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE /api/settings/dropbox - disconnect Dropbox
+/**
+ * DELETE /api/settings/dropbox - disconnect Dropbox
+ */
 export async function DELETE() {
   const session = await getSession()
   if (!session || session.user.role !== 'ADMIN') {
@@ -79,13 +99,13 @@ export async function DELETE() {
   }
 
   try {
-    await prisma.systemSetting.delete({
-      where: { key: 'dropbox_access_token' },
-    })
+    // Revoke tokens and clean up
+    await revokeTokens()
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    // Setting might not exist
+    console.error('Error disconnecting Dropbox:', error)
+    // Still return success even if revoke fails
     return NextResponse.json({ success: true })
   }
 }
