@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { SuccessConfetti } from '@/components/ui/confetti'
 
 interface Correction {
   id: string
@@ -37,6 +38,7 @@ export function CorrectionsList({ corrections, isAdmin = false, projectId }: Cor
   const [showAddForm, setShowAddForm] = useState(false)
   const [recentlyResolved, setRecentlyResolved] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [showConfetti, setShowConfetti] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -81,6 +83,17 @@ export function CorrectionsList({ corrections, isAdmin = false, projectId }: Cor
             ? { ...c, isResolved: !newResolvedState, resolvedAt: !newResolvedState ? new Date() : null }
             : c
         ))
+      } else {
+        // Check if all corrections are now resolved
+        const updatedItems = items.map(c =>
+          c.id === correctionId
+            ? { ...c, isResolved: newResolvedState }
+            : c
+        )
+        const allResolved = updatedItems.every(c => c.isResolved)
+        if (allResolved && updatedItems.length > 0) {
+          setShowConfetti(true)
+        }
       }
     } catch (error) {
       console.error('Error updating correction:', error)
@@ -190,6 +203,12 @@ export function CorrectionsList({ corrections, isAdmin = false, projectId }: Cor
 
   return (
     <div className="space-y-4">
+      {/* Confetti celebration when all done */}
+      <SuccessConfetti
+        trigger={showConfetti}
+        onComplete={() => setShowConfetti(false)}
+      />
+
       {/* Summary with animated progress */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 text-sm">
