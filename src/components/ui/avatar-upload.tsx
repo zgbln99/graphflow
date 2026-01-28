@@ -281,7 +281,7 @@ export function Avatar({
     <div className={cn('relative inline-block', className)}>
       <div
         className={cn(
-          'rounded-full overflow-hidden flex items-center justify-center',
+          'relative rounded-full overflow-hidden flex items-center justify-center',
           displaySizes[size]
         )}
       >
@@ -290,6 +290,7 @@ export function Avatar({
             src={src}
             alt={name}
             fill
+            sizes="48px"
             className="object-cover"
           />
         ) : (
