@@ -1,90 +1,66 @@
 <!doctype html>
-<html lang="pl">
+<html lang="pl" data-bs-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow">
   <title><%= title %></title>
-  <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%230b0d0d%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229%22 fill=%22none%22 stroke=%22%2312a150%22 stroke-width=%222%22/%3E%3C/svg%3E' %>">
-  <link rel="stylesheet" href="/club/zmc.css?v=6">
+  <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : '/favicon.ico' %>">
+  <link rel="stylesheet" href="/vendor/tabler/css/tabler.min.css">
+  <link rel="stylesheet" href="/club/brand.css?v=7">
 </head>
-<body class="auth-body">
+<body class="d-flex flex-column">
   <%- include('_icons') %>
 
-  <main class="login">
-    <!-- Lewa strona: wyłącznie identyfikacja klubu -->
-    <section class="login-visual">
-      <svg class="login-court" viewBox="0 0 560 300" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
-        <rect x="10" y="10" width="540" height="280"/>
-        <path d="M280 10v280"/>
-        <circle cx="280" cy="150" r="46"/>
-        <rect x="10" y="92" width="112" height="116"/>
-        <path d="M122 92a58 58 0 0 1 0 116"/>
-        <path d="M10 44h34a132 132 0 0 0 0 212H10"/>
-        <rect x="438" y="92" width="112" height="116"/>
-        <path d="M438 92a58 58 0 0 0 0 116"/>
-        <path d="M550 44h-34a132 132 0 0 1 0 212h34"/>
-      </svg>
+  <div class="page page-center">
+    <div class="container container-tight py-4">
 
-      <span class="login-visual-top lbl">System wewnętrzny klubu</span>
-
-      <header class="login-brand">
+      <div class="text-center mb-4">
         <% if (branding && branding.logoUrl) { %>
-          <img class="brand-logo" src="<%= branding.logoUrl %>" alt="Logo klubu">
+          <img class="login-logo" src="<%= branding.logoUrl %>" alt="Logo klubu">
         <% } else { %>
-          <span class="wordmark"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
+          <div class="navbar-brand-club justify-content-center">
+            <span class="wordmark text-center"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
+          </div>
         <% } %>
-      </header>
+      </div>
 
-      <footer class="login-visual-foot">
-        <span>System wewnętrzny</span><i class="sep"></i>
-        <span>Sezon 2026 / 27</span><i class="sep"></i>
-        <span>Dostęp wyłącznie dla pracowników klubu</span>
-      </footer>
-    </section>
+      <div class="card card-md">
+        <div class="card-body">
+          <h2 class="h2 text-center mb-1">Zaloguj się</h2>
+          <p class="text-secondary text-center mb-4">Panel działu marketingu</p>
 
-    <!-- Prawa strona: formularz -->
-    <section class="login-panel">
-      <div class="login-panel-top">
-        <div class="login-mobile-brand">
-          <% if (branding && branding.logoUrl) { %>
-            <img class="brand-logo" src="<%= branding.logoUrl %>" alt="Logo klubu">
-          <% } else { %>
-            <span class="wordmark"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
+          <% if (error) { %>
+            <div class="alert alert-danger" role="alert">
+              <div class="d-flex">
+                <div class="me-2"><svg class="icon"><use href="#i-alert"></use></svg></div>
+                <div><%= error %></div>
+              </div>
+            </div>
           <% } %>
+
+          <form method="post" action="/login" autocomplete="on" novalidate>
+            <div class="mb-3">
+              <label class="form-label" for="email">Adres e-mail</label>
+              <input id="email" name="email" type="email" class="form-control" placeholder="imie@zastal.pl"
+                     autocomplete="username" required autofocus>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="password">Hasło</label>
+              <input id="password" name="password" type="password" class="form-control" placeholder="Hasło"
+                     autocomplete="current-password" required>
+            </div>
+            <div class="form-footer">
+              <button type="submit" class="btn btn-primary w-100">Zaloguj się</button>
+            </div>
+          </form>
         </div>
       </div>
 
-      <div class="login-form-wrap">
-        <h2>Zaloguj się</h2>
-        <p>Panel działu marketingu.</p>
-
-        <% if (error) { %>
-          <div class="auth-error" role="alert">
-            <svg class="ico ico-sm"><use href="#i-alert"></use></svg><%= error %>
-          </div>
-        <% } %>
-
-        <form method="post" action="/login" class="login-form">
-          <label>
-            <span>E-mail</span>
-            <input name="email" type="email" autocomplete="username" placeholder="imie@zastal.pl" required autofocus>
-          </label>
-          <label>
-            <span>Hasło</span>
-            <input name="password" type="password" autocomplete="current-password" required>
-          </label>
-          <button class="login-submit" type="submit">Zaloguj się</button>
-        </form>
-
-        <p class="login-note">Konta zakłada administrator systemu.<br>Problem z logowaniem zgłoś do administratora klubu.</p>
+      <div class="text-center text-secondary mt-3">
+        Konta zakłada administrator systemu.
       </div>
-
-      <footer class="login-panel-foot">
-        <span>Zastal Zielona Góra</span>
-        <span>Marketing Center</span>
-      </footer>
-    </section>
-  </main>
+    </div>
+  </div>
 </body>
 </html>

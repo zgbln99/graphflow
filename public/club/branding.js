@@ -9,7 +9,7 @@
   const setStatus = (message, isError = false) => {
     if (!status) return;
     status.textContent = message || '';
-    status.style.color = isError ? 'var(--danger)' : 'var(--accent-2)';
+    status.className = 'small mt-2 ' + (isError ? 'text-danger' : 'text-success');
   };
 
   input.addEventListener('change', async () => {
@@ -31,7 +31,7 @@
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || 'Nie udało się zapisać logo.');
 
-      preview.innerHTML = `<img src="${data.logoUrl}?v=${Date.now()}" alt="Logo klubu">`;
+      preview.innerHTML = `<img src="${data.logoUrl}?v=${Date.now()}" alt="Logo klubu" style="max-width:100%;max-height:100%;object-fit:contain">`;
       setStatus('Logo zapisane. Odświeżam branding…');
       setTimeout(() => window.location.reload(), 650);
     } catch (error) {
@@ -50,7 +50,7 @@
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || 'Nie udało się usunąć logo.');
 
-      preview.innerHTML = '<span>Brak logo</span>';
+      preview.innerHTML = '<span class="text-secondary small">Brak logo</span>';
       setStatus('Logo usunięte.');
       setTimeout(() => window.location.reload(), 500);
     } catch (error) {

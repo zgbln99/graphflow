@@ -1,0 +1,86 @@
+/* ============================================================
+   ZASTAL MARKETING CENTER — warstwa marki na Tabler UI
+   Tu trzymamy wyłącznie to, czego nie daje gotowy szablon:
+   font klubowy, kolor marki, układ 100dvh i drobne wyjątki.
+   Cała reszta wyglądu pochodzi z Tablera.
+   ============================================================ */
+
+/* ---------- Font klubowy ---------- */
+@font-face{font-family:"ZT Talk";src:url("/club/fonts/ZTTalk-Regular.ttf") format("truetype");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"ZT Talk";src:url("/club/fonts/ZTTalk-Medium.ttf") format("truetype");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"ZT Talk";src:url("/club/fonts/ZTTalk-SemiBold.ttf") format("truetype");font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:"ZT Talk";src:url("/club/fonts/ZTTalk-Bold.ttf") format("truetype");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:"ZT Talk Expanded";src:url("/club/fonts/ZTTalk-SemiBoldExpanded.ttf") format("truetype");font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:"ZT Talk Expanded";src:url("/club/fonts/ZTTalk-BoldExpanded.ttf") format("truetype");font-weight:700;font-style:normal;font-display:swap}
+
+/* ---------- Kolory marki podstawione pod zmienne Tablera ---------- */
+:root,
+[data-bs-theme=dark]{
+  --tblr-font-sans-serif:"ZT Talk",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --tblr-primary:#0d8f4f;
+  --tblr-primary-rgb:13,143,79;
+  --tblr-primary-fg:#ffffff;
+  --tblr-green:#0d8f4f;
+  --tblr-green-rgb:13,143,79;
+  --tblr-link-color:#3ecb84;
+  --tblr-link-color-rgb:62,203,132;
+  --tblr-link-hover-color:#63d89b;
+}
+.text-primary{--tblr-text-opacity:1;color:#3ecb84!important}
+.btn-primary{--tblr-btn-hover-bg:#0fa75c;--tblr-btn-hover-border-color:#0fa75c}
+.btn-link{--tblr-btn-color:#3ecb84;--tblr-btn-hover-color:#63d89b;color:#3ecb84}
+.btn-link:hover,.btn-link:focus{color:#63d89b}
+
+/* Nagłówki i liczby w wersji rozstrzelonej — typografia klubu */
+.page-title,.card-title,.display-1,.display-2,.h1,h1{font-family:"ZT Talk Expanded","ZT Talk",sans-serif}
+
+/* ---------- Aplikacja mieści się w jednym ekranie (§25) ---------- */
+.app-body{overflow:hidden}
+.app-body .page{height:100dvh;overflow:hidden}
+.app-body .page-wrapper{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.app-body .page-body{flex:1;min-height:0;margin-bottom:0;overflow:auto}
+.app-body .navbar-vertical .navbar-collapse{min-height:0;overflow-y:auto}
+
+/* Logo klubu w panelu bocznym: samo logo, bez ramki i tekstu obok */
+.navbar-brand-club{display:flex;align-items:center;padding:.25rem 0;margin:0}
+.navbar-brand-club img{display:block;width:auto;max-width:100%;height:44px;object-fit:contain;object-position:left center}
+.navbar-brand-club .wordmark{line-height:1.15}
+.navbar-brand-club .wordmark b{display:block;font-family:"ZT Talk Expanded","ZT Talk",sans-serif;font-size:1.05rem;font-weight:700;letter-spacing:.02em}
+.navbar-brand-club .wordmark span{display:block;font-size:.625rem;letter-spacing:.16em;color:var(--tblr-secondary)}
+
+/* Ikony ze sprite'a — Tabler oczekuje tych atrybutów na samym elemencie svg */
+.icon{display:inline-block;width:1.25rem;height:1.25rem;vertical-align:middle;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Przyciski ikonowe: Tabler wylicza szerokość z ujemnych marginesów ikony,
+   co przy ikonach ze sprite'a daje przycisk szerokości 2px. */
+.btn-icon{min-width:2.25rem;justify-content:center}
+.btn-icon.btn-sm{min-width:1.85rem}
+.btn-icon .icon{margin:0}
+
+/* ---------- Widoki przełączane bez przeładowania strony ---------- */
+.view{display:none}
+.view.active-view{display:block}
+.view.active-view.view-flex{display:flex;flex-direction:column;min-height:0;height:100%}
+
+/* Panele z własnym scrollem (lista zdjęć, warstwy, harmonogram) */
+.scroll-y{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+
+/* ---------- Drobne wyjątki dla ekranów specyficznych dla klubu ---------- */
+.fixture-title{font-family:"ZT Talk Expanded","ZT Talk",sans-serif;font-size:1.5rem;font-weight:600;letter-spacing:-.02em}
+.fixture-title .club{color:#3ecb84}
+
+/* Płótno edytora skaluje się do dostępnego miejsca, nie do rozmiaru szablonu */
+.canvas-stage{display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}
+.canvas-stage canvas{max-width:100%;max-height:100%;width:auto;height:auto}
+
+/* Kafle zdjęć: proporcja z paddingu (aspect-ratio zawodzi w siatce o stałej wysokości) */
+.photo-tile{position:relative;height:0;padding-top:100%;border-radius:var(--tblr-border-radius);background:var(--tblr-bg-surface-secondary);border:1px solid var(--tblr-border-color);cursor:pointer}
+.photo-tile:hover{border-color:var(--tblr-primary)}
+.photo-tile.selected{border-color:var(--tblr-primary);box-shadow:0 0 0 1px var(--tblr-primary)}
+.photo-tile-43{padding-top:75%}
+.thumb-45{aspect-ratio:4/5;background:var(--tblr-bg-surface-secondary);border-bottom:1px solid var(--tblr-border-color)}
+.thumb-1610{aspect-ratio:16/10;background:var(--tblr-bg-surface-secondary);border-bottom:1px solid var(--tblr-border-color)}
+
+/* Logowanie: logo klubu nad kartą formularza */
+.login-logo{display:block;width:auto;max-width:min(320px,72vw);height:clamp(56px,7vw,84px);margin:0 auto;object-fit:contain}
