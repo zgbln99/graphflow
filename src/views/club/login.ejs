@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/club/styles.css">
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-card">
+      <div class="auth-brand">
+        <div class="crest">Z</div>
+        <div>
+          <strong>ZASTAL</strong>
+          <span>MARKETING CENTER</span>
+        </div>
+      </div>
+      <div class="auth-copy">
+        <span class="eyebrow">PANEL WEWNĘTRZNY</span>
+        <h1>Zaloguj się</h1>
+        <p>Dostęp do meczów, zdjęć, szablonów i eksportów.</p>
+      </div>
+      <% if (error) { %><div class="auth-error"><%= error %></div><% } %>
+      <form method="post" action="/login" class="auth-form">
+        <label>E-mail<input name="email" type="email" autocomplete="username" required autofocus></label>
+        <label>Hasło<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary auth-submit" type="submit">Zaloguj się</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
