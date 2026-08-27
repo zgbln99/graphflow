@@ -1,8 +1,9 @@
 (() => {
-  if (!document.querySelector('link[href="/club/branding-overrides.css"]')) {
+  if (!document.querySelector('link[data-zmc-branding-overrides]')) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = '/club/branding-overrides.css';
+    link.href = '/club/branding-overrides.css?v=3';
+    link.dataset.zmcBrandingOverrides = '1';
     document.head.appendChild(link);
   }
 
