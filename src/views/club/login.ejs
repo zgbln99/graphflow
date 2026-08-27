@@ -13,13 +13,12 @@
       <div class="auth-glow auth-glow-one"></div>
       <div class="auth-glow auth-glow-two"></div>
       <div class="auth-hero-inner">
-        <div class="auth-brand auth-brand-large">
+        <div class="auth-brand auth-brand-large auth-brand-logo-only">
           <% if (branding?.logoUrl) { %>
-            <div class="brand-logo-frame"><img src="<%= branding.logoUrl %>" alt="Logo klubu"></div>
+            <img class="auth-brand-logo-image" src="<%= branding.logoUrl %>" alt="Logo klubu">
           <% } else { %>
             <div class="crest crest-large">Z</div>
           <% } %>
-          <div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div>
         </div>
         <div class="auth-hero-copy">
           <span class="auth-kicker">INTERNAL CREATIVE PLATFORM</span>
@@ -35,9 +34,12 @@
     </section>
     <section class="auth-panel">
       <div class="auth-panel-inner">
-        <div class="auth-mobile-brand">
-          <% if (branding?.logoUrl) { %><div class="brand-logo-frame small"><img src="<%= branding.logoUrl %>" alt="Logo klubu"></div><% } else { %><div class="crest">Z</div><% } %>
-          <div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div>
+        <div class="auth-mobile-brand auth-brand-logo-only">
+          <% if (branding?.logoUrl) { %>
+            <img class="auth-brand-logo-image" src="<%= branding.logoUrl %>" alt="Logo klubu">
+          <% } else { %>
+            <div class="crest">Z</div>
+          <% } %>
         </div>
         <div class="auth-copy auth-copy-premium">
           <span class="eyebrow">BEZPIECZNY DOSTĘP</span>
