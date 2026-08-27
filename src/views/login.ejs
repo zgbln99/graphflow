@@ -1,53 +1,72 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logowanie | <%= appName %></title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Logowanie — ZASTAL MARKETING CENTER</title>
+  <link rel="stylesheet" href="/club/styles.css">
 </head>
-<body class="bg-gray-100 min-h-screen">
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
+<body class="auth-body">
+  <main class="login-shell">
+    <section class="login-visual" aria-hidden="true">
+      <div class="login-noise"></div>
+      <div class="court-lines">
+        <span class="court-circle"></span>
+        <span class="court-line-v"></span>
+        <span class="court-arc"></span>
+      </div>
+      <div class="login-brand-large">
+        <div class="brand-mark brand-mark-xl">Z</div>
         <div>
-            <h1 class="text-center text-3xl font-extrabold text-gray-900"><%= appName %></h1>
-            <h2 class="mt-6 text-center text-xl text-gray-600">Panel Zleceń Graficznych</h2>
+          <strong>ZASTAL</strong>
+          <span>MARKETING CENTER</span>
+        </div>
+      </div>
+      <div class="login-hero-copy">
+        <span class="login-kicker">CENTRUM MEDIALNE KLUBU</span>
+        <h1>Grafiki. Zdjęcia.<br>Jeden workflow.</h1>
+        <p>Wszystkie materiały meczowe i klubowe w jednym miejscu — gotowe do pracy w kilka sekund.</p>
+      </div>
+      <div class="login-status"><span></span> System wewnętrzny</div>
+    </section>
+
+    <section class="login-panel">
+      <div class="login-card">
+        <div class="login-mobile-brand">
+          <div class="brand-mark">Z</div>
+          <div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div>
+        </div>
+        <div class="login-heading">
+          <span class="login-kicker">WITAJ PONOWNIE</span>
+          <h2>Zaloguj się</h2>
+          <p>Użyj swojego konta ZASTAL Marketing Center.</p>
         </div>
 
-        <%- include('../partials/flash') %>
+        <% if (typeof error !== 'undefined' && error) { %>
+          <div class="auth-error"><span>!</span><div><strong>Nie udało się zalogować</strong><br><%= error %></div></div>
+        <% } %>
 
-        <form class="mt-8 space-y-6" action="/login" method="POST">
-            <div class="rounded-md shadow-sm -space-y-px">
-                <div>
-                    <label for="email" class="sr-only">Email</label>
-                    <input id="email" name="email" type="email" autocomplete="email" required
-                           class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                           placeholder="Adres email">
-                </div>
-                <div>
-                    <label for="password" class="sr-only">Hasło</label>
-                    <input id="password" name="password" type="password" autocomplete="current-password" required
-                           class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                           placeholder="Hasło">
-                </div>
+        <form class="login-form" action="/login" method="post">
+          <label>
+            <span>Adres e-mail</span>
+            <div class="input-shell">
+              <span class="input-icon">@</span>
+              <input type="email" name="email" autocomplete="email" placeholder="twoj@zastal.pl" required autofocus>
             </div>
-
-            <div class="flex items-center justify-between">
-                <div class="text-sm">
-                    <a href="/forgot-password" class="font-medium text-indigo-600 hover:text-indigo-500">
-                        Zapomniałeś hasła?
-                    </a>
-                </div>
+          </label>
+          <label>
+            <span>Hasło</span>
+            <div class="input-shell">
+              <span class="input-icon">••</span>
+              <input type="password" name="password" autocomplete="current-password" placeholder="Wpisz hasło" required>
             </div>
-
-            <div>
-                <button type="submit"
-                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Zaloguj się
-                </button>
-            </div>
+          </label>
+          <button class="login-submit" type="submit">Zaloguj się <span>→</span></button>
         </form>
-    </div>
-</div>
+
+        <div class="login-footnote">Dostęp wyłącznie dla uprawnionych użytkowników klubu.</div>
+      </div>
+    </section>
+  </main>
 </body>
 </html>
