@@ -9,54 +9,33 @@
   <link rel="stylesheet" href="/club/login-logo.css">
   <link rel="stylesheet" href="/club/operations.css">
 </head>
-<body class="auth-body">
-  <main class="auth-shell auth-shell-premium">
-    <section class="auth-hero">
-      <div class="auth-glow auth-glow-one"></div>
-      <div class="auth-glow auth-glow-two"></div>
-      <div class="auth-hero-inner">
-        <div class="auth-brand auth-brand-large auth-brand-logo-only">
-          <% if (branding?.logoUrl) { %>
-            <img class="auth-brand-logo-image" src="<%= branding.logoUrl %>" alt="Logo klubu">
-          <% } else { %>
-            <div class="crest crest-large">Z</div>
-          <% } %>
-        </div>
-        <div class="auth-hero-copy">
-          <span class="auth-kicker">Zastal · Marketing Center</span>
-          <h1>Centrum operacyjne<br>dnia meczowego.</h1>
-          <p>Materiały, zdjęcia i publikacje prowadzone w jednym, uporządkowanym procesie — od zapowiedzi do ostatniego gwizdka.</p>
-        </div>
-        <div class="auth-feature-row">
-          <div><b>Planowanie</b><span>Harmonogram i briefy</span></div>
-          <div><b>Produkcja</b><span>Materiały meczowe</span></div>
-          <div><b>Archiwum</b><span>Zdjęcia i eksporty</span></div>
-        </div>
+<body class="auth-body login-v4-body">
+  <main class="login-v4">
+    <header class="login-v4-header">
+      <div class="login-v4-brand">
+        <% if (branding?.logoUrl) { %>
+          <img src="<%= branding.logoUrl %>" alt="Logo klubu">
+        <% } else { %>
+          <div class="crest">Z</div>
+        <% } %>
       </div>
-    </section>
-    <section class="auth-panel">
-      <div class="auth-panel-inner">
-        <div class="auth-mobile-brand auth-brand-logo-only">
-          <% if (branding?.logoUrl) { %>
-            <img class="auth-brand-logo-image" src="<%= branding.logoUrl %>" alt="Logo klubu">
-          <% } else { %>
-            <div class="crest">Z</div>
-          <% } %>
-        </div>
-        <div class="auth-copy auth-copy-premium">
-          <span class="eyebrow">Panel zespołu</span>
-          <h2>Zaloguj się</h2>
-          <p>Użyj danych przypisanych do Twojego konta klubowego.</p>
-        </div>
+      <div class="login-v4-context"><span>Marketing Center</span><b>Sezon 2026 / 27</b></div>
+    </header>
+
+    <section class="login-v4-main">
+      <div class="login-v4-form-column">
+        <div class="login-v4-heading"><span>System wewnętrzny</span><h1>Zaloguj się do panelu</h1><p>Wprowadź dane swojego konta klubowego.</p></div>
         <% if (error) { %><div class="auth-error"><span>!</span><%= error %></div><% } %>
-        <form method="post" action="/login" class="auth-form auth-form-premium">
-          <label><span>Adres e-mail</span><div class="auth-input-wrap"><input name="email" type="email" autocomplete="username" placeholder="imie@zastal.pl" required autofocus></div></label>
-          <label><span>Hasło</span><div class="auth-input-wrap"><input name="password" type="password" autocomplete="current-password" placeholder="Wpisz hasło" required></div></label>
-          <button class="primary auth-submit auth-submit-premium" type="submit"><span>Wejdź do centrum</span><span aria-hidden="true">↗</span></button>
+        <form method="post" action="/login" class="login-v4-form">
+          <label><span>E-mail</span><input name="email" type="email" autocomplete="username" placeholder="imie@zastal.pl" required autofocus></label>
+          <label><span>Hasło</span><input name="password" type="password" autocomplete="current-password" placeholder="Wpisz hasło" required></label>
+          <button class="login-v4-submit" type="submit"><span>Zaloguj się</span><span aria-hidden="true">→</span></button>
         </form>
-        <div class="auth-security-note"><span class="status-dot"></span> System klubowy · dostęp autoryzowany</div>
+        <div class="login-v4-note"><span class="status-dot"></span>Dostęp wyłącznie dla pracowników klubu</div>
       </div>
     </section>
+
+    <footer class="login-v4-footer"><span>Zastal Zielona Góra</span><span>Marketing Center · system wewnętrzny</span></footer>
   </main>
 </body>
 </html>

@@ -102,29 +102,33 @@
         <section id="view-other" class="view"><div class="section-title"><h2>Inne grafiki</h2><button class="primary">+ Nowa grafika</button></div><div class="other-grid scroll-panel" id="other-grid"></div></section>
         <section id="view-library" class="view"><div class="section-title"><h2>Biblioteka zdjęć</h2><button class="primary">Prześlij zdjęcia</button></div><div class="big-photo-grid scroll-panel" id="library-grid"></div></section>
         <section id="view-history" class="view"><div class="card table-card"><h2>Historia eksportów</h2><div class="table-scroll"><table><thead><tr><th>Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead><tbody id="history-body"></tbody></table></div></div></section>
-        <section id="view-dashboard" class="view operations-dashboard">
-          <div class="ops-summary">
-            <div><span>Najbliższy mecz</span><strong>04 paź</strong><small>wyjazd · Wrocław</small></div>
-            <div><span>Do publikacji</span><strong>7</strong><small>materiałów w kolejce</small></div>
-            <div><span>Gotowość pakietu</span><strong>68%</strong><small>5 z 7 materiałów</small></div>
-            <div><span>Zdjęcia w sezonie</span><strong>4 286</strong><small>w klubowym archiwum</small></div>
-          </div>
-          <div class="ops-grid">
-            <article class="ops-primary">
-              <header><div><span class="ops-overline">Następny mecz · 4. kolejka</span><h2>Śląsk Wrocław <i>vs</i> Zastal</h2></div><span class="ops-status">za 6 dni</span></header>
-              <div class="ops-match-meta"><div><span>Data</span><b>04.10.2026 · 17:30</b></div><div><span>Miejsce</span><b>Hala Orbita, Wrocław</b></div><div><span>Rozgrywki</span><b>ORLEN Basket Liga</b></div></div>
-              <div class="ops-progress-head"><span>Pakiet meczowy</span><b>5 z 7 materiałów</b></div>
-              <div class="ops-progress"><i style="width:68%"></i></div>
-              <div class="ops-checklist">
-                <div class="done"><i>✓</i><span><b>Matchday</b><small>Eksport: 02.10 · 10:00</small></span><em>Gotowe</em></div>
-                <div class="done"><i>✓</i><span><b>Zapowiedź meczu</b><small>Wersje: feed + story</small></span><em>Gotowe</em></div>
-                <div><i>3</i><span><b>Starting Five</b><small>Oczekuje na skład</small></span><em>W toku</em></div>
-                <div><i>4</i><span><b>Final Score</b><small>Szablon przypisany</small></span><em>Plan</em></div>
+        <section id="view-dashboard" class="view dashboard-v4">
+          <header class="dashboard-v4-header">
+            <div><span>Wtorek, 29 września</span><h2>Dzień dobry, <%= user.displayName.split(' ')[0] %></h2></div>
+            <p>Najbliższy mecz: <b>Śląsk Wrocław — Zastal</b> · 04.10 · 17:30</p>
+          </header>
+
+          <div class="dashboard-v4-grid">
+            <section class="production-v4">
+              <header class="section-v4-head"><div><span>4. kolejka · wyjazd</span><h3>Pakiet meczowy</h3></div><button type="button">Otwórz mecz</button></header>
+              <div class="fixture-v4"><div><b>Śląsk Wrocław</b><span>Hala Orbita</span></div><strong>04.10<span>17:30</span></strong><div><b>Zastal</b><span>ORLEN Basket Liga</span></div></div>
+              <div class="work-table-v4">
+                <div class="work-table-head"><span>Materiał</span><span>Format</span><span>Termin</span><span>Status</span></div>
+                <button type="button"><span><b>Zapowiedź meczu</b><small>Feed i relacja</small></span><span>1080 × 1350</span><span>02.10 · 10:00</span><em class="is-ready">Gotowe</em></button>
+                <button type="button"><span><b>Matchday</b><small>Feed i relacja</small></span><span>1080 × 1350</span><span>04.10 · 09:00</span><em class="is-ready">Gotowe</em></button>
+                <button type="button"><span><b>Starting Five</b><small>Relacja</small></span><span>1080 × 1920</span><span>04.10 · 16:45</span><em>Oczekuje</em></button>
+                <button type="button"><span><b>Wynik końcowy</b><small>Feed i relacja</small></span><span>1080 × 1350</span><span>Po meczu</span><em>Plan</em></button>
               </div>
-            </article>
-            <aside class="ops-side">
-              <section class="ops-activity"><header><div><span class="ops-overline">Dzisiaj</span><h3>Ostatnia aktywność</h3></div><button>Pełna historia</button></header><div class="activity-row"><time>14:32</time><span><b>Final Score</b><small>wyeksportował Jan Kowalski</small></span><em>PNG</em></div><div class="activity-row"><time>13:48</time><span><b>87 nowych zdjęć</b><small>Zastal — Anwil / Photographer</small></span><em>S3</em></div><div class="activity-row"><time>12:10</time><span><b>Matchday zatwierdzony</b><small>przez Administratora</small></span><em>OK</em></div></section>
-              <section class="ops-system"><header><span class="ops-overline">Połączenia</span><h3>Status systemu</h3></header><div><span><i class="is-on"></i>Aplikacja</span><b>Sprawna</b></div><div><span><i></i>MEGA S3</span><b>Konfiguracja</b></div><div><span><i class="is-on"></i>Szablony</span><b>12 aktywnych</b></div></section>
+            </section>
+
+            <aside class="publishing-v4">
+              <header class="section-v4-head"><div><span>Najbliższe 48 godzin</span><h3>Plan publikacji</h3></div><button type="button">Zobacz wszystko</button></header>
+              <div class="publish-day-v4"><span>Dzisiaj</span><i></i></div>
+              <div class="publish-row-v4"><time>18:00</time><div><b>Galeria po meczu z Anwilem</b><span>Facebook · Instagram</span></div><em>Gotowe</em></div>
+              <div class="publish-row-v4"><time>20:30</time><div><b>Wyniki głosowania MVP</b><span>Instagram Stories</span></div><em>Do akceptacji</em></div>
+              <div class="publish-day-v4"><span>Jutro</span><i></i></div>
+              <div class="publish-row-v4"><time>10:00</time><div><b>Zapowiedź wyjazdu</b><span>Facebook · Instagram</span></div><em>Zaplanowane</em></div>
+              <div class="publishing-v4-footer"><span>3 publikacje</span><span>2 materiały gotowe</span></div>
             </aside>
           </div>
         </section>
