@@ -2,15 +2,15 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title><%= title %></title>
   <link rel="stylesheet" href="/club/styles.css">
 </head>
-<body>
-  <div class="app-shell">
-    <aside class="sidebar">
+<body class="app-body">
+  <div class="app-shell" id="app-shell">
+    <aside class="sidebar" id="sidebar">
       <div class="brand"><div class="crest">Z</div><div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div></div>
-      <select class="season"><option>Sezon 2026/27</option></select>
+      <select class="season" aria-label="Sezon"><option>Sezon 2026/27</option></select>
       <nav>
         <button data-view="dashboard">⌂ Dashboard</button>
         <button class="active" data-view="matches">◉ Mecze</button>
@@ -18,73 +18,84 @@
         <button data-view="templates">◫ Szablony</button>
         <button data-view="library">▣ Biblioteka zdjęć</button>
         <button data-view="history">↺ Historia</button>
-        <button data-view="settings">⚙ Ustawienia</button>
+        <% if (user.role === 'admin') { %><button data-view="settings">⚙ Ustawienia</button><% } %>
       </nav>
-      <div class="storage"><b>MEGA S3</b><span>832 GB / 2 TB</span><div class="bar"><i></i></div><button>Zarządzaj plikami</button></div>
-      <div class="profile"><div class="avatar">JK</div><div><b>Jan Kowalski</b><span>Administrator</span></div></div>
+      <div class="storage"><b>MEGA S3</b><span>Połączenie zostanie skonfigurowane</span><div class="bar"><i style="width:0"></i></div><button type="button">Zarządzaj plikami</button></div>
+      <div class="profile">
+        <div class="avatar"><%= user.displayName.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase() %></div>
+        <div class="profile-copy"><b><%= user.displayName %></b><span><%= user.role %></span></div>
+        <form method="post" action="/logout"><button class="icon-btn" title="Wyloguj" aria-label="Wyloguj">↪</button></form>
+      </div>
     </aside>
 
-    <main>
+    <main class="workspace">
       <header class="topbar">
-        <div><span class="eyebrow" id="eyebrow">MECZE</span><h1 id="page-title">Mecze</h1></div>
-        <div class="actions"><button class="ghost">Podgląd</button><button class="primary" id="new-action">+ Nowy mecz</button></div>
+        <div class="topbar-left">
+          <button class="mobile-menu" id="mobile-menu" type="button" aria-label="Menu">☰</button>
+          <div><span class="eyebrow" id="eyebrow">MECZE</span><h1 id="page-title">Mecze</h1></div>
+        </div>
+        <div class="actions"><button class="ghost compact-hide">Podgląd</button><button class="primary" id="new-action">+ Nowy mecz</button></div>
       </header>
 
-      <section id="view-matches" class="view active-view">
-        <div class="toolbar"><input placeholder="Szukaj meczu…"><select><option>Wszystkie statusy</option></select><select><option>Sezon 2026/27</option></select></div>
-        <div class="match-list">
-          <article class="match-row" data-match="zastal-anwil"><div class="team-logo green">Z</div><div class="match-main"><b>Zastal vs Anwil</b><span>Hala CRS, Zielona Góra</span></div><div class="score">92 : 81</div><div><b>27.09.2026</b><span>18:00</span></div><span class="pill live">Na żywo</span><div><b>4 / 8</b><span>grafiki</span></div><button>•••</button></article>
-          <article class="match-row"><div class="team-logo">Ś</div><div class="match-main"><b>Śląsk vs Zastal</b><span>Hala Orbita, Wrocław</span></div><div class="score muted">- : -</div><div><b>04.10.2026</b><span>17:30</span></div><span class="pill planned">Zaplanowany</span><div><b>0 / 7</b><span>grafiki</span></div><button>•••</button></article>
-          <article class="match-row"><div class="team-logo green">Z</div><div class="match-main"><b>Zastal vs King</b><span>Hala CRS, Zielona Góra</span></div><div class="score muted">- : -</div><div><b>11.10.2026</b><span>16:00</span></div><span class="pill planned">Zaplanowany</span><div><b>0 / 7</b><span>grafiki</span></div><button>•••</button></article>
-        </div>
-      </section>
+      <div class="view-stack">
+        <section id="view-matches" class="view active-view">
+          <div class="toolbar"><input placeholder="Szukaj meczu…"><select><option>Wszystkie statusy</option></select><select><option>Sezon 2026/27</option></select></div>
+          <div class="match-list scroll-panel">
+            <article class="match-row" data-match="zastal-anwil"><div class="team-logo green">Z</div><div class="match-main"><b>Zastal vs Anwil</b><span>Hala CRS, Zielona Góra</span></div><div class="score">92 : 81</div><div><b>27.09.2026</b><span>18:00</span></div><span class="pill live">Na żywo</span><div><b>4 / 8</b><span>grafiki</span></div><button>•••</button></article>
+            <article class="match-row"><div class="team-logo">Ś</div><div class="match-main"><b>Śląsk vs Zastal</b><span>Hala Orbita, Wrocław</span></div><div class="score muted">- : -</div><div><b>04.10.2026</b><span>17:30</span></div><span class="pill planned">Zaplanowany</span><div><b>0 / 7</b><span>grafiki</span></div><button>•••</button></article>
+            <article class="match-row"><div class="team-logo green">Z</div><div class="match-main"><b>Zastal vs King</b><span>Hala CRS, Zielona Góra</span></div><div class="score muted">- : -</div><div><b>11.10.2026</b><span>16:00</span></div><span class="pill planned">Zaplanowany</span><div><b>0 / 7</b><span>grafiki</span></div><button>•••</button></article>
+          </div>
+        </section>
 
-      <section id="view-match" class="view">
-        <div class="match-header card">
-          <div class="score-card"><div class="team-logo green">Z</div><div><strong>92 : 81</strong><span>FINAL</span></div><div class="team-logo blue">A</div><small>27.09.2026 • 18:00<br>Hala CRS, Zielona Góra</small></div>
-          <div class="match-meta"><h3>Dane meczu</h3><dl><dt>Rozgrywki</dt><dd>ORLEN Basket Liga</dd><dt>Kolejka</dt><dd>3</dd><dt>Sędziowie</dt><dd>Kowalski, Nowak, Wiśniewski</dd></dl><button>Edytuj dane</button></div>
-          <div class="folders"><h3>Foldery zdjęć</h3><button>📁 Photographer <span>312 zdjęć</span></button><button>📁 Social Media <span>89 zdjęć</span></button><button>📁 Selected <span>27 zdjęć</span></button><button class="ghost">Zarządzaj folderami</button></div>
-        </div>
-        <div class="section-title"><h2>Grafiki meczowe</h2><button class="primary">+ Dodaj grafikę</button></div>
-        <div class="graphic-grid" id="graphic-grid"></div>
-      </section>
+        <section id="view-match" class="view">
+          <div class="match-screen">
+            <div class="match-header card">
+              <div class="score-card"><div class="team-logo green">Z</div><div><strong>92 : 81</strong><span>FINAL</span></div><div class="team-logo blue">A</div><small>27.09.2026 • 18:00<br>Hala CRS, Zielona Góra</small></div>
+              <div class="match-meta"><h3>Dane meczu</h3><dl><dt>Rozgrywki</dt><dd>ORLEN Basket Liga</dd><dt>Kolejka</dt><dd>3</dd><dt>Sędziowie</dt><dd>Kowalski, Nowak, Wiśniewski</dd></dl><button>Edytuj dane</button></div>
+              <div class="folders"><h3>Foldery zdjęć</h3><button>📁 Photographer <span>312 zdjęć</span></button><button>📁 Social Media <span>89 zdjęć</span></button><button>📁 Selected <span>27 zdjęć</span></button><button class="ghost">Zarządzaj folderami</button></div>
+            </div>
+            <div class="section-title"><h2>Grafiki meczowe</h2><button class="primary">+ Dodaj grafikę</button></div>
+            <div class="graphic-grid scroll-panel" id="graphic-grid"></div>
+          </div>
+        </section>
 
-      <section id="view-editor" class="view editor-layout">
-        <div class="editor-left card">
-          <div class="tabs"><button class="active">EDYTOR</button><button>USTAWIENIA</button><button>HISTORIA</button></div>
-          <h2 id="editor-template-name">Final Score</h2>
-          <div id="dynamic-fields"></div>
-          <button class="ghost full">+ Dodaj pole</button>
-        </div>
-        <div class="canvas-wrap card">
-          <div class="canvas-toolbar"><button>↶</button><button>↷</button><span id="canvas-size">1080 × 1350</span></div>
-          <div class="canvas-stage"><canvas id="design-canvas" width="540" height="675"></canvas></div>
-          <div class="zoom"><button>-</button><span>68%</span><button>+</button></div>
-          <div class="exports"><h3>Ostatnie eksporty</h3><div class="export-strip"><div></div><div></div><div></div><div></div></div></div>
-        </div>
-        <div class="photos-panel card">
-          <div class="panel-head"><div><h3>Zdjęcia z meczu</h3><span>MEGA S3 • 3 foldery</span></div><button>↻</button></div>
-          <div class="folder-tabs"><button class="active">Wszystkie</button><button>Photographer</button><button>Social</button><button>Selected</button></div>
-          <input placeholder="Szukaj zdjęć…">
-          <div class="photo-grid" id="photo-grid"></div>
-          <button class="ghost full">Prześlij zdjęcia</button>
-        </div>
-      </section>
+        <section id="view-editor" class="view editor-layout">
+          <div class="editor-left card panel-scroll">
+            <div class="tabs"><button class="active">EDYTOR</button><button>USTAWIENIA</button><button>HISTORIA</button></div>
+            <h2 id="editor-template-name">Final Score</h2>
+            <div id="dynamic-fields"></div>
+          </div>
+          <div class="canvas-wrap card">
+            <div class="canvas-toolbar"><button>↶</button><button>↷</button><span id="canvas-size">1080 × 1350</span></div>
+            <div class="canvas-stage"><canvas id="design-canvas" width="540" height="675"></canvas></div>
+            <div class="zoom"><button>-</button><span>68%</span><button>+</button></div>
+            <div class="exports"><h3>Ostatnie eksporty</h3><div class="export-strip"><div></div><div></div><div></div><div></div></div></div>
+          </div>
+          <div class="photos-panel card">
+            <div class="panel-head"><div><h3>Zdjęcia z meczu</h3><span>MEGA S3 • foldery przypisane do meczu</span></div><button>↻</button></div>
+            <div class="folder-tabs"><button class="active">Wszystkie</button><button>Photographer</button><button>Social</button><button>Selected</button></div>
+            <input placeholder="Szukaj zdjęć…">
+            <div class="photo-grid" id="photo-grid"></div>
+            <button class="ghost full">Prześlij zdjęcia</button>
+          </div>
+        </section>
 
-      <section id="view-templates" class="view">
-        <div class="template-admin">
-          <div class="card template-list"><div class="section-title"><h2>Szablony</h2><button class="primary" id="create-template">+ Nowy szablon</button></div><div id="template-list"></div></div>
-          <div class="card layer-editor"><div class="tabs"><button>PODGLĄD</button><button>POLA</button><button class="active">WARSTWY</button><button>USTAWIENIA</button></div><h3>Warstwy</h3><div id="layers-list"></div><button id="add-layer" class="ghost full">+ Dodaj warstwę</button></div>
-          <div class="card layer-props"><h3>Właściwości warstwy</h3><div id="layer-properties"><p>Wybierz warstwę.</p></div></div>
-        </div>
-      </section>
+        <section id="view-templates" class="view">
+          <div class="template-admin">
+            <div class="card template-list panel-scroll"><div class="section-title"><h2>Szablony</h2><button class="primary" id="create-template">+ Nowy</button></div><div id="template-list"></div></div>
+            <div class="card layer-editor panel-scroll"><div class="tabs"><button>PODGLĄD</button><button>POLA</button><button class="active">WARSTWY</button><button>USTAWIENIA</button></div><h3>Warstwy</h3><div id="layers-list"></div><button id="add-layer" class="ghost full">+ Dodaj warstwę</button></div>
+            <div class="card layer-props panel-scroll"><h3>Właściwości warstwy</h3><div id="layer-properties"><p>Wybierz warstwę.</p></div></div>
+          </div>
+        </section>
 
-      <section id="view-other" class="view"><div class="section-title"><h2>Inne grafiki</h2><button class="primary">+ Nowa grafika</button></div><div class="other-grid" id="other-grid"></div></section>
-      <section id="view-library" class="view"><div class="section-title"><h2>Biblioteka zdjęć</h2><button class="primary">Prześlij zdjęcia</button></div><div class="big-photo-grid" id="library-grid"></div></section>
-      <section id="view-history" class="view"><div class="card"><h2>Historia eksportów</h2><table><thead><tr><th>Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead><tbody id="history-body"></tbody></table></div></section>
-      <section id="view-dashboard" class="view"><div class="kpis"><div class="card"><span>Mecze</span><b>14</b></div><div class="card"><span>Zdjęcia</span><b>4 286</b></div><div class="card"><span>Szablony</span><b>12</b></div><div class="card"><span>Eksporty</span><b>168</b></div></div></section>
-      <section id="view-settings" class="view"><div class="card settings-card"><h2>Ustawienia</h2><label>Endpoint MEGA S3<input placeholder="https://s3...mega.io"></label><label>Bucket<input placeholder="club-media"></label><label>Domyślny prefix<input placeholder="2026-27/"></label><button class="primary">Zapisz</button></div></section>
+        <section id="view-other" class="view"><div class="section-title"><h2>Inne grafiki</h2><button class="primary">+ Nowa grafika</button></div><div class="other-grid scroll-panel" id="other-grid"></div></section>
+        <section id="view-library" class="view"><div class="section-title"><h2>Biblioteka zdjęć</h2><button class="primary">Prześlij zdjęcia</button></div><div class="big-photo-grid scroll-panel" id="library-grid"></div></section>
+        <section id="view-history" class="view"><div class="card table-card"><h2>Historia eksportów</h2><div class="table-scroll"><table><thead><tr><th>Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead><tbody id="history-body"></tbody></table></div></div></section>
+        <section id="view-dashboard" class="view"><div class="kpis"><div class="card"><span>Mecze</span><b>14</b></div><div class="card"><span>Zdjęcia</span><b>4 286</b></div><div class="card"><span>Szablony</span><b>12</b></div><div class="card"><span>Eksporty</span><b>168</b></div></div></section>
+        <section id="view-settings" class="view"><div class="card settings-card panel-scroll"><h2>Ustawienia</h2><label>Endpoint MEGA S3<input placeholder="https://s3...mega.io"></label><label>Bucket<input placeholder="club-media"></label><label>Domyślny prefix<input placeholder="2026-27/"></label><button class="primary">Zapisz</button></div></section>
+      </div>
     </main>
+    <button class="sidebar-backdrop" id="sidebar-backdrop" type="button" aria-label="Zamknij menu"></button>
   </div>
   <script src="/club/app.js"></script>
 </body>
