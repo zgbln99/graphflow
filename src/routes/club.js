@@ -11,6 +11,7 @@ const {
   analyzeFacebookOverview,
   getCachedState
 } = require('../services/social-intelligence');
+const { getDashboardData } = require('../services/dashboard-data');
 
 const router = express.Router();
 const db = Database.getInstance();
@@ -227,7 +228,8 @@ router.get('/', requireAuth, async (req, res, next) => {
     res.render('club/index', {
       title: 'ZASTAL MARKETING CENTER',
       user: req.session.user,
-      branding
+      branding,
+      dashboard: getDashboardData()
     });
   } catch (err) {
     next(err);

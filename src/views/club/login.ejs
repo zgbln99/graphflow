@@ -3,39 +3,100 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
   <title><%= title %></title>
-  <link rel="stylesheet" href="/club/styles.css">
-  <link rel="stylesheet" href="/club/premium.css">
-  <link rel="stylesheet" href="/club/login-logo.css">
-  <link rel="stylesheet" href="/club/operations.css">
+  <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230a0e10%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229%22 fill=%22none%22 stroke=%22%231fbf63%22 stroke-width=%222%22/%3E%3Cpath d=%22M7 16h18M16 7c-3 4-3 14 0 18M16 7c3 4 3 14 0 18%22 fill=%22none%22 stroke=%22%231fbf63%22 stroke-width=%221.4%22/%3E%3C/svg%3E' %>">
+  <link rel="stylesheet" href="/club/zmc.css?v=5">
 </head>
-<body class="auth-body login-v4-body">
-  <main class="login-v4">
-    <header class="login-v4-header">
-      <div class="login-v4-brand">
-        <% if (branding?.logoUrl) { %>
-          <img src="<%= branding.logoUrl %>" alt="Logo klubu">
-        <% } else { %>
-          <div class="crest">Z</div>
-        <% } %>
-      </div>
-      <div class="login-v4-context"><span>Marketing Center</span><b>Sezon 2026 / 27</b></div>
-    </header>
+<body class="auth-body">
+  <%- include('_icons') %>
 
-    <section class="login-v4-main">
-      <div class="login-v4-form-column">
-        <div class="login-v4-heading"><span>System wewnętrzny</span><h1>Zaloguj się do panelu</h1><p>Wprowadź dane swojego konta klubowego.</p></div>
-        <% if (error) { %><div class="auth-error"><span>!</span><%= error %></div><% } %>
-        <form method="post" action="/login" class="login-v4-form">
-          <label><span>E-mail</span><input name="email" type="email" autocomplete="username" placeholder="imie@zastal.pl" required autofocus></label>
-          <label><span>Hasło</span><input name="password" type="password" autocomplete="current-password" placeholder="Wpisz hasło" required></label>
-          <button class="login-v4-submit" type="submit"><span>Zaloguj się</span><span aria-hidden="true">→</span></button>
-        </form>
-        <div class="login-v4-note"><span class="status-dot"></span>Dostęp wyłącznie dla pracowników klubu</div>
+  <main class="login">
+    <!-- Lewa kolumna: identyfikacja klubu -->
+    <section class="login-visual">
+      <svg class="login-court" viewBox="0 0 600 420" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+        <rect x="20" y="20" width="560" height="380"/>
+        <path d="M300 20v380"/>
+        <circle cx="300" cy="210" r="62"/>
+        <circle cx="300" cy="210" r="22"/>
+        <rect x="20" y="130" width="130" height="160"/>
+        <rect x="450" y="130" width="130" height="160"/>
+        <path d="M150 130a90 90 0 0 1 0 160"/>
+        <path d="M450 130a90 90 0 0 0 0 160"/>
+        <path d="M20 60h44a175 175 0 0 0 0 300H20"/>
+        <path d="M580 60h-44a175 175 0 0 1 0 300h44"/>
+      </svg>
+
+      <header class="login-brand">
+        <% if (branding && branding.logoUrl) { %>
+          <img class="brand-logo" src="<%= branding.logoUrl %>" alt="Logo klubu">
+        <% } else { %>
+          <span class="wordmark"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
+        <% } %>
+      </header>
+
+      <div class="login-visual-copy">
+        <span class="over">System wewnętrzny klubu</span>
+        <h1>Centrum produkcji<br>materiałów meczowych</h1>
+        <p>Szablony, zdjęcia i eksporty w jednym miejscu — od zapowiedzi meczu po wynik końcowy.</p>
+      </div>
+
+      <div class="login-visual-facts">
+        <div><b>Mecze i sezony</b><span>Pakiet grafik przypisany do każdego spotkania</span></div>
+        <div><b>Szablony klubowe</b><span>Layout kontrolowany przez grafika, treść przez social media</span></div>
+        <div><b>Biblioteka zdjęć</b><span>Foldery meczowe i eksporty w jednym magazynie</span></div>
       </div>
     </section>
 
-    <footer class="login-v4-footer"><span>Zastal Zielona Góra</span><span>Marketing Center · system wewnętrzny</span></footer>
+    <!-- Prawa kolumna: formularz -->
+    <section class="login-panel">
+      <div class="login-panel-top">
+        <div class="login-mobile-brand">
+          <% if (branding && branding.logoUrl) { %>
+            <img class="brand-logo" src="<%= branding.logoUrl %>" alt="Logo klubu">
+          <% } else { %>
+            <span class="wordmark"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
+          <% } %>
+        </div>
+        <div class="login-season"><span>Sezon</span><b>2026 / 27</b></div>
+      </div>
+
+      <div class="login-form-wrap">
+        <h2>Zaloguj się</h2>
+        <p>Dostęp wyłącznie dla pracowników działu marketingu.</p>
+
+        <% if (error) { %>
+          <div class="auth-error" role="alert">
+            <svg class="ico ico-sm"><use href="#i-alert"></use></svg><%= error %>
+          </div>
+        <% } %>
+
+        <form method="post" action="/login" class="login-form">
+          <label>
+            <span>Adres e-mail</span>
+            <input name="email" type="email" autocomplete="username" placeholder="imie@zastal.pl" required autofocus>
+          </label>
+          <label>
+            <span>Hasło</span>
+            <input name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+          </label>
+          <button class="login-submit" type="submit">
+            <span>Zaloguj się</span>
+            <svg class="ico"><use href="#i-chevron"></use></svg>
+          </button>
+        </form>
+
+        <div class="login-note">
+          <span class="status-dot"></span>
+          Konta zakłada administrator systemu
+        </div>
+      </div>
+
+      <footer class="login-panel-foot">
+        <span>Zastal Zielona Góra</span>
+        <span>Marketing Center</span>
+      </footer>
+    </section>
   </main>
 </body>
 </html>

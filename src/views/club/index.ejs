@@ -3,210 +3,509 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
   <title><%= title %></title>
-  <link rel="stylesheet" href="/club/styles.css">
-  <link rel="stylesheet" href="/club/premium.css">
-  <link rel="stylesheet" href="/club/operations.css">
+  <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230a0e10%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229%22 fill=%22none%22 stroke=%22%231fbf63%22 stroke-width=%222%22/%3E%3Cpath d=%22M7 16h18M16 7c-3 4-3 14 0 18M16 7c3 4 3 14 0 18%22 fill=%22none%22 stroke=%22%231fbf63%22 stroke-width=%221.4%22/%3E%3C/svg%3E' %>">
+  <link rel="stylesheet" href="/club/zmc.css?v=5">
 </head>
 <body class="app-body">
-  <div class="app-shell" id="app-shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand <%= branding?.logoUrl ? 'brand-logo-only' : '' %>">
-        <% if (branding?.logoUrl) { %>
-          <div class="brand-logo-frame sidebar-logo-wide"><img src="<%= branding.logoUrl %>" alt="Logo Zastal"></div>
-        <% } else { %>
-          <div class="crest">Z</div>
-          <div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div>
+<%
+  const role = user.role || 'social';
+  const can = (...roles) => roles.includes(role);
+  const initials = String(user.displayName || user.email)
+    .split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
+  const roleLabels = {
+    admin: 'Administrator',
+    designer: 'Grafik',
+    social: 'Social media',
+    photographer: 'Fotograf'
+  };
+  const d = dashboard;
+  const match = d.nextMatch;
+  const progress = match.graphicsTotal ? Math.round(match.graphicsReady / match.graphicsTotal * 100) : 0;
+%>
+<%- include('_icons') %>
+
+<div class="app-shell" id="app-shell">
+  <!-- ---------------- SIDEBAR ---------------- -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <% if (branding && branding.logoUrl) { %>
+        <img class="brand-logo" src="<%= branding.logoUrl %>" alt="Logo klubu">
+      <% } else { %>
+        <span class="wordmark"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
+      <% } %>
+    </div>
+
+    <div class="season-wrap">
+      <span>Aktywny sezon</span>
+      <select class="season" aria-label="Aktywny sezon"><option><%= d.season %></option></select>
+    </div>
+
+    <nav>
+      <span class="nav-label">Praca</span>
+      <button class="active" data-view="dashboard"><svg class="ico"><use href="#i-dashboard"></use></svg>Dashboard</button>
+      <button data-view="matches"><svg class="ico"><use href="#i-match"></use></svg>Mecze<span class="count">3</span></button>
+      <% if (can('admin','designer','social')) { %>
+        <button data-view="other"><svg class="ico"><use href="#i-other"></use></svg>Inne grafiki</button>
+      <% } %>
+      <% if (can('admin','social')) { %>
+        <button data-view="social"><svg class="ico"><use href="#i-social"></use></svg>Monitoring social</button>
+      <% } %>
+
+      <span class="nav-label">Biblioteka</span>
+      <% if (can('admin','designer')) { %>
+        <button data-view="templates"><svg class="ico"><use href="#i-template"></use></svg>Szablony</button>
+      <% } %>
+      <button data-view="library"><svg class="ico"><use href="#i-photos"></use></svg>Biblioteka zdjęć</button>
+      <% if (can('admin','designer','social')) { %>
+        <button data-view="history"><svg class="ico"><use href="#i-history"></use></svg>Historia</button>
+      <% } %>
+
+      <% if (role === 'admin') { %>
+        <span class="nav-label">Administracja</span>
+        <button data-view="settings"><svg class="ico"><use href="#i-settings"></use></svg>Ustawienia</button>
+      <% } %>
+    </nav>
+
+    <div class="storage">
+      <div class="storage-head"><b>Magazyn zdjęć</b><em>MEGA S3</em></div>
+      <span>Połączenie nieskonfigurowane</span>
+      <div class="meter"><i style="width:0"></i></div>
+      <% if (role === 'admin') { %><button type="button" data-view="settings">Konfiguruj połączenie</button><% } %>
+    </div>
+
+    <div class="profile">
+      <div class="avatar"><%= initials %></div>
+      <div class="profile-copy">
+        <b><%= user.displayName %></b>
+        <span><%= roleLabels[role] || role %></span>
+      </div>
+      <form method="post" action="/logout">
+        <button class="icon-btn" type="submit" title="Wyloguj się" aria-label="Wyloguj się">
+          <svg class="ico"><use href="#i-logout"></use></svg>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- ---------------- WORKSPACE ---------------- -->
+  <main class="workspace">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu" id="mobile-menu" type="button" aria-label="Menu">
+          <svg class="ico"><use href="#i-menu"></use></svg>
+        </button>
+        <div>
+          <span class="eyebrow" id="eyebrow">Sezon <%= d.season %></span>
+          <h1 id="page-title">Dashboard</h1>
+        </div>
+      </div>
+      <div class="actions">
+        <div class="topbar-clock"><svg class="ico ico-sm"><use href="#i-clock"></use></svg><span id="topbar-clock-value">—</span></div>
+        <% if (role === 'admin') { %>
+          <button class="primary" id="new-action" type="button">Nowy mecz</button>
+        <% } else if (role === 'photographer') { %>
+          <button class="primary" id="new-action" type="button">Prześlij zdjęcia</button>
         <% } %>
       </div>
-      <div class="season-wrap"><span>Aktywny sezon</span><select class="season" aria-label="Sezon"><option>2026 / 27</option></select></div>
-      <nav>
-        <span class="nav-label">Praca</span>
-        <button data-view="dashboard"><span>Przegląd</span></button>
-        <button class="active" data-view="matches"><span>Mecze</span></button>
-        <button data-view="other"><span>Materiały klubowe</span></button>
-        <button data-view="social"><span>Monitoring social</span></button>
-        <span class="nav-label">Biblioteka</span>
-        <button data-view="templates"><span>Szablony</span></button>
-        <button data-view="library"><span>Zdjęcia</span></button>
-        <button data-view="history"><span>Eksporty</span></button>
-        <% if (user.role === 'admin') { %><button data-view="settings"><span>Ustawienia</span></button><% } %>
-      </nav>
-      <div class="storage"><div class="storage-head"><b>Magazyn zdjęć</b><em>MEGA S3</em></div><span>Oczekuje na konfigurację</span><div class="bar"><i style="width:0"></i></div><button type="button">Konfiguruj połączenie</button></div>
-      <div class="profile">
-        <div class="avatar"><%= user.displayName.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase() %></div>
-        <div class="profile-copy"><b><%= user.displayName %></b><span><%= user.role %></span></div>
-        <form method="post" action="/logout"><button class="icon-btn" title="Wyloguj" aria-label="Wyloguj">↪</button></form>
-      </div>
-    </aside>
+    </header>
 
-    <main class="workspace">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button class="mobile-menu" id="mobile-menu" type="button" aria-label="Menu">☰</button>
-          <div><span class="eyebrow" id="eyebrow">Zastal Marketing Center</span><h1 id="page-title">Mecze</h1></div>
-        </div>
-        <div class="actions"><button class="ghost compact-hide">Podgląd</button><button class="primary" id="new-action">+ Nowy mecz</button></div>
-      </header>
+    <div class="view-stack">
 
-      <div class="view-stack">
-        <section id="view-matches" class="view active-view">
-          <div class="toolbar"><input placeholder="Szukaj meczu…"><select><option>Wszystkie statusy</option></select><select><option>Sezon 2026/27</option></select></div>
-          <div class="match-list scroll-panel">
-            <article class="match-row" data-match="zastal-anwil"><div class="team-logo green">Z</div><div class="match-main"><b>Zastal vs Anwil</b><span>Hala CRS, Zielona Góra</span></div><div class="score">92 : 81</div><div><b>27.09.2026</b><span>18:00</span></div><span class="pill live">Na żywo</span><div><b>4 / 8</b><span>grafiki</span></div><button>•••</button></article>
-            <article class="match-row"><div class="team-logo">Ś</div><div class="match-main"><b>Śląsk vs Zastal</b><span>Hala Orbita, Wrocław</span></div><div class="score muted">- : -</div><div><b>04.10.2026</b><span>17:30</span></div><span class="pill planned">Zaplanowany</span><div><b>0 / 7</b><span>grafiki</span></div><button>•••</button></article>
-            <article class="match-row"><div class="team-logo green">Z</div><div class="match-main"><b>Zastal vs King</b><span>Hala CRS, Zielona Góra</span></div><div class="score muted">- : -</div><div><b>11.10.2026</b><span>16:00</span></div><span class="pill planned">Zaplanowany</span><div><b>0 / 7</b><span>grafiki</span></div><button>•••</button></article>
-          </div>
-        </section>
-
-        <section id="view-match" class="view">
-          <div class="match-screen">
-            <div class="match-header card">
-              <div class="score-card"><div class="team-logo green">Z</div><div><strong>92 : 81</strong><span>FINAL</span></div><div class="team-logo blue">A</div><small>27.09.2026 • 18:00<br>Hala CRS, Zielona Góra</small></div>
-              <div class="match-meta"><h3>Dane meczu</h3><dl><dt>Rozgrywki</dt><dd>ORLEN Basket Liga</dd><dt>Kolejka</dt><dd>3</dd><dt>Sędziowie</dt><dd>Kowalski, Nowak, Wiśniewski</dd></dl><button>Edytuj dane</button></div>
-              <div class="folders"><h3>Foldery zdjęć</h3><button>📁 Photographer <span>312 zdjęć</span></button><button>📁 Social Media <span>89 zdjęć</span></button><button>📁 Selected <span>27 zdjęć</span></button><button class="ghost">Zarządzaj folderami</button></div>
-            </div>
-            <div class="section-title"><h2>Grafiki meczowe</h2><button class="primary">+ Dodaj grafikę</button></div>
-            <div class="graphic-grid scroll-panel" id="graphic-grid"></div>
-          </div>
-        </section>
-
-        <section id="view-editor" class="view editor-layout">
-          <div class="editor-left card panel-scroll">
-            <div class="tabs"><button class="active">EDYTOR</button><button>USTAWIENIA</button><button>HISTORIA</button></div>
-            <h2 id="editor-template-name">Final Score</h2>
-            <div id="dynamic-fields"></div>
-          </div>
-          <div class="canvas-wrap card">
-            <div class="canvas-toolbar"><button>↶</button><button>↷</button><span id="canvas-size">1080 × 1350</span></div>
-            <div class="canvas-stage"><canvas id="design-canvas" width="540" height="675"></canvas></div>
-            <div class="zoom"><button>-</button><span>68%</span><button>+</button></div>
-            <div class="exports"><h3>Ostatnie eksporty</h3><div class="export-strip"><div></div><div></div><div></div><div></div></div></div>
-          </div>
-          <div class="photos-panel card">
-            <div class="panel-head"><div><h3>Zdjęcia z meczu</h3><span>MEGA S3 • foldery przypisane do meczu</span></div><button>↻</button></div>
-            <div class="folder-tabs"><button class="active">Wszystkie</button><button>Photographer</button><button>Social</button><button>Selected</button></div>
-            <input placeholder="Szukaj zdjęć…">
-            <div class="photo-grid" id="photo-grid"></div>
-            <button class="ghost full">Prześlij zdjęcia</button>
-          </div>
-        </section>
-
-        <section id="view-templates" class="view">
-          <div class="template-admin">
-            <div class="card template-list panel-scroll"><div class="section-title"><h2>Szablony</h2><button class="primary" id="create-template">+ Nowy</button></div><div id="template-list"></div></div>
-            <div class="card layer-editor panel-scroll"><div class="tabs"><button>PODGLĄD</button><button>POLA</button><button class="active">WARSTWY</button><button>USTAWIENIA</button></div><h3>Warstwy</h3><div id="layers-list"></div><button id="add-layer" class="ghost full">+ Dodaj warstwę</button></div>
-            <div class="card layer-props panel-scroll"><h3>Właściwości warstwy</h3><div id="layer-properties"><p>Wybierz warstwę.</p></div></div>
-          </div>
-        </section>
-
-        <section id="view-other" class="view"><div class="section-title"><h2>Inne grafiki</h2><button class="primary">+ Nowa grafika</button></div><div class="other-grid scroll-panel" id="other-grid"></div></section>
-        <section id="view-library" class="view"><div class="section-title"><h2>Biblioteka zdjęć</h2><button class="primary">Prześlij zdjęcia</button></div><div class="big-photo-grid scroll-panel" id="library-grid"></div></section>
-        <section id="view-history" class="view"><div class="card table-card"><h2>Historia eksportów</h2><div class="table-scroll"><table><thead><tr><th>Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead><tbody id="history-body"></tbody></table></div></div></section>
-        <section id="view-social" class="view social-view">
-          <header class="social-header">
-            <div>
-              <span>Facebook · analiza komunikacji</span>
-              <h2>Monitoring social</h2>
-              <p>Ostatnie publikacje, reakcje kibiców i rekomendacje dla zespołu marketingowego.</p>
-            </div>
-            <div class="social-actions">
-              <button class="ghost" id="social-refresh" type="button">Odśwież dane</button>
-              <button class="primary" id="social-analyze" type="button">Analizuj teraz</button>
-            </div>
-          </header>
-
-          <div class="social-connection" id="social-connection" data-state="loading">
-            <span class="social-connection-dot"></span>
-            <b>Sprawdzam połączenia</b>
-            <span id="social-last-sync">Facebook i OpenAI</span>
-          </div>
-
-          <div class="social-layout">
-            <section class="social-monitor">
-              <div class="social-metrics" aria-label="Podsumowanie Facebooka">
-                <div><span>Obserwujący</span><b id="social-followers">—</b></div>
-                <div><span>Publikacje</span><b id="social-post-count">—</b></div>
-                <div><span>Śr. interakcji</span><b id="social-average">—</b></div>
-                <div><span>Śr. zaangażowanie</span><b id="social-engagement">—</b></div>
+      <!-- ============ DASHBOARD ============ -->
+      <section id="view-dashboard" class="view view-dashboard active-view">
+        <div class="dash">
+          <div class="dash-strip">
+            <% d.counters.forEach(counter => { %>
+              <div>
+                <span><%= counter.label %></span>
+                <b class="<%= counter.accent ? 'is-accent' : '' %>"><%= counter.value %><% if (counter.unit) { %><small><%= counter.unit %></small><% } %></b>
               </div>
-              <header class="social-section-head">
-                <div><span>Ostatnie publikacje</span><h3>Aktywność profilu</h3></div>
-                <span id="social-feed-range">Ostatnie 12 postów</span>
-              </header>
-              <div class="social-post-list" id="social-posts">
-                <div class="social-empty"><b>Ładowanie danych</b><span>Sprawdzam połączenie z profilem klubowym.</span></div>
-              </div>
-            </section>
-
-            <aside class="social-advisor">
-              <header class="social-section-head">
-                <div><span>Asystent komunikacji</span><h3>Co publikujemy dalej?</h3></div>
-                <span id="social-analysis-model">OpenAI</span>
-              </header>
-              <div class="social-advice" id="social-advice">
-                <div class="social-empty"><b>Analiza jeszcze niegotowa</b><span>Po połączeniu usług wybierz „Analizuj teraz”.</span></div>
-              </div>
-            </aside>
+            <% }) %>
           </div>
-        </section>
-        <section id="view-dashboard" class="view dashboard-v4">
-          <header class="dashboard-v4-header">
-            <div><span>Wtorek, 29 września</span><h2>Dzień dobry, <%= user.displayName.split(' ')[0] %></h2></div>
-            <p>Najbliższy mecz: <b>Śląsk Wrocław — Zastal</b> · 04.10 · 17:30</p>
-          </header>
 
-          <div class="dashboard-v4-grid">
-            <section class="production-v4">
-              <header class="section-v4-head"><div><span>4. kolejka · wyjazd</span><h3>Pakiet meczowy</h3></div><button type="button">Otwórz mecz</button></header>
-              <div class="fixture-v4"><div><b>Śląsk Wrocław</b><span>Hala Orbita</span></div><strong>04.10<span>17:30</span></strong><div><b>Zastal</b><span>ORLEN Basket Liga</span></div></div>
-              <div class="work-table-v4">
-                <div class="work-table-head"><span>Materiał</span><span>Format</span><span>Termin</span><span>Status</span></div>
-                <button type="button"><span><b>Zapowiedź meczu</b><small>Feed i relacja</small></span><span>1080 × 1350</span><span>02.10 · 10:00</span><em class="is-ready">Gotowe</em></button>
-                <button type="button"><span><b>Matchday</b><small>Feed i relacja</small></span><span>1080 × 1350</span><span>04.10 · 09:00</span><em class="is-ready">Gotowe</em></button>
-                <button type="button"><span><b>Starting Five</b><small>Relacja</small></span><span>1080 × 1920</span><span>04.10 · 16:45</span><em>Oczekuje</em></button>
-                <button type="button"><span><b>Wynik końcowy</b><small>Feed i relacja</small></span><span>1080 × 1350</span><span>Po meczu</span><em>Plan</em></button>
-              </div>
-            </section>
-
-            <aside class="publishing-v4">
-              <header class="section-v4-head"><div><span>Najbliższe 48 godzin</span><h3>Plan publikacji</h3></div><button type="button">Zobacz wszystko</button></header>
-              <div class="publish-day-v4"><span>Dzisiaj</span><i></i></div>
-              <div class="publish-row-v4"><time>18:00</time><div><b>Galeria po meczu z Anwilem</b><span>Facebook · Instagram</span></div><em>Gotowe</em></div>
-              <div class="publish-row-v4"><time>20:30</time><div><b>Wyniki głosowania MVP</b><span>Instagram Stories</span></div><em>Do akceptacji</em></div>
-              <div class="publish-day-v4"><span>Jutro</span><i></i></div>
-              <div class="publish-row-v4"><time>10:00</time><div><b>Zapowiedź wyjazdu</b><span>Facebook · Instagram</span></div><em>Zaplanowane</em></div>
-              <div class="publishing-v4-footer"><span>3 publikacje</span><span>2 materiały gotowe</span></div>
-            </aside>
-          </div>
-        </section>
-        <section id="view-settings" class="view">
-          <div class="settings-grid panel-scroll">
-            <div class="card settings-card branding-card">
-              <div class="settings-heading"><h2>Branding aplikacji</h2><p>Logo widoczne w panelu oraz na ekranie logowania.</p></div>
-              <div class="brand-uploader">
-                <div class="brand-preview" id="brand-preview">
-                  <% if (branding?.logoUrl) { %><img src="<%= branding.logoUrl %>" alt="Aktualne logo"><% } else { %><span>Z</span><% } %>
-                </div>
-                <div class="brand-upload-copy">
-                  <b>Logo klubu</b>
-                  <span>PNG, JPG, WEBP lub SVG • najlepiej plik z przezroczystym tłem.</span>
-                  <div class="brand-upload-actions">
-                    <label class="primary upload-label"><input id="brand-logo-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>Wybierz logo</label>
-                    <% if (branding?.logoUrl) { %><button class="ghost" id="brand-logo-remove" type="button">Usuń</button><% } %>
+          <div class="dash-grid">
+            <div class="dash-main">
+              <!-- Najbliższy mecz -->
+              <article class="matchcenter">
+                <header class="mc-head">
+                  <div class="mc-tags">
+                    <span class="pill live">Najbliższy mecz</span>
+                    <span><%= match.competition %></span><i class="sep"></i>
+                    <span><%= match.round %></span><i class="sep"></i>
+                    <span><%= match.venueType %></span>
                   </div>
-                  <div class="settings-status" id="branding-status"></div>
+                  <div class="mc-count"><span>Pozostało</span><b><%= match.daysLeft %> dni</b></div>
+                </header>
+
+                <div class="mc-fixture">
+                  <div class="mc-team">
+                    <span class="crest <%= match.home.isClub ? 'is-club' : '' %>"><%= match.home.short %></span>
+                    <div><b><%= match.home.name %></b><span><%= match.home.role %></span></div>
+                  </div>
+                  <div class="mc-when">
+                    <b><%= match.date %> · <%= match.time %></b>
+                    <span><%= match.arena %></span>
+                  </div>
+                  <div class="mc-team is-away">
+                    <div><b><%= match.away.name %></b><span><%= match.away.role %></span></div>
+                    <span class="crest <%= match.away.isClub ? 'is-club' : '' %>"><%= match.away.short %></span>
+                  </div>
                 </div>
+
+                <footer class="mc-foot">
+                  <div class="mc-progress">
+                    <div class="mc-progress-head">
+                      <b>Pakiet materiałów meczowych</b>
+                      <span><%= match.graphicsReady %> z <%= match.graphicsTotal %> gotowych · <%= progress %>%</span>
+                    </div>
+                    <div class="meter"><i style="width:<%= progress %>%"></i></div>
+                  </div>
+                  <div class="mc-actions">
+                    <button class="primary" type="button" data-view="matches">Otwórz mecz</button>
+                    <button class="ghost compact-hide" type="button" data-view="library">Foldery zdjęć</button>
+                  </div>
+                </footer>
+              </article>
+
+              <!-- Produkcja materiałów -->
+              <section class="panel">
+                <header>
+                  <div><span class="over">Produkcja</span><h3>Materiały na najbliższy mecz</h3></div>
+                  <button class="link" type="button" data-view="matches">Otwórz workflow</button>
+                </header>
+                <div class="prod-table">
+                  <div class="prod-head">
+                    <span>Materiał</span><span>Format</span><span>Termin</span><span>Odpowiedzialny</span><span>Status</span>
+                  </div>
+                  <div class="prod-body scroll-panel">
+                    <% d.production.forEach(item => { %>
+                      <button class="prod-row" type="button">
+                        <span><b><%= item.name %></b><small><%= item.channel %></small></span>
+                        <span><%= item.format %></span>
+                        <span><%= item.deadline %></span>
+                        <span class="who"><%= item.owner %></span>
+                        <em class="tag-status is-<%= item.state %>"><%= item.status %></em>
+                      </button>
+                    <% }) %>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <aside class="dash-rail">
+              <!-- Wymaga działania -->
+              <section class="panel">
+                <header>
+                  <div><span class="over">Do zrobienia</span><h3>Wymaga działania</h3></div>
+                  <span class="link"><%= d.attention.length %></span>
+                </header>
+                <div class="scroll-panel">
+                  <% d.attention.forEach(item => { %>
+                    <button class="task-row is-<%= item.level %>" type="button">
+                      <i></i>
+                      <span><b><%= item.title %></b><span><%= item.detail %></span></span>
+                      <time><%= item.due %></time>
+                    </button>
+                  <% }) %>
+                </div>
+              </section>
+
+              <!-- Zdjęcia -->
+              <section class="panel">
+                <header>
+                  <div><span class="over">Biblioteka</span><h3>Ostatnie zdjęcia</h3></div>
+                  <button class="link" type="button" data-view="library">Wszystkie</button>
+                </header>
+                <div class="thumb-strip">
+                  <div class="thumb"></div><div class="thumb"></div><div class="thumb"></div>
+                  <div class="more">+<%= d.photos.recentCount %></div>
+                </div>
+                <% d.photos.folders.forEach(folder => { %>
+                  <div class="folder-line">
+                    <svg class="ico ico-sm"><use href="#i-folder"></use></svg>
+                    <%= folder.name %><em><%= folder.count %></em>
+                  </div>
+                <% }) %>
+              </section>
+
+              <!-- Eksporty -->
+              <section class="panel">
+                <header>
+                  <div><span class="over">Historia</span><h3>Ostatnie eksporty</h3></div>
+                  <button class="link" type="button" data-view="history">Wszystkie</button>
+                </header>
+                <div class="scroll-panel">
+                  <% d.exports.forEach(item => { %>
+                    <button class="export-row" type="button">
+                      <span class="mini"></span>
+                      <span><b><%= item.name %></b><span><%= item.context %> · <%= item.format %></span></span>
+                      <time><%= item.time %></time>
+                    </button>
+                  <% }) %>
+                </div>
+              </section>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MECZE ============ -->
+      <section id="view-matches" class="view">
+        <div class="toolbar">
+          <input placeholder="Szukaj meczu…" aria-label="Szukaj meczu">
+          <select aria-label="Status"><option>Wszystkie statusy</option><option>Zaplanowane</option><option>Rozegrane</option></select>
+          <select aria-label="Sezon"><option>Sezon <%= d.season %></option></select>
+        </div>
+        <div class="match-list scroll-panel">
+          <article class="match-row" data-match="zastal-anwil">
+            <div class="team-logo green">ZAS</div>
+            <div class="match-main"><b>Zastal — Anwil</b><span>Hala CRS, Zielona Góra</span></div>
+            <div class="score">92 : 81</div>
+            <div><b>27.09.2026</b><span>18:00</span></div>
+            <span class="pill live">Rozegrany</span>
+            <div><b>4 / 8</b><span>grafiki</span></div>
+            <button type="button" aria-label="Więcej"><svg class="ico ico-sm"><use href="#i-more"></use></svg></button>
+          </article>
+          <article class="match-row">
+            <div class="team-logo">ŚLĄ</div>
+            <div class="match-main"><b>Śląsk Wrocław — Zastal</b><span>Hala Orbita, Wrocław</span></div>
+            <div class="score muted">— : —</div>
+            <div><b>04.10.2026</b><span>17:30</span></div>
+            <span class="pill planned">Zaplanowany</span>
+            <div><b>4 / 8</b><span>grafiki</span></div>
+            <button type="button" aria-label="Więcej"><svg class="ico ico-sm"><use href="#i-more"></use></svg></button>
+          </article>
+          <article class="match-row">
+            <div class="team-logo green">ZAS</div>
+            <div class="match-main"><b>Zastal — King Szczecin</b><span>Hala CRS, Zielona Góra</span></div>
+            <div class="score muted">— : —</div>
+            <div><b>11.10.2026</b><span>16:00</span></div>
+            <span class="pill planned">Zaplanowany</span>
+            <div><b>0 / 7</b><span>grafiki</span></div>
+            <button type="button" aria-label="Więcej"><svg class="ico ico-sm"><use href="#i-more"></use></svg></button>
+          </article>
+        </div>
+      </section>
+
+      <!-- ============ CENTRUM MECZU ============ -->
+      <section id="view-match" class="view">
+        <div class="match-screen">
+          <div class="match-header card">
+            <div class="score-card">
+              <div class="team-logo green">ZAS</div>
+              <div><strong>92 : 81</strong><span>KONIEC</span></div>
+              <div class="team-logo blue">ANW</div>
+              <small>27.09.2026 · 18:00<br>Hala CRS, Zielona Góra</small>
+            </div>
+            <div class="match-meta">
+              <h3>Dane meczu</h3>
+              <dl>
+                <dt>Rozgrywki</dt><dd>ORLEN Basket Liga</dd>
+                <dt>Kolejka</dt><dd>3</dd>
+                <dt>Sezon</dt><dd><%= d.season %></dd>
+              </dl>
+              <button type="button">Edytuj dane meczu</button>
+            </div>
+            <div class="folders">
+              <h3>Foldery zdjęć</h3>
+              <% d.photos.folders.forEach(folder => { %>
+                <button type="button">
+                  <svg class="ico ico-sm"><use href="#i-folder"></use></svg><%= folder.name %><span><%= folder.count %></span>
+                </button>
+              <% }) %>
+              <button type="button">Zarządzaj folderami</button>
+            </div>
+          </div>
+          <div class="section-title">
+            <h2>Grafiki meczowe</h2>
+            <button class="primary" type="button">Dodaj grafikę</button>
+          </div>
+          <div class="graphic-grid scroll-panel" id="graphic-grid"></div>
+        </div>
+      </section>
+
+      <!-- ============ EDYTOR ============ -->
+      <section id="view-editor" class="view editor-layout">
+        <div class="editor-left card panel-scroll">
+          <div class="tabs"><button class="active" type="button">EDYTOR</button><button type="button">USTAWIENIA</button><button type="button">HISTORIA</button></div>
+          <h2 id="editor-template-name">Final Score</h2>
+          <div id="dynamic-fields"></div>
+        </div>
+        <div class="canvas-wrap card">
+          <div class="canvas-toolbar">
+            <button type="button" aria-label="Cofnij"><svg class="ico ico-sm"><use href="#i-undo"></use></svg></button>
+            <button type="button" aria-label="Ponów"><svg class="ico ico-sm"><use href="#i-redo"></use></svg></button>
+            <span id="canvas-size">1080 × 1350</span>
+          </div>
+          <div class="canvas-stage"><canvas id="design-canvas" width="540" height="675"></canvas></div>
+          <div class="zoom"><button type="button">−</button><span>68%</span><button type="button">+</button></div>
+          <div class="exports">
+            <h3>Ostatnie eksporty</h3>
+            <div class="export-strip"><div></div><div></div><div></div><div></div></div>
+          </div>
+        </div>
+        <div class="photos-panel card">
+          <div class="panel-head">
+            <div><h3>Zdjęcia z meczu</h3><span>Foldery przypisane do spotkania</span></div>
+            <button type="button" aria-label="Odśwież"><svg class="ico ico-sm"><use href="#i-refresh"></use></svg></button>
+          </div>
+          <div class="folder-tabs">
+            <button class="active" type="button">Wszystkie</button><button type="button">Photo</button><button type="button">Social</button><button type="button">Wybrane</button>
+          </div>
+          <input placeholder="Szukaj zdjęć…" aria-label="Szukaj zdjęć">
+          <div class="photo-grid" id="photo-grid"></div>
+          <button class="ghost" type="button">Prześlij zdjęcia</button>
+        </div>
+      </section>
+
+      <!-- ============ SZABLONY ============ -->
+      <section id="view-templates" class="view">
+        <div class="template-admin">
+          <div class="card template-list panel-scroll">
+            <div class="section-title"><h2>Szablony</h2><button class="primary" id="create-template" type="button">Nowy</button></div>
+            <div id="template-list"></div>
+          </div>
+          <div class="card layer-editor panel-scroll">
+            <div class="tabs"><button type="button">PODGLĄD</button><button type="button">POLA</button><button class="active" type="button">WARSTWY</button><button type="button">USTAWIENIA</button></div>
+            <h3>Warstwy</h3>
+            <div id="layers-list"></div>
+            <button id="add-layer" class="ghost full" type="button">Dodaj warstwę</button>
+          </div>
+          <div class="card layer-props panel-scroll">
+            <h3>Właściwości warstwy</h3>
+            <div id="layer-properties"><p class="muted">Wybierz warstwę z listy.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ INNE GRAFIKI ============ -->
+      <section id="view-other" class="view">
+        <div class="section-title"><h2>Inne grafiki</h2><button class="primary" type="button">Nowa grafika</button></div>
+        <div class="other-grid scroll-panel" id="other-grid"></div>
+      </section>
+
+      <!-- ============ BIBLIOTEKA ZDJĘĆ ============ -->
+      <section id="view-library" class="view">
+        <div class="section-title"><h2>Biblioteka zdjęć</h2><button class="primary" type="button">Prześlij zdjęcia</button></div>
+        <div class="big-photo-grid scroll-panel" id="library-grid"></div>
+      </section>
+
+      <!-- ============ HISTORIA ============ -->
+      <section id="view-history" class="view">
+        <div class="card table-card">
+          <h2>Historia eksportów</h2>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead>
+              <tbody id="history-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MONITORING SOCIAL ============ -->
+      <section id="view-social" class="view social-view">
+        <header class="social-header">
+          <div>
+            <span>Facebook · analiza komunikacji</span>
+            <h2>Aktywność profilu klubowego</h2>
+            <p>Ostatnie publikacje, reakcje kibiców i rekomendacje dla zespołu marketingowego.</p>
+          </div>
+          <div class="social-actions">
+            <button class="ghost" id="social-refresh" type="button">Odśwież dane</button>
+            <button class="primary" id="social-analyze" type="button">Analizuj teraz</button>
+          </div>
+        </header>
+
+        <div class="social-connection" id="social-connection" data-state="loading">
+          <span class="social-connection-dot"></span>
+          <b>Sprawdzam połączenia</b>
+          <span id="social-last-sync">Facebook i OpenAI</span>
+        </div>
+
+        <div class="social-layout">
+          <section class="social-monitor">
+            <div class="social-metrics" aria-label="Podsumowanie Facebooka">
+              <div><span>Obserwujący</span><b id="social-followers">—</b></div>
+              <div><span>Publikacje</span><b id="social-post-count">—</b></div>
+              <div><span>Śr. interakcji</span><b id="social-average">—</b></div>
+              <div><span>Zaangażowanie</span><b id="social-engagement">—</b></div>
+            </div>
+            <header class="social-section-head">
+              <div><span>Ostatnie publikacje</span><h3>Aktywność profilu</h3></div>
+              <span id="social-feed-range">Ostatnie 12 postów</span>
+            </header>
+            <div class="social-post-list" id="social-posts">
+              <div class="social-empty"><b>Ładowanie danych</b><span>Sprawdzam połączenie z profilem klubowym.</span></div>
+            </div>
+          </section>
+
+          <aside class="social-advisor">
+            <header class="social-section-head">
+              <div><span>Asystent komunikacji</span><h3>Co publikujemy dalej?</h3></div>
+              <span id="social-analysis-model">OpenAI</span>
+            </header>
+            <div class="social-advice" id="social-advice">
+              <div class="social-empty"><b>Analiza jeszcze niegotowa</b><span>Po połączeniu usług wybierz „Analizuj teraz”.</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============ USTAWIENIA ============ -->
+      <section id="view-settings" class="view">
+        <div class="settings-grid panel-scroll">
+          <div class="card settings-card branding-card">
+            <div class="settings-heading">
+              <h2>Branding klubu</h2>
+              <p>Logo pojawia się na ekranie logowania oraz na górze panelu bocznego.</p>
+            </div>
+            <div class="brand-uploader">
+              <div class="brand-preview" id="brand-preview">
+                <% if (branding && branding.logoUrl) { %>
+                  <img src="<%= branding.logoUrl %>" alt="Aktualne logo klubu">
+                <% } else { %>
+                  <span>Brak logo</span>
+                <% } %>
+              </div>
+              <div class="brand-upload-copy">
+                <b>Logo klubu</b>
+                <span>PNG, JPG, WEBP lub SVG — najlepiej plik z przezroczystym tłem, maks. 5 MB.</span>
+                <div class="brand-upload-actions">
+                  <label class="primary upload-label">
+                    <input id="brand-logo-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>Wybierz plik
+                  </label>
+                  <% if (branding && branding.logoUrl) { %>
+                    <button class="ghost" id="brand-logo-remove" type="button">Usuń logo</button>
+                  <% } %>
+                </div>
+                <div class="settings-status" id="branding-status"></div>
               </div>
             </div>
-            <div class="card settings-card"><h2>MEGA S3</h2><label>Endpoint MEGA S3<input placeholder="https://s3...mega.io"></label><label>Bucket<input placeholder="club-media"></label><label>Domyślny prefix<input placeholder="2026-27/"></label><button class="primary">Zapisz ustawienia</button></div>
           </div>
-        </section>
-      </div>
-    </main>
-    <button class="sidebar-backdrop" id="sidebar-backdrop" type="button" aria-label="Zamknij menu"></button>
-  </div>
-  <script src="/club/app.js"></script>
-  <script src="/club/branding.js"></script>
+
+          <div class="card settings-card">
+            <div class="settings-heading">
+              <h2>Magazyn zdjęć</h2>
+              <p>Storage zgodny z S3 — zdjęcia, assety i eksporty trzymamy poza serwerem aplikacji.</p>
+            </div>
+            <label>Endpoint<input placeholder="https://s3.eu-central-1.mega.io"></label>
+            <label>Bucket<input placeholder="zastal-media"></label>
+            <label>Domyślny prefix<input placeholder="2026-27/"></label>
+            <button class="primary" type="button">Zapisz ustawienia</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <button class="sidebar-backdrop" id="sidebar-backdrop" type="button" aria-label="Zamknij menu"></button>
+</div>
+
+<script src="/club/app.js?v=5"></script>
+<script src="/club/branding.js?v=5"></script>
 </body>
 </html>

@@ -1,12 +1,4 @@
 (() => {
-  if (!document.querySelector('link[data-zmc-branding-overrides]')) {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = '/club/branding-overrides.css?v=3';
-    link.dataset.zmcBrandingOverrides = '1';
-    document.head.appendChild(link);
-  }
-
   const input = document.getElementById('brand-logo-input');
   const preview = document.getElementById('brand-preview');
   const status = document.getElementById('branding-status');
@@ -17,7 +9,7 @@
   const setStatus = (message, isError = false) => {
     if (!status) return;
     status.textContent = message || '';
-    status.style.color = isError ? '#ff8996' : '#62dda0';
+    status.style.color = isError ? 'var(--danger)' : 'var(--accent-2)';
   };
 
   input.addEventListener('change', async () => {
@@ -58,7 +50,7 @@
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || 'Nie udało się usunąć logo.');
 
-      preview.innerHTML = '<span>Z</span>';
+      preview.innerHTML = '<span>Brak logo</span>';
       setStatus('Logo usunięte.');
       setTimeout(() => window.location.reload(), 500);
     } catch (error) {

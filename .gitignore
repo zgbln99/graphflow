@@ -15,3 +15,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Zależności
+node_modules/
