@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title><%= title %></title>
   <link rel="stylesheet" href="/club/styles.css">
+  <link rel="stylesheet" href="/club/premium.css">
 </head>
 <body class="auth-body">
   <main class="auth-shell auth-shell-premium">
@@ -18,10 +19,7 @@
           <% } else { %>
             <div class="crest crest-large">Z</div>
           <% } %>
-          <div>
-            <strong>ZASTAL</strong>
-            <span>MARKETING CENTER</span>
-          </div>
+          <div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div>
         </div>
         <div class="auth-hero-copy">
           <span class="auth-kicker">INTERNAL CREATIVE PLATFORM</span>
@@ -35,46 +33,23 @@
         </div>
       </div>
     </section>
-
     <section class="auth-panel">
       <div class="auth-panel-inner">
         <div class="auth-mobile-brand">
-          <% if (branding?.logoUrl) { %>
-            <div class="brand-logo-frame small"><img src="<%= branding.logoUrl %>" alt="Logo klubu"></div>
-          <% } else { %>
-            <div class="crest">Z</div>
-          <% } %>
+          <% if (branding?.logoUrl) { %><div class="brand-logo-frame small"><img src="<%= branding.logoUrl %>" alt="Logo klubu"></div><% } else { %><div class="crest">Z</div><% } %>
           <div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div>
         </div>
-
         <div class="auth-copy auth-copy-premium">
           <span class="eyebrow">BEZPIECZNY DOSTĘP</span>
           <h2>Witaj ponownie</h2>
           <p>Zaloguj się swoim kontem, aby przejść do panelu.</p>
         </div>
-
         <% if (error) { %><div class="auth-error"><span>!</span><%= error %></div><% } %>
-
         <form method="post" action="/login" class="auth-form auth-form-premium">
-          <label>
-            <span>Adres e-mail</span>
-            <div class="auth-input-wrap">
-              <span class="auth-input-icon">@</span>
-              <input name="email" type="email" autocomplete="username" placeholder="twoj@email.pl" required autofocus>
-            </div>
-          </label>
-          <label>
-            <span>Hasło</span>
-            <div class="auth-input-wrap">
-              <span class="auth-input-icon">●</span>
-              <input name="password" type="password" autocomplete="current-password" placeholder="••••••••••••" required>
-            </div>
-          </label>
-          <button class="primary auth-submit auth-submit-premium" type="submit">
-            <span>Zaloguj się</span><span>→</span>
-          </button>
+          <label><span>Adres e-mail</span><div class="auth-input-wrap"><span class="auth-input-icon">@</span><input name="email" type="email" autocomplete="username" placeholder="twoj@email.pl" required autofocus></div></label>
+          <label><span>Hasło</span><div class="auth-input-wrap"><span class="auth-input-icon">●</span><input name="password" type="password" autocomplete="current-password" placeholder="••••••••••••" required></div></label>
+          <button class="primary auth-submit auth-submit-premium" type="submit"><span>Zaloguj się</span><span>→</span></button>
         </form>
-
         <div class="auth-security-note"><span class="status-dot"></span> Panel wewnętrzny • dostęp tylko dla autoryzowanych użytkowników</div>
       </div>
     </section>
