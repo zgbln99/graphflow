@@ -5,7 +5,7 @@ document.getElementById('mobile-menu')?.addEventListener('click',()=>shell.class
 document.getElementById('sidebar-backdrop')?.addEventListener('click',()=>shell.classList.remove('sidebar-open'));
 
 const views=[...document.querySelectorAll('.view')],title=document.getElementById('page-title'),eyebrow=document.getElementById('eyebrow');
-function showView(name){views.forEach(v=>v.classList.remove('active-view'));const el=document.getElementById('view-'+name);if(el)el.classList.add('active-view');document.querySelectorAll('.sidebar nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));const labels={dashboard:'Przegląd',matches:'Mecze',match:'Zastal vs Anwil',editor:'Edytor grafiki',other:'Materiały klubowe',templates:'Szablony',library:'Zdjęcia',history:'Eksporty',settings:'Ustawienia'};title.textContent=labels[name]||name;eyebrow.textContent=(name==='match'||name==='editor')?'Mecz':'Zastal Marketing Center';shell.classList.remove('sidebar-open')}
+function showView(name){views.forEach(v=>v.classList.remove('active-view'));const el=document.getElementById('view-'+name);if(el)el.classList.add('active-view');document.querySelectorAll('.sidebar nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));const labels={dashboard:'Przegląd',matches:'Mecze',match:'Zastal vs Anwil',editor:'Edytor grafiki',other:'Materiały klubowe',social:'Monitoring social',templates:'Szablony',library:'Zdjęcia',history:'Eksporty',settings:'Ustawienia'};title.textContent=labels[name]||name;eyebrow.textContent=(name==='match'||name==='editor')?'Mecz':'Zastal Marketing Center';shell.classList.remove('sidebar-open');if(name==='social')loadSocialView()}
 document.querySelectorAll('.sidebar nav button').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
 document.querySelector('[data-match]')?.addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')showView('match')});
 
@@ -30,3 +30,209 @@ const lib=document.getElementById('library-grid');for(let i=0;i<24;i++){const p=
 const history=document.getElementById('history-body');[['Final Score','Zastal vs Anwil','27.09.2026 19:32'],['Halftime','Zastal vs Anwil','27.09.2026 18:45'],['Matchday','Zastal vs Anwil','27.09.2026 12:10'],['Urodziny','Piotr Nowak','26.09.2026 08:00']].forEach(r=>{const tr=document.createElement('tr');tr.innerHTML=`<td><div style="width:52px;height:38px;background:#183626;border-radius:5px"></div></td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>PNG</td><td>${document.querySelector('.profile-copy b')?.textContent||'Użytkownik'}</td>`;history.appendChild(tr)});
 
 renderTemplates();renderEditor();
+
+const socialElements={
+  connection:document.getElementById('social-connection'),
+  lastSync:document.getElementById('social-last-sync'),
+  followers:document.getElementById('social-followers'),
+  postCount:document.getElementById('social-post-count'),
+  average:document.getElementById('social-average'),
+  engagement:document.getElementById('social-engagement'),
+  posts:document.getElementById('social-posts'),
+  advice:document.getElementById('social-advice'),
+  model:document.getElementById('social-analysis-model'),
+  refresh:document.getElementById('social-refresh'),
+  analyze:document.getElementById('social-analyze')
+};
+let socialViewLoaded=false;
+let socialIntegrations=null;
+
+function escapeHTML(value){
+  return String(value??'').replace(/[&<>'"]/g,char=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'
+  })[char]);
+}
+
+function safeExternalUrl(value){
+  try{
+    const url=new URL(value);
+    return ['http:','https:'].includes(url.protocol)?url.href:'#';
+  }catch{return '#'}
+}
+
+function formatSocialNumber(value){
+  return new Intl.NumberFormat('pl-PL',{maximumFractionDigits:1}).format(Number(value||0));
+}
+
+function formatSocialDate(value){
+  if(!value)return 'Brak daty';
+  return new Intl.DateTimeFormat('pl-PL',{
+    day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'
+  }).format(new Date(value));
+}
+
+function setSocialConnection(state,title,detail){
+  if(!socialElements.connection)return;
+  socialElements.connection.dataset.state=state;
+  const titleNode=socialElements.connection.querySelector('b');
+  if(titleNode)titleNode.textContent=title;
+  if(socialElements.lastSync)socialElements.lastSync.textContent=detail;
+}
+
+function setSocialBusy(button,busy,label){
+  if(!button)return;
+  if(!button.dataset.label)button.dataset.label=button.textContent;
+  button.disabled=busy;
+  button.textContent=busy?label:button.dataset.label;
+}
+
+async function socialRequest(url,options={}){
+  const response=await fetch(url,{
+    ...options,
+    headers:{'Content-Type':'application/json',...(options.headers||{})}
+  });
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(payload.error||'Nie udało się pobrać danych.');
+  return payload;
+}
+
+function renderSocialOverview(overview){
+  if(!overview)return;
+  socialElements.followers.textContent=overview.page.followers?formatSocialNumber(overview.page.followers):'—';
+  socialElements.postCount.textContent=formatSocialNumber(overview.posts.length);
+  socialElements.average.textContent=formatSocialNumber(overview.averages.interactions);
+  socialElements.engagement.textContent=overview.averages.engagementRate===null?'—':`${formatSocialNumber(overview.averages.engagementRate)}%`;
+
+  if(!overview.posts.length){
+    socialElements.posts.innerHTML='<div class="social-empty"><b>Brak publikacji</b><span>Facebook nie zwrócił postów z wybranego okresu.</span></div>';
+    return;
+  }
+
+  socialElements.posts.innerHTML=overview.posts.map(post=>{
+    const url=safeExternalUrl(post.permalinkUrl);
+    const best=post.id===overview.bestPostId?' is-best':'';
+    return `<article class="social-post-row${best}">
+      <time>${escapeHTML(formatSocialDate(post.createdAt))}</time>
+      <div class="social-post-copy">
+        <b>${escapeHTML(post.message.slice(0,150))}${post.message.length>150?'…':''}</b>
+        <span>${best?'<em>Najlepszy wynik</em>':''}${post.imageUrl?'Post ze zdjęciem':'Post tekstowy'}</span>
+      </div>
+      <div class="social-post-result"><b>${formatSocialNumber(post.interactions)}</b><span>interakcji</span></div>
+      <div class="social-post-breakdown"><span>${formatSocialNumber(post.reactions)} reakcji</span><span>${formatSocialNumber(post.comments)} komentarzy</span><span>${formatSocialNumber(post.shares)} udostępnień</span></div>
+      ${url!=='#'?`<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Otwórz post na Facebooku">↗</a>`:''}
+    </article>`;
+  }).join('');
+}
+
+function renderSocialAnalysis(analysis){
+  if(!analysis)return;
+  socialElements.model.textContent=analysis.model||'OpenAI';
+  const action=analysis.recommendedAction;
+  const suggestions=(analysis.suggestions||[]).map((item,index)=>`
+    <article class="social-suggestion">
+      <span>0${index+1} · ${escapeHTML(item.timing)}</span>
+      <b>${escapeHTML(item.title)}</b>
+      <p>${escapeHTML(item.concept)}</p>
+      <footer><span>${escapeHTML(item.channel)} · ${escapeHTML(item.format)}</span><em>${escapeHTML(item.why)}</em></footer>
+    </article>
+  `).join('');
+  const observations=(analysis.observations||[]).map(item=>`<li>${escapeHTML(item)}</li>`).join('');
+
+  socialElements.advice.innerHTML=`
+    <section class="social-recommendation" data-priority="${escapeHTML(action.priority)}">
+      <span>Najważniejsza rekomendacja</span>
+      <h4>${escapeHTML(action.title)}</h4>
+      <p>${escapeHTML(action.rationale)}</p>
+      <div><b>${escapeHTML(action.publishAt)}</b><span>${escapeHTML(action.format)}</span></div>
+    </section>
+    <section class="social-observations">
+      <span>Wnioski z profilu</span>
+      <p>${escapeHTML(analysis.summary)}</p>
+      <ul>${observations}</ul>
+    </section>
+    <section class="social-suggestions">
+      <header><span>Kolejne pomysły</span><b>Okno: ${escapeHTML(analysis.timing.bestWindow)}</b></header>
+      ${suggestions}
+    </section>
+  `;
+}
+
+function renderSocialSetup(status){
+  const facebookReady=status.facebook.configured;
+  const openaiReady=status.openai.configured;
+  if(!facebookReady){
+    setSocialConnection('setup','Facebook niepołączony','Dodaj dane strony Meta na serwerze');
+    socialElements.posts.innerHTML='<div class="social-empty"><b>Połącz profil klubowy</b><span>Administrator musi dodać identyfikator strony i token dostępu Meta.</span></div>';
+  }else if(!openaiReady){
+    setSocialConnection('partial','Facebook połączony','Brakuje konfiguracji analizy OpenAI');
+    socialElements.advice.innerHTML='<div class="social-empty"><b>Analiza OpenAI nieaktywna</b><span>Po dodaniu klucza API rekomendacje pojawią się w tym miejscu.</span></div>';
+  }else{
+    const detail=status.facebook.monitoringEnabled
+      ?`Monitoring automatyczny co ${status.facebook.intervalMinutes} min`
+      :'Facebook i OpenAI są gotowe';
+    setSocialConnection('ready','Integracje aktywne',detail);
+  }
+}
+
+async function loadSocialOverview(){
+  try{
+    const payload=await socialRequest('/api/social/overview');
+    renderSocialOverview(payload.overview);
+    if(payload.analysis)renderSocialAnalysis(payload.analysis);
+    setSocialConnection(
+      socialIntegrations?.openai.configured?'ready':'partial',
+      'Dane Facebook aktualne',
+      `Ostatnia synchronizacja: ${formatSocialDate(payload.overview.fetchedAt)}`
+    );
+  }catch(error){
+    setSocialConnection('error','Nie udało się pobrać Facebooka',error.message);
+    socialElements.posts.innerHTML=`<div class="social-empty is-error"><b>Błąd synchronizacji</b><span>${escapeHTML(error.message)}</span></div>`;
+  }
+}
+
+async function loadSocialView(){
+  if(socialViewLoaded||!socialElements.connection)return;
+  socialViewLoaded=true;
+  try{
+    const payload=await socialRequest('/api/social/status');
+    socialIntegrations=payload.integrations;
+    renderSocialSetup(socialIntegrations);
+    if(payload.cache?.overview)renderSocialOverview(payload.cache.overview);
+    if(payload.cache?.analysis)renderSocialAnalysis(payload.cache.analysis);
+    if(socialIntegrations.facebook.configured)await loadSocialOverview();
+  }catch(error){
+    socialViewLoaded=false;
+    setSocialConnection('error','Integracje niedostępne',error.message);
+  }
+}
+
+socialElements.refresh?.addEventListener('click',async()=>{
+  setSocialBusy(socialElements.refresh,true,'Odświeżam…');
+  try{
+    const payload=await socialRequest('/api/social/refresh',{method:'POST',body:'{}'});
+    renderSocialOverview(payload.overview);
+    setSocialConnection('ready','Dane Facebook aktualne',`Ostatnia synchronizacja: ${formatSocialDate(payload.overview.fetchedAt)}`);
+  }catch(error){
+    setSocialConnection('error','Błąd synchronizacji',error.message);
+  }finally{
+    setSocialBusy(socialElements.refresh,false);
+  }
+});
+
+socialElements.analyze?.addEventListener('click',async()=>{
+  setSocialBusy(socialElements.analyze,true,'Analizuję…');
+  setSocialConnection('loading','Analiza w toku','OpenAI analizuje ostatnie publikacje');
+  try{
+    const payload=await socialRequest('/api/social/analyze',{
+      method:'POST',
+      body:JSON.stringify({refresh:true})
+    });
+    renderSocialOverview(payload.overview);
+    renderSocialAnalysis(payload.analysis);
+    setSocialConnection('ready','Analiza gotowa',`Wygenerowano: ${formatSocialDate(payload.analysis.generatedAt)}`);
+  }catch(error){
+    setSocialConnection('error','Analiza nieudana',error.message);
+  }finally{
+    setSocialBusy(socialElements.analyze,false);
+  }
+});

@@ -667,6 +667,326 @@ th,td{border-color:var(--ops-line)}
   font-size:10px;
 }
 
+/* Social monitoring */
+.view.social-view{
+  gap:0;
+  padding:0;
+  background:var(--ops-bg);
+}
+.social-header{
+  min-height:114px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:28px;
+  padding:24px 32px;
+  border-bottom:1px solid var(--ops-line);
+}
+.social-header>div:first-child>span{
+  color:var(--ops-green);
+  font-size:10px;
+  font-weight:600;
+}
+.social-header h2{
+  margin:5px 0 0;
+  font-family:"ZT Talk Expanded","ZT Talk",sans-serif;
+  font-size:28px;
+  font-weight:600;
+  line-height:1.1;
+  letter-spacing:-.025em;
+}
+.social-header p{
+  margin:7px 0 0;
+  color:var(--ops-muted);
+  font-size:12px;
+}
+.social-actions{display:flex;gap:8px}
+.social-actions button:disabled{cursor:wait;opacity:.6}
+.social-connection{
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:0 32px;
+  border-bottom:1px solid var(--ops-line);
+  background:#0a0f12;
+  color:var(--ops-text-soft);
+  font-size:11px;
+}
+.social-connection>b{font-weight:600}
+.social-connection>span:last-child{
+  margin-left:auto;
+  color:var(--ops-muted);
+  font-size:10px;
+}
+.social-connection-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#748087;
+}
+.social-connection[data-state="loading"] .social-connection-dot{
+  animation:statusBlink 1s ease-in-out infinite;
+}
+.social-connection[data-state="ready"] .social-connection-dot{background:var(--ops-green)}
+.social-connection[data-state="partial"] .social-connection-dot,
+.social-connection[data-state="setup"] .social-connection-dot{background:#e4b85c}
+.social-connection[data-state="error"] .social-connection-dot{background:var(--ops-red)}
+.social-layout{
+  flex:1;
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1.55fr) minmax(390px,.78fr);
+}
+.social-monitor,.social-advisor{
+  min-width:0;
+  overflow:auto;
+  overscroll-behavior:contain;
+}
+.social-monitor{padding:28px 32px 34px}
+.social-advisor{
+  padding:28px 30px 34px;
+  border-left:1px solid var(--ops-line);
+  background:#0a0f12;
+}
+.social-metrics{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  margin-bottom:30px;
+  border-top:1px solid var(--ops-line-strong);
+  border-bottom:1px solid var(--ops-line);
+}
+.social-metrics>div{
+  min-width:0;
+  padding:17px 18px 16px;
+  border-right:1px solid var(--ops-line);
+}
+.social-metrics>div:first-child{padding-left:0}
+.social-metrics>div:last-child{border-right:0}
+.social-metrics span,.social-metrics b{display:block}
+.social-metrics span{
+  color:var(--ops-muted);
+  font-size:10px;
+}
+.social-metrics b{
+  margin-top:6px;
+  font-family:"ZT Talk Expanded","ZT Talk",sans-serif;
+  font-size:23px;
+  font-weight:600;
+  line-height:1;
+}
+.social-section-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:15px;
+}
+.social-section-head span{
+  color:var(--ops-muted);
+  font-size:10px;
+}
+.social-section-head h3{
+  margin:4px 0 0;
+  font-family:"ZT Talk Expanded","ZT Talk",sans-serif;
+  font-size:19px;
+  font-weight:600;
+}
+.social-post-list{border-top:1px solid var(--ops-line-strong)}
+.social-post-row{
+  min-height:86px;
+  display:grid;
+  grid-template-columns:92px minmax(190px,1fr) 70px 245px 20px;
+  align-items:center;
+  gap:16px;
+  padding:14px 10px;
+  border-bottom:1px solid var(--ops-line);
+  transition:background-color .15s ease;
+}
+.social-post-row:hover{background:var(--ops-panel-hover)}
+.social-post-row>time{
+  color:var(--ops-muted);
+  font-size:10px;
+}
+.social-post-copy{min-width:0}
+.social-post-copy>b{
+  display:-webkit-box;
+  overflow:hidden;
+  font-size:12px;
+  font-weight:500;
+  line-height:1.4;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+}
+.social-post-copy>span{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:5px;
+  color:var(--ops-muted);
+  font-size:9px;
+}
+.social-post-copy em{
+  padding-right:8px;
+  border-right:1px solid var(--ops-line-strong);
+  color:var(--ops-green);
+  font-style:normal;
+}
+.social-post-result b,.social-post-result span{display:block}
+.social-post-result b{
+  font-family:"ZT Talk Expanded","ZT Talk",sans-serif;
+  font-size:17px;
+  font-weight:600;
+}
+.social-post-result span{
+  margin-top:2px;
+  color:var(--ops-muted);
+  font-size:9px;
+}
+.social-post-breakdown{
+  display:flex;
+  justify-content:flex-end;
+  gap:13px;
+  color:#8f9b95;
+  font-size:9.5px;
+  white-space:nowrap;
+}
+.social-post-row>a{
+  color:var(--ops-muted);
+  font-size:14px;
+  text-decoration:none;
+}
+.social-post-row>a:hover{color:#fff}
+.social-empty{
+  min-height:180px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:6px;
+  padding:26px;
+  border:1px solid var(--ops-line);
+  background:var(--ops-panel);
+}
+.social-empty b{font-size:13px;font-weight:600}
+.social-empty span{
+  max-width:390px;
+  color:var(--ops-muted);
+  font-size:11px;
+  line-height:1.5;
+}
+.social-empty.is-error{border-color:rgba(255,129,135,.3)}
+.social-recommendation{
+  padding:20px 0 23px;
+  border-top:3px solid var(--ops-green);
+  border-bottom:1px solid var(--ops-line-strong);
+}
+.social-recommendation>span,.social-observations>span{
+  color:var(--ops-muted);
+  font-size:10px;
+}
+.social-recommendation h4{
+  margin:8px 0 9px;
+  font-family:"ZT Talk Expanded","ZT Talk",sans-serif;
+  font-size:21px;
+  font-weight:600;
+  line-height:1.2;
+}
+.social-recommendation p{
+  margin:0;
+  color:#a9b4ae;
+  font-size:11px;
+  line-height:1.6;
+}
+.social-recommendation>div{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin-top:18px;
+  padding-top:14px;
+  border-top:1px solid var(--ops-line);
+}
+.social-recommendation>div b{font-size:12px;font-weight:600}
+.social-recommendation>div span{color:var(--ops-muted);font-size:10px}
+.social-observations{
+  padding:22px 0;
+  border-bottom:1px solid var(--ops-line-strong);
+}
+.social-observations p{
+  margin:9px 0 13px;
+  color:var(--ops-text-soft);
+  font-size:12px;
+  line-height:1.55;
+}
+.social-observations ul{
+  display:grid;
+  gap:7px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+.social-observations li{
+  position:relative;
+  padding-left:14px;
+  color:var(--ops-muted);
+  font-size:10.5px;
+  line-height:1.45;
+}
+.social-observations li:before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:.58em;
+  width:5px;
+  height:1px;
+  background:var(--ops-green);
+}
+.social-suggestions{padding-top:22px}
+.social-suggestions>header{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:4px;
+}
+.social-suggestions>header span,.social-suggestions>header b{
+  color:var(--ops-muted);
+  font-size:10px;
+  font-weight:500;
+}
+.social-suggestion{
+  padding:16px 0;
+  border-bottom:1px solid var(--ops-line);
+}
+.social-suggestion>span{
+  color:var(--ops-green);
+  font-size:9px;
+}
+.social-suggestion>b{
+  display:block;
+  margin-top:5px;
+  font-size:12px;
+  font-weight:600;
+}
+.social-suggestion>p{
+  margin:6px 0 10px;
+  color:#a5b0aa;
+  font-size:10.5px;
+  line-height:1.5;
+}
+.social-suggestion footer{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  color:var(--ops-muted);
+  font-size:9px;
+}
+.social-suggestion footer em{
+  max-width:55%;
+  font-style:normal;
+  text-align:right;
+}
+
 /* Login */
 .auth-body.login-v4-body{
   overflow:hidden;
@@ -829,6 +1149,10 @@ th,td{border-color:var(--ops-line)}
   from{opacity:0;transform:translateY(7px)}
   to{opacity:1;transform:none}
 }
+@keyframes statusBlink{
+  0%,100%{opacity:.35}
+  50%{opacity:1}
+}
 
 @media(max-width:1180px){
   :root{--sidebar:232px}
@@ -842,6 +1166,9 @@ th,td{border-color:var(--ops-line)}
     grid-template-columns:minmax(170px,1.35fr) minmax(96px,.65fr) minmax(105px,.7fr) 82px;
     gap:12px;
   }
+  .social-layout{grid-template-columns:minmax(0,1.35fr) minmax(350px,.8fr)}
+  .social-post-row{grid-template-columns:82px minmax(170px,1fr) 64px 20px}
+  .social-post-breakdown{display:none}
 }
 
 @media(max-width:900px){
@@ -874,6 +1201,18 @@ th,td{border-color:var(--ops-line)}
   .publishing-v4{
     overflow:visible;
     padding-top:28px;
+    border-top:1px solid var(--ops-line);
+    border-left:0;
+  }
+  .view.social-view{overflow:auto}
+  .social-header{min-height:108px;padding-right:26px;padding-left:26px}
+  .social-connection{padding-right:26px;padding-left:26px}
+  .social-layout{display:block}
+  .social-monitor,.social-advisor{overflow:visible}
+  .social-monitor{padding-right:26px;padding-left:26px}
+  .social-advisor{
+    padding-right:26px;
+    padding-left:26px;
     border-top:1px solid var(--ops-line);
     border-left:0;
   }
@@ -923,6 +1262,44 @@ th,td{border-color:var(--ops-line)}
   .work-table-v4 button>span:nth-child(2),
   .work-table-v4 button>span:nth-child(3){display:none}
   .match-row{min-height:66px;padding-right:12px;padding-left:12px}
+  .social-header{
+    min-height:0;
+    align-items:flex-start;
+    flex-direction:column;
+    gap:18px;
+    padding:20px 16px;
+  }
+  .social-header h2{font-size:23px}
+  .social-header p{max-width:330px}
+  .social-actions{width:100%}
+  .social-actions button{flex:1}
+  .social-connection{padding:0 16px}
+  .social-connection>span:last-child{display:none}
+  .social-monitor,.social-advisor{padding-right:16px;padding-left:16px}
+  .social-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .social-metrics>div{
+    padding:15px 12px;
+    border-bottom:1px solid var(--ops-line);
+  }
+  .social-metrics>div:first-child{padding-left:12px}
+  .social-metrics>div:nth-child(2){border-right:0}
+  .social-metrics>div:nth-child(n+3){border-bottom:0}
+  .social-post-row{
+    grid-template-columns:minmax(0,1fr) 58px 18px;
+    gap:10px;
+    padding:14px 4px;
+  }
+  .social-post-row>time{grid-column:1/-1}
+  .social-post-result{text-align:right}
+  .social-post-copy>span{font-size:8.5px}
+  .social-section-head>span:last-child{display:none}
+  .social-suggestion footer{display:block}
+  .social-suggestion footer em{
+    display:block;
+    max-width:none;
+    margin-top:5px;
+    text-align:left;
+  }
   .login-v4{
     grid-template-rows:80px minmax(0,1fr) 48px;
     padding:0 18px;

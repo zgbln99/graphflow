@@ -25,6 +25,7 @@
         <button data-view="dashboard"><span>Przegląd</span></button>
         <button class="active" data-view="matches"><span>Mecze</span></button>
         <button data-view="other"><span>Materiały klubowe</span></button>
+        <button data-view="social"><span>Monitoring social</span></button>
         <span class="nav-label">Biblioteka</span>
         <button data-view="templates"><span>Szablony</span></button>
         <button data-view="library"><span>Zdjęcia</span></button>
@@ -102,6 +103,53 @@
         <section id="view-other" class="view"><div class="section-title"><h2>Inne grafiki</h2><button class="primary">+ Nowa grafika</button></div><div class="other-grid scroll-panel" id="other-grid"></div></section>
         <section id="view-library" class="view"><div class="section-title"><h2>Biblioteka zdjęć</h2><button class="primary">Prześlij zdjęcia</button></div><div class="big-photo-grid scroll-panel" id="library-grid"></div></section>
         <section id="view-history" class="view"><div class="card table-card"><h2>Historia eksportów</h2><div class="table-scroll"><table><thead><tr><th>Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead><tbody id="history-body"></tbody></table></div></div></section>
+        <section id="view-social" class="view social-view">
+          <header class="social-header">
+            <div>
+              <span>Facebook · analiza komunikacji</span>
+              <h2>Monitoring social</h2>
+              <p>Ostatnie publikacje, reakcje kibiców i rekomendacje dla zespołu marketingowego.</p>
+            </div>
+            <div class="social-actions">
+              <button class="ghost" id="social-refresh" type="button">Odśwież dane</button>
+              <button class="primary" id="social-analyze" type="button">Analizuj teraz</button>
+            </div>
+          </header>
+
+          <div class="social-connection" id="social-connection" data-state="loading">
+            <span class="social-connection-dot"></span>
+            <b>Sprawdzam połączenia</b>
+            <span id="social-last-sync">Facebook i OpenAI</span>
+          </div>
+
+          <div class="social-layout">
+            <section class="social-monitor">
+              <div class="social-metrics" aria-label="Podsumowanie Facebooka">
+                <div><span>Obserwujący</span><b id="social-followers">—</b></div>
+                <div><span>Publikacje</span><b id="social-post-count">—</b></div>
+                <div><span>Śr. interakcji</span><b id="social-average">—</b></div>
+                <div><span>Śr. zaangażowanie</span><b id="social-engagement">—</b></div>
+              </div>
+              <header class="social-section-head">
+                <div><span>Ostatnie publikacje</span><h3>Aktywność profilu</h3></div>
+                <span id="social-feed-range">Ostatnie 12 postów</span>
+              </header>
+              <div class="social-post-list" id="social-posts">
+                <div class="social-empty"><b>Ładowanie danych</b><span>Sprawdzam połączenie z profilem klubowym.</span></div>
+              </div>
+            </section>
+
+            <aside class="social-advisor">
+              <header class="social-section-head">
+                <div><span>Asystent komunikacji</span><h3>Co publikujemy dalej?</h3></div>
+                <span id="social-analysis-model">OpenAI</span>
+              </header>
+              <div class="social-advice" id="social-advice">
+                <div class="social-empty"><b>Analiza jeszcze niegotowa</b><span>Po połączeniu usług wybierz „Analizuj teraz”.</span></div>
+              </div>
+            </aside>
+          </div>
+        </section>
         <section id="view-dashboard" class="view dashboard-v4">
           <header class="dashboard-v4-header">
             <div><span>Wtorek, 29 września</span><h2>Dzień dobry, <%= user.displayName.split(' ')[0] %></h2></div>

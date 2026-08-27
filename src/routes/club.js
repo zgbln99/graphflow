@@ -4,6 +4,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Database = require('../config/database');
+const {
+  IntegrationError,
+  getIntegrationStatus,
+  fetchFacebookOverview,
+  analyzeFacebookOverview,
+  getCachedState
+} = require('../services/social-intelligence');
 
 const router = express.Router();
 const db = Database.getInstance();
@@ -35,6 +42,15 @@ function requireAuth(req, res, next) {
 function requireAdmin(req, res, next) {
   if (req.session?.user?.role === 'admin') return next();
   return res.status(403).send('Brak uprawnień.');
+}
+
+function integrationErrorResponse(res, error) {
+  const status = error instanceof IntegrationError ? error.status : 500;
+  return res.status(status).json({
+    success: false,
+    code: error.code || 'SOCIAL_INTEGRATION_ERROR',
+    error: error.message || 'Nie udało się pobrać danych integracji.'
+  });
 }
 
 async function getBranding() {
@@ -167,6 +183,41 @@ router.delete('/admin/branding/logo', requireAuth, requireAdmin, async (req, res
     res.json({ success: true });
   } catch (err) {
     next(err);
+  }
+});
+
+router.get('/api/social/status', requireAuth, (req, res) => {
+  res.json({
+    success: true,
+    integrations: getIntegrationStatus(),
+    cache: getCachedState()
+  });
+});
+
+router.get('/api/social/overview', requireAuth, async (req, res) => {
+  try {
+    const overview = await fetchFacebookOverview();
+    res.json({ success: true, overview, analysis: getCachedState().analysis });
+  } catch (error) {
+    integrationErrorResponse(res, error);
+  }
+});
+
+router.post('/api/social/refresh', requireAuth, async (req, res) => {
+  try {
+    const overview = await fetchFacebookOverview({ force: true });
+    res.json({ success: true, overview, analysis: getCachedState().analysis });
+  } catch (error) {
+    integrationErrorResponse(res, error);
+  }
+});
+
+router.post('/api/social/analyze', requireAuth, async (req, res) => {
+  try {
+    const result = await analyzeFacebookOverview({ forceOverview: Boolean(req.body?.refresh) });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    integrationErrorResponse(res, error);
   }
 });
 

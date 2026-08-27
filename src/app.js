@@ -9,6 +9,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const express = require('express');
 const session = require('express-session');
 const clubRoutes = require('./routes/club');
+const { startSocialMonitor } = require('./services/social-intelligence');
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use((err, req, res, next) => {
 const PORT = Number(process.env.APP_PORT || 3000);
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`ZASTAL MARKETING CENTER running on http://127.0.0.1:${PORT}`);
+  startSocialMonitor(console);
 });
 
 module.exports = app;

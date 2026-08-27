@@ -2,6 +2,26 @@
 
 Profesjonalny panel do zarządzania zleceniami graficznymi dla agencji i freelancerów.
 
+## ZASTAL MARKETING CENTER
+
+Branch `feat/club-graphics-v1` zawiera samodzielną aplikację Express uruchamianą poleceniem `npm start`.
+Konfiguracja aplikacji i integracji znajduje się w pliku `.env` tworzonym na podstawie `.env.example`.
+
+### Monitoring Facebooka i analiza OpenAI
+
+Integracja działa wyłącznie po stronie serwera — token Meta i klucz OpenAI nie są wysyłane do przeglądarki.
+
+Wymagane ustawienia:
+
+- `META_PAGE_ID` — identyfikator oficjalnej strony klubu,
+- `META_PAGE_ACCESS_TOKEN` — Page Access Token z uprawnieniami do odczytu treści i zaangażowania strony,
+- `META_GRAPH_VERSION` — przypięta wersja Graph API,
+- `OPENAI_API_KEY` — klucz projektu OpenAI,
+- `OPENAI_MODEL` — model analityczny, domyślnie `gpt-5.4-mini`.
+
+Widok „Monitoring social” pobiera ostatnie posty, liczy reakcje, komentarze i udostępnienia, a następnie generuje ustrukturyzowane rekomendacje przez OpenAI Responses API.
+Serwer odświeża dane w tle zgodnie z `SOCIAL_MONITOR_INTERVAL_MS`. Ustawienie `SOCIAL_AUTO_ANALYZE=true` uruchamia nową analizę automatycznie po wykryciu nowego posta.
+
 ## Funkcje
 
 ### Dla klientów:
