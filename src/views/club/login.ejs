@@ -7,26 +7,76 @@
   <link rel="stylesheet" href="/club/styles.css">
 </head>
 <body class="auth-body">
-  <main class="auth-shell">
-    <section class="auth-card">
-      <div class="auth-brand">
-        <div class="crest">Z</div>
-        <div>
-          <strong>ZASTAL</strong>
-          <span>MARKETING CENTER</span>
+  <main class="auth-shell auth-shell-premium">
+    <section class="auth-hero">
+      <div class="auth-glow auth-glow-one"></div>
+      <div class="auth-glow auth-glow-two"></div>
+      <div class="auth-hero-inner">
+        <div class="auth-brand auth-brand-large">
+          <% if (branding?.logoUrl) { %>
+            <div class="brand-logo-frame"><img src="<%= branding.logoUrl %>" alt="Logo klubu"></div>
+          <% } else { %>
+            <div class="crest crest-large">Z</div>
+          <% } %>
+          <div>
+            <strong>ZASTAL</strong>
+            <span>MARKETING CENTER</span>
+          </div>
+        </div>
+        <div class="auth-hero-copy">
+          <span class="auth-kicker">INTERNAL CREATIVE PLATFORM</span>
+          <h1>Wszystkie materiały meczowe.<br>W jednym miejscu.</h1>
+          <p>Szablony, zdjęcia, grafiki live i szybki eksport dla całego zespołu marketingowego.</p>
+        </div>
+        <div class="auth-feature-row">
+          <div><b>01</b><span>Mecze i workflow</span></div>
+          <div><b>02</b><span>Zdjęcia z MEGA S3</span></div>
+          <div><b>03</b><span>Dynamiczne szablony</span></div>
         </div>
       </div>
-      <div class="auth-copy">
-        <span class="eyebrow">PANEL WEWNĘTRZNY</span>
-        <h1>Zaloguj się</h1>
-        <p>Dostęp do meczów, zdjęć, szablonów i eksportów.</p>
+    </section>
+
+    <section class="auth-panel">
+      <div class="auth-panel-inner">
+        <div class="auth-mobile-brand">
+          <% if (branding?.logoUrl) { %>
+            <div class="brand-logo-frame small"><img src="<%= branding.logoUrl %>" alt="Logo klubu"></div>
+          <% } else { %>
+            <div class="crest">Z</div>
+          <% } %>
+          <div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div>
+        </div>
+
+        <div class="auth-copy auth-copy-premium">
+          <span class="eyebrow">BEZPIECZNY DOSTĘP</span>
+          <h2>Witaj ponownie</h2>
+          <p>Zaloguj się swoim kontem, aby przejść do panelu.</p>
+        </div>
+
+        <% if (error) { %><div class="auth-error"><span>!</span><%= error %></div><% } %>
+
+        <form method="post" action="/login" class="auth-form auth-form-premium">
+          <label>
+            <span>Adres e-mail</span>
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon">@</span>
+              <input name="email" type="email" autocomplete="username" placeholder="twoj@email.pl" required autofocus>
+            </div>
+          </label>
+          <label>
+            <span>Hasło</span>
+            <div class="auth-input-wrap">
+              <span class="auth-input-icon">●</span>
+              <input name="password" type="password" autocomplete="current-password" placeholder="••••••••••••" required>
+            </div>
+          </label>
+          <button class="primary auth-submit auth-submit-premium" type="submit">
+            <span>Zaloguj się</span><span>→</span>
+          </button>
+        </form>
+
+        <div class="auth-security-note"><span class="status-dot"></span> Panel wewnętrzny • dostęp tylko dla autoryzowanych użytkowników</div>
       </div>
-      <% if (error) { %><div class="auth-error"><%= error %></div><% } %>
-      <form method="post" action="/login" class="auth-form">
-        <label>E-mail<input name="email" type="email" autocomplete="username" required autofocus></label>
-        <label>Hasło<input name="password" type="password" autocomplete="current-password" required></label>
-        <button class="primary auth-submit" type="submit">Zaloguj się</button>
-      </form>
     </section>
   </main>
 </body>
