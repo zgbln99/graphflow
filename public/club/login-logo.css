@@ -1,0 +1,44 @@
+.auth-brand-logo-only{
+  display:block;
+  width:100%;
+}
+
+.auth-brand-logo-image{
+  display:block;
+  width:min(380px,38vw);
+  height:128px;
+  max-width:100%;
+  object-fit:contain;
+  object-position:left center;
+  padding:0;
+  margin:0;
+  border:0;
+  background:transparent;
+  border-radius:0;
+}
+
+.auth-brand-large{
+  min-height:128px;
+  align-items:flex-start;
+}
+
+@media(max-width:1000px){
+  .auth-mobile-brand.auth-brand-logo-only{
+    display:block;
+    width:100%;
+    margin-bottom:44px;
+  }
+
+  .auth-mobile-brand .auth-brand-logo-image{
+    width:min(280px,70vw);
+    height:96px;
+    object-position:left center;
+  }
+}
+
+@media(max-width:620px){
+  .auth-mobile-brand .auth-brand-logo-image{
+    width:min(240px,72vw);
+    height:82px;
+  }
+}
