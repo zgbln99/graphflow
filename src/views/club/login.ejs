@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/club/styles.css">
   <link rel="stylesheet" href="/club/premium.css">
   <link rel="stylesheet" href="/club/login-logo.css">
+  <link rel="stylesheet" href="/club/operations.css">
 </head>
 <body class="auth-body">
   <main class="auth-shell auth-shell-premium">
@@ -22,14 +23,14 @@
           <% } %>
         </div>
         <div class="auth-hero-copy">
-          <span class="auth-kicker">INTERNAL CREATIVE PLATFORM</span>
-          <h1>Wszystkie materiały meczowe.<br>W jednym miejscu.</h1>
-          <p>Szablony, zdjęcia, grafiki live i szybki eksport dla całego zespołu marketingowego.</p>
+          <span class="auth-kicker">ZASTAL · MARKETING OPERATIONS</span>
+          <h1>Centrum operacyjne<br>dnia meczowego.</h1>
+          <p>Materiały, zdjęcia i publikacje prowadzone w jednym, uporządkowanym procesie — od zapowiedzi do ostatniego gwizdka.</p>
         </div>
         <div class="auth-feature-row">
-          <div><b>01</b><span>Mecze i workflow</span></div>
-          <div><b>02</b><span>Zdjęcia z MEGA S3</span></div>
-          <div><b>03</b><span>Dynamiczne szablony</span></div>
+          <div><b>01 / PLAN</b><span>Harmonogram i briefy</span></div>
+          <div><b>02 / LIVE</b><span>Produkcja meczowa</span></div>
+          <div><b>03 / ARCHIVE</b><span>Materiały i eksporty</span></div>
         </div>
       </div>
     </section>
@@ -43,17 +44,17 @@
           <% } %>
         </div>
         <div class="auth-copy auth-copy-premium">
-          <span class="eyebrow">BEZPIECZNY DOSTĘP</span>
-          <h2>Witaj ponownie</h2>
-          <p>Zaloguj się swoim kontem, aby przejść do panelu.</p>
+          <span class="eyebrow">PANEL ZESPOŁU</span>
+          <h2>Zaloguj się</h2>
+          <p>Użyj danych przypisanych do Twojego konta klubowego.</p>
         </div>
         <% if (error) { %><div class="auth-error"><span>!</span><%= error %></div><% } %>
         <form method="post" action="/login" class="auth-form auth-form-premium">
-          <label><span>Adres e-mail</span><div class="auth-input-wrap"><span class="auth-input-icon">@</span><input name="email" type="email" autocomplete="username" placeholder="twoj@email.pl" required autofocus></div></label>
-          <label><span>Hasło</span><div class="auth-input-wrap"><span class="auth-input-icon">●</span><input name="password" type="password" autocomplete="current-password" placeholder="••••••••••••" required></div></label>
-          <button class="primary auth-submit auth-submit-premium" type="submit"><span>Zaloguj się</span><span>→</span></button>
+          <label><span>Adres e-mail</span><div class="auth-input-wrap"><input name="email" type="email" autocomplete="username" placeholder="imie@zastal.pl" required autofocus></div></label>
+          <label><span>Hasło</span><div class="auth-input-wrap"><input name="password" type="password" autocomplete="current-password" placeholder="Wpisz hasło" required></div></label>
+          <button class="primary auth-submit auth-submit-premium" type="submit"><span>Wejdź do centrum</span><span aria-hidden="true">↗</span></button>
         </form>
-        <div class="auth-security-note"><span class="status-dot"></span> Panel wewnętrzny • dostęp tylko dla autoryzowanych użytkowników</div>
+        <div class="auth-security-note"><span class="status-dot"></span> System klubowy · dostęp autoryzowany</div>
       </div>
     </section>
   </main>

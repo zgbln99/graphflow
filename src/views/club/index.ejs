@@ -6,6 +6,7 @@
   <title><%= title %></title>
   <link rel="stylesheet" href="/club/styles.css">
   <link rel="stylesheet" href="/club/premium.css">
+  <link rel="stylesheet" href="/club/operations.css">
 </head>
 <body class="app-body">
   <div class="app-shell" id="app-shell">
@@ -18,17 +19,19 @@
           <div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div>
         <% } %>
       </div>
-      <select class="season" aria-label="Sezon"><option>Sezon 2026/27</option></select>
+      <div class="season-wrap"><span>AKTYWNY SEZON</span><select class="season" aria-label="Sezon"><option>2026 / 27</option></select></div>
       <nav>
-        <button data-view="dashboard">⌂ Dashboard</button>
-        <button class="active" data-view="matches">◉ Mecze</button>
-        <button data-view="other">▧ Inne grafiki</button>
-        <button data-view="templates">◫ Szablony</button>
-        <button data-view="library">▣ Biblioteka zdjęć</button>
-        <button data-view="history">↺ Historia</button>
-        <% if (user.role === 'admin') { %><button data-view="settings">⚙ Ustawienia</button><% } %>
+        <span class="nav-label">OPERACJE</span>
+        <button data-view="dashboard"><i>01</i><span>Centrum dnia</span></button>
+        <button class="active" data-view="matches"><i>02</i><span>Mecze</span></button>
+        <button data-view="other"><i>03</i><span>Materiały klubowe</span></button>
+        <span class="nav-label">ZASOBY</span>
+        <button data-view="templates"><i>04</i><span>Szablony</span></button>
+        <button data-view="library"><i>05</i><span>Biblioteka zdjęć</span></button>
+        <button data-view="history"><i>06</i><span>Historia eksportów</span></button>
+        <% if (user.role === 'admin') { %><button data-view="settings"><i>07</i><span>Ustawienia</span></button><% } %>
       </nav>
-      <div class="storage"><b>MEGA S3</b><span>Połączenie zostanie skonfigurowane</span><div class="bar"><i style="width:0"></i></div><button type="button">Zarządzaj plikami</button></div>
+      <div class="storage"><div class="storage-head"><b>MAGAZYN MEDIÓW</b><em>MEGA S3</em></div><span>Oczekuje na konfigurację</span><div class="bar"><i style="width:0"></i></div><button type="button">Konfiguruj połączenie</button></div>
       <div class="profile">
         <div class="avatar"><%= user.displayName.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase() %></div>
         <div class="profile-copy"><b><%= user.displayName %></b><span><%= user.role %></span></div>
@@ -99,7 +102,32 @@
         <section id="view-other" class="view"><div class="section-title"><h2>Inne grafiki</h2><button class="primary">+ Nowa grafika</button></div><div class="other-grid scroll-panel" id="other-grid"></div></section>
         <section id="view-library" class="view"><div class="section-title"><h2>Biblioteka zdjęć</h2><button class="primary">Prześlij zdjęcia</button></div><div class="big-photo-grid scroll-panel" id="library-grid"></div></section>
         <section id="view-history" class="view"><div class="card table-card"><h2>Historia eksportów</h2><div class="table-scroll"><table><thead><tr><th>Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead><tbody id="history-body"></tbody></table></div></div></section>
-        <section id="view-dashboard" class="view"><div class="kpis"><div class="card"><span>Mecze</span><b>14</b></div><div class="card"><span>Zdjęcia</span><b>4 286</b></div><div class="card"><span>Szablony</span><b>12</b></div><div class="card"><span>Eksporty</span><b>168</b></div></div></section>
+        <section id="view-dashboard" class="view operations-dashboard">
+          <div class="ops-summary">
+            <div><span>NAJBLIŻSZY MECZ</span><strong>04 PAŹ</strong><small>wyjazd · Wrocław</small></div>
+            <div><span>DO PUBLIKACJI</span><strong>07</strong><small>materiałów w kolejce</small></div>
+            <div><span>GOTOWOŚĆ</span><strong>68%</strong><small>pakietu meczowego</small></div>
+            <div><span>ARCHIWUM</span><strong>4 286</strong><small>zdjęć w sezonie</small></div>
+          </div>
+          <div class="ops-grid">
+            <article class="ops-primary">
+              <header><div><span class="ops-overline">NASTĘPNE WYDARZENIE · KOLEJKA 4</span><h2>Śląsk Wrocław <i>vs</i> Zastal</h2></div><span class="ops-status">ZA 6 DNI</span></header>
+              <div class="ops-match-meta"><div><span>DATA</span><b>04.10.2026 · 17:30</b></div><div><span>MIEJSCE</span><b>Hala Orbita, Wrocław</b></div><div><span>ROZGRYWKI</span><b>ORLEN Basket Liga</b></div></div>
+              <div class="ops-progress-head"><span>PAKIET MECZOWY</span><b>5 z 7 materiałów</b></div>
+              <div class="ops-progress"><i style="width:68%"></i></div>
+              <div class="ops-checklist">
+                <div class="done"><i>✓</i><span><b>Matchday</b><small>Eksport: 02.10 · 10:00</small></span><em>GOTOWE</em></div>
+                <div class="done"><i>✓</i><span><b>Zapowiedź meczu</b><small>Wersje: feed + story</small></span><em>GOTOWE</em></div>
+                <div><i>3</i><span><b>Starting Five</b><small>Oczekuje na skład</small></span><em>W TOKU</em></div>
+                <div><i>4</i><span><b>Final Score</b><small>Szablon przypisany</small></span><em>PLAN</em></div>
+              </div>
+            </article>
+            <aside class="ops-side">
+              <section class="ops-activity"><header><div><span class="ops-overline">DZISIAJ</span><h3>Praca zespołu</h3></div><button>Pełna historia</button></header><div class="activity-row"><time>14:32</time><span><b>Final Score</b><small>wyeksportował Jan Kowalski</small></span><em>PNG</em></div><div class="activity-row"><time>13:48</time><span><b>87 nowych zdjęć</b><small>Zastal — Anwil / Photographer</small></span><em>S3</em></div><div class="activity-row"><time>12:10</time><span><b>Matchday zatwierdzony</b><small>przez Administratora</small></span><em>OK</em></div></section>
+              <section class="ops-system"><header><span class="ops-overline">SYSTEMY</span><h3>Status usług</h3></header><div><span><i class="is-on"></i>Aplikacja</span><b>Sprawna</b></div><div><span><i></i>MEGA S3</span><b>Konfiguracja</b></div><div><span><i class="is-on"></i>Szablony</span><b>12 aktywnych</b></div></section>
+            </aside>
+          </div>
+        </section>
         <section id="view-settings" class="view">
           <div class="settings-grid panel-scroll">
             <div class="card settings-card branding-card">
