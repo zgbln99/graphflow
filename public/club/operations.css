@@ -1,10 +1,14 @@
 /* Zastal Marketing Center — refined club operations UI */
+@font-face{font-family:"ZT Talk";src:url("/club/fonts/ZTTalk-Regular.ttf") format("truetype");font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:"ZT Talk";src:url("/club/fonts/ZTTalk-Medium.ttf") format("truetype");font-style:normal;font-weight:500;font-display:swap}
+@font-face{font-family:"ZT Talk";src:url("/club/fonts/ZTTalk-SemiBold.ttf") format("truetype");font-style:normal;font-weight:600;font-display:swap}
+@font-face{font-family:"ZT Talk";src:url("/club/fonts/ZTTalk-Bold.ttf") format("truetype");font-style:normal;font-weight:700;font-display:swap}
 :root{
   --ops-green:#4ed98a;--ops-green-bright:#72e6a3;--ops-green-soft:rgba(78,217,138,.11);
   --ops-bg:#080d10;--ops-surface:#0e1519;--ops-surface-2:#121b20;--ops-line:#222e34;
   --ops-text:#f3f6f4;--ops-muted:#7f8d94;--sidebar:250px;--topbar:78px;--radius:11px;--radius-sm:8px
 }
-body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:0}
+body{font-family:"ZT Talk",Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:0}
 .app-body{background:var(--ops-bg)}
 .app-body:before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 74% -18%,rgba(63,180,112,.07),transparent 30%)}
 .app-shell{position:relative}
