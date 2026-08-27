@@ -7,7 +7,6 @@ document.getElementById('sidebar-backdrop')?.addEventListener('click',()=>shell.
 const views=[...document.querySelectorAll('.view')];
 const pageTitle=document.getElementById('page-title');
 const eyebrow=document.getElementById('eyebrow');
-const seasonLabel=document.querySelector('.season')?.value||'';
 
 const viewLabels={
   dashboard:'Dashboard',
@@ -22,8 +21,8 @@ const viewLabels={
   settings:'Ustawienia'
 };
 const viewContext={
-  match:'Mecz · 27.09.2026',
-  editor:'Mecz · grafika meczowa'
+  match:'Zastal — Anwil · 27.09.2026',
+  editor:'Zastal — Anwil · Final Score'
 };
 
 function showView(name){
@@ -31,7 +30,7 @@ function showView(name){
   document.getElementById('view-'+name)?.classList.add('active-view');
   document.querySelectorAll('.sidebar nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
   pageTitle.textContent=viewLabels[name]||name;
-  eyebrow.textContent=viewContext[name]||('Sezon '+seasonLabel);
+  eyebrow.textContent=viewContext[name]||'';
   shell.classList.remove('sidebar-open');
   if(name==='social')loadSocialView();
 }
@@ -40,12 +39,6 @@ function showView(name){
 document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
 document.querySelector('[data-match]')?.addEventListener('click',e=>{if(!e.target.closest('button'))showView('match')});
 
-// Zegar w pasku górnym — dzień meczowy planujemy z dokładnością do minuty.
-const clock=document.getElementById('topbar-clock-value');
-if(clock){
-  const tick=()=>{clock.textContent=new Intl.DateTimeFormat('pl-PL',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date())};
-  tick();setInterval(tick,30000);
-}
 
 const graphicNames=['Matchday','Starting Five','Q1','Halftime','Q3','Final Score','MVP','Player Stats'];
 const grid=document.getElementById('graphic-grid');graphicNames.forEach((name,i)=>{const d=document.createElement('article');d.className='graphic-card';d.innerHTML=`<div class="graphic-thumb"></div><footer><b>${name}</b><span class="${i<4?'is-ready':''}">${i<4?'Gotowe':'Do zrobienia'}</span></footer>`;d.addEventListener('click',()=>{state.currentTemplate=name==='Final Score'?'final':'matchday';renderEditor();showView('editor')});grid.appendChild(d)});
@@ -65,7 +58,7 @@ document.getElementById('create-template')?.addEventListener('click',()=>{const 
 
 const other=document.getElementById('other-grid');['Urodziny','Transfer','Nowy sponsor','Komunikat klubowy','MVP miesiąca','Kontuzja'].forEach(n=>{const d=document.createElement('div');d.className='other-card';d.innerHTML=`<div class="other-thumb"></div><b>${n}</b><span class="sub">Szablon dynamiczny</span>`;other.appendChild(d)});
 const lib=document.getElementById('library-grid');for(let i=0;i<24;i++){const p=document.createElement('div');p.className='photo';lib.appendChild(p)}
-const history=document.getElementById('history-body');[['Final Score','Zastal vs Anwil','27.09.2026 19:32'],['Halftime','Zastal vs Anwil','27.09.2026 18:45'],['Matchday','Zastal vs Anwil','27.09.2026 12:10'],['Urodziny','Piotr Nowak','26.09.2026 08:00']].forEach(r=>{const tr=document.createElement('tr');tr.innerHTML=`<td><span class="mini" style="display:block;width:46px;height:34px"></span></td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>PNG</td><td>${document.querySelector('.profile-copy b')?.textContent||'Użytkownik'}</td>`;history.appendChild(tr)});
+const history=document.getElementById('history-body');[['Final Score','Zastal vs Anwil','27.09.2026 19:32'],['Halftime','Zastal vs Anwil','27.09.2026 18:45'],['Matchday','Zastal vs Anwil','27.09.2026 12:10'],['Urodziny','Piotr Nowak','26.09.2026 08:00']].forEach(r=>{const tr=document.createElement('tr');tr.innerHTML=`<td><span class="mini"></span></td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>PNG</td><td>${document.querySelector('.profile-copy b')?.textContent||'Użytkownik'}</td>`;history.appendChild(tr)});
 
 renderTemplates();renderEditor();
 

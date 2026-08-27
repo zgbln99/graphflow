@@ -5,27 +5,28 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow">
   <title><%= title %></title>
-  <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230a0e10%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229%22 fill=%22none%22 stroke=%22%231fbf63%22 stroke-width=%222%22/%3E%3Cpath d=%22M7 16h18M16 7c-3 4-3 14 0 18M16 7c3 4 3 14 0 18%22 fill=%22none%22 stroke=%22%231fbf63%22 stroke-width=%221.4%22/%3E%3C/svg%3E' %>">
-  <link rel="stylesheet" href="/club/zmc.css?v=5">
+  <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%230b0d0d%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229%22 fill=%22none%22 stroke=%22%2312a150%22 stroke-width=%222%22/%3E%3C/svg%3E' %>">
+  <link rel="stylesheet" href="/club/zmc.css?v=6">
 </head>
 <body class="auth-body">
   <%- include('_icons') %>
 
   <main class="login">
-    <!-- Lewa kolumna: identyfikacja klubu -->
+    <!-- Lewa strona: wyłącznie identyfikacja klubu -->
     <section class="login-visual">
-      <svg class="login-court" viewBox="0 0 600 420" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
-        <rect x="20" y="20" width="560" height="380"/>
-        <path d="M300 20v380"/>
-        <circle cx="300" cy="210" r="62"/>
-        <circle cx="300" cy="210" r="22"/>
-        <rect x="20" y="130" width="130" height="160"/>
-        <rect x="450" y="130" width="130" height="160"/>
-        <path d="M150 130a90 90 0 0 1 0 160"/>
-        <path d="M450 130a90 90 0 0 0 0 160"/>
-        <path d="M20 60h44a175 175 0 0 0 0 300H20"/>
-        <path d="M580 60h-44a175 175 0 0 1 0 300h44"/>
+      <svg class="login-court" viewBox="0 0 560 300" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
+        <rect x="10" y="10" width="540" height="280"/>
+        <path d="M280 10v280"/>
+        <circle cx="280" cy="150" r="46"/>
+        <rect x="10" y="92" width="112" height="116"/>
+        <path d="M122 92a58 58 0 0 1 0 116"/>
+        <path d="M10 44h34a132 132 0 0 0 0 212H10"/>
+        <rect x="438" y="92" width="112" height="116"/>
+        <path d="M438 92a58 58 0 0 0 0 116"/>
+        <path d="M550 44h-34a132 132 0 0 1 0 212h34"/>
       </svg>
+
+      <span class="login-visual-top lbl">System wewnętrzny klubu</span>
 
       <header class="login-brand">
         <% if (branding && branding.logoUrl) { %>
@@ -35,20 +36,14 @@
         <% } %>
       </header>
 
-      <div class="login-visual-copy">
-        <span class="over">System wewnętrzny klubu</span>
-        <h1>Centrum produkcji<br>materiałów meczowych</h1>
-        <p>Szablony, zdjęcia i eksporty w jednym miejscu — od zapowiedzi meczu po wynik końcowy.</p>
-      </div>
-
-      <div class="login-visual-facts">
-        <div><b>Mecze i sezony</b><span>Pakiet grafik przypisany do każdego spotkania</span></div>
-        <div><b>Szablony klubowe</b><span>Layout kontrolowany przez grafika, treść przez social media</span></div>
-        <div><b>Biblioteka zdjęć</b><span>Foldery meczowe i eksporty w jednym magazynie</span></div>
-      </div>
+      <footer class="login-visual-foot">
+        <span>System wewnętrzny</span><i class="sep"></i>
+        <span>Sezon 2026 / 27</span><i class="sep"></i>
+        <span>Dostęp wyłącznie dla pracowników klubu</span>
+      </footer>
     </section>
 
-    <!-- Prawa kolumna: formularz -->
+    <!-- Prawa strona: formularz -->
     <section class="login-panel">
       <div class="login-panel-top">
         <div class="login-mobile-brand">
@@ -58,12 +53,11 @@
             <span class="wordmark"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
           <% } %>
         </div>
-        <div class="login-season"><span>Sezon</span><b>2026 / 27</b></div>
       </div>
 
       <div class="login-form-wrap">
         <h2>Zaloguj się</h2>
-        <p>Dostęp wyłącznie dla pracowników działu marketingu.</p>
+        <p>Panel działu marketingu.</p>
 
         <% if (error) { %>
           <div class="auth-error" role="alert">
@@ -73,23 +67,17 @@
 
         <form method="post" action="/login" class="login-form">
           <label>
-            <span>Adres e-mail</span>
+            <span>E-mail</span>
             <input name="email" type="email" autocomplete="username" placeholder="imie@zastal.pl" required autofocus>
           </label>
           <label>
             <span>Hasło</span>
-            <input name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+            <input name="password" type="password" autocomplete="current-password" required>
           </label>
-          <button class="login-submit" type="submit">
-            <span>Zaloguj się</span>
-            <svg class="ico"><use href="#i-chevron"></use></svg>
-          </button>
+          <button class="login-submit" type="submit">Zaloguj się</button>
         </form>
 
-        <div class="login-note">
-          <span class="status-dot"></span>
-          Konta zakłada administrator systemu
-        </div>
+        <p class="login-note">Konta zakłada administrator systemu.<br>Problem z logowaniem zgłoś do administratora klubu.</p>
       </div>
 
       <footer class="login-panel-foot">
