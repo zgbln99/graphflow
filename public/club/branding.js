@@ -1,8 +1,15 @@
 (() => {
+  if (!document.querySelector('link[href="/club/branding-overrides.css"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/club/branding-overrides.css';
+    document.head.appendChild(link);
+  }
+
   const input = document.getElementById('brand-logo-input');
   const preview = document.getElementById('brand-preview');
   const status = document.getElementById('branding-status');
-  const removeBtn = document.getElementById('remove-brand-logo');
+  const removeBtn = document.getElementById('brand-logo-remove');
 
   if (!input || !preview) return;
 
