@@ -5,11 +5,19 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title><%= title %></title>
   <link rel="stylesheet" href="/club/styles.css">
+  <link rel="stylesheet" href="/club/premium.css">
 </head>
 <body class="app-body">
   <div class="app-shell" id="app-shell">
     <aside class="sidebar" id="sidebar">
-      <div class="brand"><div class="crest">Z</div><div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div></div>
+      <div class="brand">
+        <% if (branding?.logoUrl) { %>
+          <div class="brand-logo-frame sidebar-logo"><img src="<%= branding.logoUrl %>" alt="Logo Zastal"></div>
+        <% } else { %>
+          <div class="crest">Z</div>
+        <% } %>
+        <div><strong>ZASTAL</strong><span>MARKETING CENTER</span></div>
+      </div>
       <select class="season" aria-label="Sezon"><option>Sezon 2026/27</option></select>
       <nav>
         <button data-view="dashboard">⌂ Dashboard</button>
@@ -92,11 +100,36 @@
         <section id="view-library" class="view"><div class="section-title"><h2>Biblioteka zdjęć</h2><button class="primary">Prześlij zdjęcia</button></div><div class="big-photo-grid scroll-panel" id="library-grid"></div></section>
         <section id="view-history" class="view"><div class="card table-card"><h2>Historia eksportów</h2><div class="table-scroll"><table><thead><tr><th>Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead><tbody id="history-body"></tbody></table></div></div></section>
         <section id="view-dashboard" class="view"><div class="kpis"><div class="card"><span>Mecze</span><b>14</b></div><div class="card"><span>Zdjęcia</span><b>4 286</b></div><div class="card"><span>Szablony</span><b>12</b></div><div class="card"><span>Eksporty</span><b>168</b></div></div></section>
-        <section id="view-settings" class="view"><div class="card settings-card panel-scroll"><h2>Ustawienia</h2><label>Endpoint MEGA S3<input placeholder="https://s3...mega.io"></label><label>Bucket<input placeholder="club-media"></label><label>Domyślny prefix<input placeholder="2026-27/"></label><button class="primary">Zapisz</button></div></section>
+
+        <% if (user.role === 'admin') { %>
+        <section id="view-settings" class="view">
+          <div class="settings-grid scroll-panel">
+            <div class="card settings-card branding-card">
+              <div class="settings-heading"><div><span class="eyebrow">WYGLĄD</span><h2>Branding aplikacji</h2><p>Logo będzie używane w panelu i na ekranie logowania.</p></div></div>
+              <div class="brand-uploader" id="brand-uploader">
+                <div class="brand-preview" id="brand-preview">
+                  <% if (branding?.logoUrl) { %><img src="<%= branding.logoUrl %>" alt="Aktualne logo"><% } else { %><span>Z</span><% } %>
+                </div>
+                <div class="brand-upload-copy"><b>Logo klubu</b><span>PNG, JPG, WEBP lub SVG • maks. 5 MB</span><div class="brand-upload-actions"><label class="primary upload-label">Wybierz logo<input id="brand-logo-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden></label><button class="ghost" id="remove-brand-logo" type="button">Usuń</button></div></div>
+              </div>
+              <div id="branding-status" class="settings-status"></div>
+            </div>
+
+            <div class="card settings-card">
+              <div class="settings-heading"><span class="eyebrow">STORAGE</span><h2>MEGA S3</h2><p>Połączenie do magazynu zdjęć i plików szablonów.</p></div>
+              <label>Endpoint MEGA S3<input placeholder="https://s3...mega.io"></label>
+              <label>Bucket<input placeholder="club-media"></label>
+              <label>Domyślny prefix<input placeholder="2026-27/"></label>
+              <button class="primary">Zapisz ustawienia</button>
+            </div>
+          </div>
+        </section>
+        <% } %>
       </div>
     </main>
     <button class="sidebar-backdrop" id="sidebar-backdrop" type="button" aria-label="Zamknij menu"></button>
   </div>
   <script src="/club/app.js"></script>
+  <% if (user.role === 'admin') { %><script src="/club/branding.js"></script><% } %>
 </body>
 </html>
