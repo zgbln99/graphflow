@@ -34,6 +34,15 @@
 /* Nagłówki i liczby w wersji rozstrzelonej — typografia klubu */
 .page-title,.card-title,.display-1,.display-2,.h1,h1{font-family:"ZT Talk Expanded","ZT Talk",sans-serif}
 
+/* ---------- Pełna szerokość ekranu ---------- */
+/* Aplikacja jest narzędziem pracy, nie stroną — treść korzysta z całej
+   szerokości monitora zamiast siedzieć w wyśrodkowanej kolumnie. */
+.app-body .container-fluid{
+  max-width:none;
+  padding-right:clamp(1rem,1.6vw,2rem);
+  padding-left:clamp(1rem,1.6vw,2rem);
+}
+
 /* ---------- Aplikacja mieści się w jednym ekranie (§25) ---------- */
 .app-body{overflow:hidden}
 .app-body .page{height:100dvh;overflow:hidden}
