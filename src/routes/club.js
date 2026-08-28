@@ -11,7 +11,7 @@ const {
   analyzeFacebookOverview,
   getCachedState
 } = require('../services/social-intelligence');
-const { getDashboardData } = require('../services/dashboard-data');
+const repo = require('../services/club-repository');
 
 const router = express.Router();
 const db = Database.getInstance();
@@ -45,6 +45,22 @@ function requireAdmin(req, res, next) {
   return res.status(403).send('Brak uprawnień.');
 }
 
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (roles.includes(req.session?.user?.role)) return next();
+    return res.status(403).json({ success: false, error: 'Brak uprawnień do tej operacji.' });
+  };
+}
+
+// Błędy walidacji z repozytorium wracają jako 400 z nazwą pola, żeby formularz
+// mógł podświetlić konkretny input; reszta idzie do globalnej obsługi błędów.
+function handleRepoError(res, next, error) {
+  if (error instanceof repo.ValidationError) {
+    return res.status(error.status || 400).json({ success: false, error: error.message, field: error.field });
+  }
+  return next(error);
+}
+
 function integrationErrorResponse(res, error) {
   const status = error instanceof IntegrationError ? error.status : 500;
   return res.status(status).json({
@@ -54,13 +70,19 @@ function integrationErrorResponse(res, error) {
   });
 }
 
-async function getBranding() {
+async function getSetting(key, fallback = null) {
   const row = await db.fetch(
     'SELECT setting_value FROM cg_settings WHERE setting_key = ? LIMIT 1',
-    ['brand_logo_url']
+    [key]
   );
+  return row?.setting_value || fallback;
+}
+
+async function getBranding() {
   return {
-    logoUrl: row?.setting_value || null
+    logoUrl: await getSetting('brand_logo_url'),
+    // Nazwa klubu służy do wyróżnienia naszej drużyny w parze meczowej.
+    clubName: await getSetting('club_name', 'Zastal')
   };
 }
 
@@ -222,6 +244,77 @@ router.post('/api/social/analyze', requireAuth, async (req, res) => {
   }
 });
 
+/* ------------------------------- sezony i mecze ------------------------------ */
+
+router.get('/api/seasons', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, seasons: await repo.listSeasons() });
+  } catch (err) { next(err); }
+});
+
+router.post('/api/seasons', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.status(201).json({ success: true, season: await repo.createSeason(req.body || {}) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.patch('/api/seasons/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.json({ success: true, season: await repo.updateSeason(req.params.id, req.body || {}) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.post('/api/seasons/:id/activate', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.json({ success: true, season: await repo.activateSeason(req.params.id) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.delete('/api/seasons/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    await repo.deleteSeason(req.params.id);
+    res.json({ success: true });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.get('/api/matches', requireAuth, async (req, res, next) => {
+  try {
+    const matches = await repo.listMatches({
+      seasonId: req.query.season || null,
+      status: req.query.status || null,
+      search: req.query.q || null
+    });
+    res.json({ success: true, matches });
+  } catch (err) { next(err); }
+});
+
+router.get('/api/matches/:id', requireAuth, async (req, res, next) => {
+  try {
+    const match = await repo.getMatch(req.params.id);
+    if (!match) return res.status(404).json({ success: false, error: 'Nie znaleziono meczu.' });
+    res.json({ success: true, match });
+  } catch (err) { next(err); }
+});
+
+router.post('/api/matches', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.status(201).json({ success: true, match: await repo.createMatch(req.body || {}) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.patch('/api/matches/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.json({ success: true, match: await repo.updateMatch(req.params.id, req.body || {}) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.delete('/api/matches/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    await repo.deleteMatch(req.params.id);
+    res.json({ success: true });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const branding = await getBranding();
@@ -229,7 +322,7 @@ router.get('/', requireAuth, async (req, res, next) => {
       title: 'ZASTAL MARKETING CENTER',
       user: req.session.user,
       branding,
-      dashboard: getDashboardData(),
+      dashboard: await repo.getDashboard(),
       integrations: getIntegrationStatus()
     });
   } catch (err) {

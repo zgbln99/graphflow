@@ -5,24 +5,26 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow">
   <title><%= title %></title>
-  <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : '/favicon.ico' %>">
+  <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%230b0d0d%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229%22 fill=%22none%22 stroke=%22%230d8f4f%22 stroke-width=%222%22/%3E%3Cpath d=%22M7 16h18M16 7c-3 4-3 14 0 18M16 7c3 4 3 14 0 18%22 fill=%22none%22 stroke=%22%230d8f4f%22 stroke-width=%221.4%22/%3E%3C/svg%3E' %>">
   <link rel="stylesheet" href="/vendor/tabler/css/tabler.min.css">
   <link rel="stylesheet" href="/club/brand.css?v=7">
 </head>
-<body class="app-body">
 <%
   const role = user.role || 'social';
   const can = (...roles) => roles.includes(role);
   const initials = String(user.displayName || user.email)
     .split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
   const roleLabels = { admin: 'Administrator', designer: 'Grafik', social: 'Social media', photographer: 'Fotograf' };
-  const badgeByState = { ok: 'bg-green-lt', work: 'bg-yellow-lt', todo: 'bg-secondary-lt', late: 'bg-red-lt' };
   const d = dashboard;
   const m = d.nextMatch;
-  const ready = d.facts.find(f => f.label === 'Materiały gotowe');
+  const clubName = (branding && branding.clubName) || 'Zastal';
+  const progress = d.counters.materialsTotal
+    ? Math.round(d.counters.materialsReady / d.counters.materialsTotal * 100)
+    : 0;
   // Układ nawigacji: pasek górny (wariant wybrany przez właściciela projektu).
   const partials = { branding, user, role, can, initials, roleLabels, d, integrations };
 %>
+<body class="app-body" data-role="<%= role %>" data-club="<%= clubName %>">
 <%- include('_icons') %>
 
 <div class="page">
@@ -57,16 +59,24 @@
       <div class="container-fluid">
         <div class="row g-2 align-items-center">
           <div class="col">
-            <div class="page-pretitle" id="eyebrow">Sezon <%= d.season %></div>
+            <div class="page-pretitle" id="eyebrow"><%= d.season ? 'Sezon ' + d.season.name : 'Brak sezonu' %></div>
             <h2 class="page-title" id="page-title">Dashboard</h2>
           </div>
           <div class="col-auto ms-auto">
             <div class="btn-list align-items-center">
-              <select class="form-select form-select-sm w-auto" aria-label="Sezon">
-                <option><%= d.season %></option>
-              </select>
+              <% if (d.seasons.length) { %>
+                <select class="form-select form-select-sm w-auto" id="season-switch" aria-label="Aktywny sezon"
+                        <%= role === 'admin' ? '' : 'disabled' %>>
+                  <% d.seasons.forEach(season => { %>
+                    <option value="<%= season.id %>" <%= d.season && season.id === d.season.id ? 'selected' : '' %>>
+                      <%= season.name %>
+                    </option>
+                  <% }) %>
+                </select>
+              <% } %>
               <% if (role === 'admin') { %>
-                <button class="btn btn-primary" id="new-action" type="button">
+                <button class="btn btn-primary" id="new-action" type="button"
+                        data-match-new data-bs-toggle="modal" data-bs-target="#match-modal">
                   <svg class="icon"><use href="#i-plus"></use></svg>Nowy mecz
                 </button>
               <% } else if (role === 'photographer') { %>
@@ -85,218 +95,244 @@
       <!-- ==================== DASHBOARD ==================== -->
       <div id="view-dashboard" class="view active-view">
         <div class="container-fluid">
-          <div class="row row-cards">
 
-            <!-- Najbliższy mecz -->
-            <div class="col-12">
-              <div class="card">
-                <div class="card-header">
-                  <h3 class="card-title">Najbliższy mecz</h3>
-                  <div class="card-actions btn-actions">
-                    <span class="badge bg-green-lt me-2"><%= m.competition %> · <%= m.round %></span>
-                    <button class="btn btn-primary btn-sm" type="button" data-view="matches">Otwórz mecz</button>
-                  </div>
+          <% if (!d.season) { %>
+            <div class="empty">
+              <div class="empty-icon"><svg class="icon icon-lg"><use href="#i-calendar"></use></svg></div>
+              <p class="empty-title">Brak sezonu</p>
+              <p class="empty-subtitle text-secondary">
+                Aplikacja układa pracę wokół sezonu i meczów. Zacznij od utworzenia sezonu,
+                potem dodasz do niego mecze.
+              </p>
+              <% if (role === 'admin') { %>
+                <div class="empty-action">
+                  <button class="btn btn-primary" type="button" data-season-new data-bs-toggle="modal" data-bs-target="#season-modal">
+                    <svg class="icon"><use href="#i-plus"></use></svg>Utwórz sezon
+                  </button>
                 </div>
-                <div class="card-body">
-                  <div class="fixture-title mb-3">
-                    <span class="<%= m.clubSide === 'home' ? 'club' : '' %>"><%= m.home %></span>
-                    <span class="text-secondary mx-2">—</span>
-                    <span class="<%= m.clubSide === 'away' ? 'club' : '' %>"><%= m.away %></span>
-                  </div>
-                  <div class="datagrid">
-                    <div class="datagrid-item">
-                      <div class="datagrid-title">Termin</div>
-                      <div class="datagrid-content"><%= m.dateLabel %> · <%= m.time %></div>
-                    </div>
-                    <div class="datagrid-item">
-                      <div class="datagrid-title">Hala</div>
-                      <div class="datagrid-content"><%= m.arena %></div>
-                    </div>
-                    <div class="datagrid-item d-none d-sm-block">
-                      <div class="datagrid-title">Charakter</div>
-                      <div class="datagrid-content"><%= m.venueType %></div>
-                    </div>
-                    <% d.facts.forEach((fact, index) => { %>
-                      <div class="datagrid-item <%= index > 1 ? 'd-none d-sm-block' : '' %>">
-                        <div class="datagrid-title"><%= fact.label %></div>
-                        <div class="datagrid-content"><%= fact.value %><% if (fact.unit) { %> <%= fact.unit %><% } %></div>
-                      </div>
-                    <% }) %>
-                  </div>
-                </div>
-                <div class="card-footer">
-                  <div class="row align-items-center g-2">
-                    <div class="col-auto text-secondary small">Pakiet materiałów meczowych</div>
-                    <div class="col">
-                      <div class="progress progress-sm">
-                        <div class="progress-bar bg-green" style="width: 25%" role="progressbar"
-                             aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">
-                          <span class="visually-hidden">25% gotowych</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-auto text-secondary small"><%= ready ? ready.value : '' %> gotowych</div>
-                  </div>
-                </div>
-              </div>
+              <% } else { %>
+                <p class="empty-subtitle text-secondary">Poproś administratora o utworzenie sezonu.</p>
+              <% } %>
             </div>
 
-            <!-- Harmonogram materiałów -->
-            <div class="col-lg-8">
-              <div class="card">
-                <div class="card-header">
-                  <h3 class="card-title">Harmonogram materiałów</h3>
-                  <div class="card-actions">
-                    <div class="btn-group btn-group-sm" role="group" aria-label="Zakres">
-                      <input type="radio" class="btn-check" name="rundown-range" id="range-match" checked>
-                      <label for="range-match" class="btn">Ten mecz</label>
-                      <input type="radio" class="btn-check" name="rundown-range" id="range-week">
-                      <label for="range-week" class="btn">Tydzień</label>
-                      <input type="radio" class="btn-check" name="rundown-range" id="range-late">
-                      <label for="range-late" class="btn">Zaległe</label>
-                    </div>
-                  </div>
+          <% } else if (!m) { %>
+            <div class="empty">
+              <div class="empty-icon"><svg class="icon icon-lg"><use href="#i-match"></use></svg></div>
+              <p class="empty-title">Sezon <%= d.season.name %> nie ma jeszcze meczów</p>
+              <p class="empty-subtitle text-secondary">Dodaj pierwszy mecz, żeby zobaczyć harmonogram materiałów.</p>
+              <% if (role === 'admin') { %>
+                <div class="empty-action">
+                  <button class="btn btn-primary" type="button" data-match-new data-bs-toggle="modal" data-bs-target="#match-modal">
+                    <svg class="icon"><use href="#i-plus"></use></svg>Dodaj mecz
+                  </button>
                 </div>
-                <div class="table-responsive">
-                  <table class="table table-vcenter card-table">
-                    <thead>
-                      <tr>
-                        <th class="w-1">Godz.</th>
-                        <th>Materiał</th>
-                        <th>Format</th>
-                        <th>Odpowiedzialny</th>
-                        <th class="w-1">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <% d.schedule.forEach(block => { %>
-                        <tr class="bg-surface-secondary">
-                          <td colspan="4" class="text-uppercase small fw-bold <%= block.matchday ? 'text-green' : 'text-secondary' %>">
-                            <%= block.day %>
-                          </td>
-                          <td class="text-secondary small text-nowrap"><%= block.note %></td>
-                        </tr>
-                        <% block.items.forEach(item => { %>
-                          <tr>
-                            <td class="text-secondary text-nowrap"><%= item.time %></td>
-                            <td>
-                              <div><%= item.name %></div>
-                              <div class="text-secondary small"><%= item.meta %></div>
-                            </td>
-                            <td class="text-secondary text-nowrap"><%= item.format %></td>
-                            <td class="text-secondary"><%= item.owner %></td>
-                            <td><span class="badge <%= badgeByState[item.state] %>"><%= item.status %></span></td>
-                          </tr>
-                        <% }) %>
-                      <% }) %>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <% } %>
             </div>
 
-            <!-- Kolumna kontrolna -->
-            <div class="col-lg-4">
-              <div class="row row-cards">
-                <div class="col-12">
-                  <div class="card">
-                    <div class="card-header">
-                      <h3 class="card-title">Wymaga decyzji</h3>
-                      <div class="card-actions"><span class="badge bg-red-lt"><%= d.blockers.length %></span></div>
+          <% } else { %>
+            <div class="row row-cards">
+
+              <!-- Najbliższy mecz -->
+              <div class="col-12">
+                <div class="card">
+                  <div class="card-header">
+                    <h3 class="card-title">
+                      <%= m.status === 'finished' ? 'Ostatni mecz' : 'Najbliższy mecz' %>
+                    </h3>
+                    <div class="card-actions btn-actions">
+                      <% if (m.competition || m.round_name) { %>
+                        <span class="badge bg-secondary-lt me-2">
+                          <%= [m.competition, m.round_name].filter(Boolean).join(' · ') %>
+                        </span>
+                      <% } %>
+                      <span class="badge <%= fmt.matchStatus(m.status).badge %> me-2"><%= fmt.matchStatus(m.status).label %></span>
+                      <button class="btn btn-primary btn-sm" type="button" data-view="matches">Otwórz mecz</button>
                     </div>
-                    <div class="list-group list-group-flush">
-                      <% d.blockers.forEach(item => { %>
-                        <div class="list-group-item">
-                          <div class="row align-items-center g-2">
-                            <div class="col-auto">
-                              <span class="status-dot <%= item.level === 'urgent' ? 'status-dot-animated bg-red' : 'bg-yellow' %>"></span>
+                  </div>
+                  <div class="card-body">
+                    <div class="fixture-title mb-3">
+                      <span class="<%= fmt.isClub(m.home_team, clubName) ? 'club' : '' %>"><%= m.home_team %></span>
+                      <span class="text-secondary mx-2">—</span>
+                      <span class="<%= fmt.isClub(m.away_team, clubName) ? 'club' : '' %>"><%= m.away_team %></span>
+                      <% if (fmt.score(m)) { %>
+                        <span class="ms-3"><%= fmt.score(m) %></span>
+                      <% } %>
+                    </div>
+                    <div class="datagrid">
+                      <div class="datagrid-item">
+                        <div class="datagrid-title">Termin</div>
+                        <div class="datagrid-content"><%= fmt.dateTime(m.match_date) %></div>
+                      </div>
+                      <div class="datagrid-item">
+                        <div class="datagrid-title">Hala</div>
+                        <div class="datagrid-content"><%= m.venue || '—' %></div>
+                      </div>
+                      <div class="datagrid-item">
+                        <div class="datagrid-title">Do meczu</div>
+                        <div class="datagrid-content"><%= fmt.relativeDays(m.match_date) || '—' %></div>
+                      </div>
+                      <div class="datagrid-item d-none d-sm-block">
+                        <div class="datagrid-title">Materiały gotowe</div>
+                        <div class="datagrid-content"><%= d.counters.materialsReady %> / <%= d.counters.materialsTotal %></div>
+                      </div>
+                      <div class="datagrid-item d-none d-sm-block">
+                        <div class="datagrid-title">Zdjęcia w folderach</div>
+                        <div class="datagrid-content"><%= d.counters.photoCount %></div>
+                      </div>
+                      <div class="datagrid-item d-none d-sm-block">
+                        <div class="datagrid-title">Eksporty (7 dni)</div>
+                        <div class="datagrid-content"><%= d.counters.weekExports %></div>
+                      </div>
+                    </div>
+                  </div>
+                  <% if (d.counters.materialsTotal) { %>
+                    <div class="card-footer">
+                      <div class="row align-items-center g-2">
+                        <div class="col-auto text-secondary small">Pakiet materiałów meczowych</div>
+                        <div class="col">
+                          <div class="progress progress-sm">
+                            <div class="progress-bar bg-green" style="width: <%= progress %>%" role="progressbar"
+                                 aria-valuenow="<%= progress %>" aria-valuemin="0" aria-valuemax="100">
+                              <span class="visually-hidden"><%= progress %>% gotowych</span>
                             </div>
-                            <div class="col text-truncate">
-                              <div class="text-truncate"><%= item.title %></div>
-                              <div class="text-secondary small text-truncate"><%= item.detail %></div>
-                            </div>
-                            <div class="col-auto text-secondary small"><%= item.due %></div>
                           </div>
                         </div>
-                      <% }) %>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="col-12">
-                  <div class="card">
-                    <div class="card-header">
-                      <h3 class="card-title">Foldery zdjęć meczu</h3>
-                      <div class="card-actions"><a href="#" class="btn btn-link btn-sm" data-view="library">Biblioteka</a></div>
-                    </div>
-                    <div class="list-group list-group-flush">
-                      <% d.folders.items.forEach(folder => { %>
-                        <div class="list-group-item d-flex align-items-center">
-                          <svg class="icon me-2 text-secondary"><use href="#i-folder"></use></svg>
-                          <span class="flex-fill text-truncate"><%= folder.name %></span>
-                          <span class="text-secondary small me-2"><%= folder.updated %></span>
-                          <span class="badge bg-secondary-lt"><%= folder.count %></span>
-                        </div>
-                      <% }) %>
-                    </div>
-                    <% if (!d.folders.connected) { %>
-                      <div class="card-footer text-secondary small">
-                        Magazyn MEGA S3 nie jest jeszcze podłączony — liczby pochodzą z indeksu lokalnego.
+                        <div class="col-auto text-secondary small"><%= d.counters.materialsReady %> / <%= d.counters.materialsTotal %> gotowych</div>
                       </div>
-                    <% } %>
-                  </div>
-                </div>
-
-                <div class="col-12">
-                  <div class="card">
-                    <div class="card-header">
-                      <h3 class="card-title">Ostatnie eksporty</h3>
-                      <div class="card-actions"><a href="#" class="btn btn-link btn-sm" data-view="history">Historia</a></div>
                     </div>
-                    <div class="list-group list-group-flush">
-                      <% d.exports.forEach(item => { %>
-                        <div class="list-group-item d-flex align-items-center">
-                          <div class="flex-fill text-truncate">
-                            <div class="text-truncate"><%= item.name %></div>
-                            <div class="text-secondary small text-truncate"><%= item.context %> · <%= item.format %></div>
-                          </div>
-                          <span class="text-secondary small ms-2"><%= item.time %></span>
+                  <% } %>
+                </div>
+              </div>
+
+              <!-- Harmonogram materiałów -->
+              <div class="col-lg-8">
+                <div class="card">
+                  <div class="card-header">
+                    <h3 class="card-title">Materiały na ten mecz</h3>
+                    <div class="card-actions text-secondary small"><%= d.materials.length %></div>
+                  </div>
+                  <% if (!d.materials.length) { %>
+                    <div class="card-body text-secondary">
+                      Do tego meczu nie przypisano jeszcze żadnych szablonów.
+                      Pakiet grafik przypisuje się w bibliotece szablonów.
+                    </div>
+                  <% } else { %>
+                    <div class="table-responsive">
+                      <table class="table table-vcenter card-table">
+                        <thead>
+                          <tr><th>Materiał</th><th>Format</th><th>Termin</th><th>Odpowiedzialny</th><th class="w-1">Status</th></tr>
+                        </thead>
+                        <tbody>
+                          <% d.materials.forEach(item => { %>
+                            <tr>
+                              <td>
+                                <div><%= item.template_name %></div>
+                                <% if (item.note) { %><div class="text-secondary small"><%= item.note %></div><% } %>
+                              </td>
+                              <td class="text-secondary text-nowrap"><%= item.width %>×<%= item.height %></td>
+                              <td class="text-secondary text-nowrap">
+                                <%= item.deadline_at ? fmt.dateTime(item.deadline_at) : '—' %>
+                              </td>
+                              <td class="text-secondary"><%= item.owner_role ? fmt.roleLabel(item.owner_role) : '—' %></td>
+                              <td>
+                                <span class="badge <%= fmt.materialStatus(item.status).badge %>">
+                                  <%= fmt.materialStatus(item.status).label %>
+                                </span>
+                              </td>
+                            </tr>
+                          <% }) %>
+                        </tbody>
+                      </table>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+
+              <!-- Kolumna kontrolna -->
+              <div class="col-lg-4">
+                <div class="row row-cards">
+                  <div class="col-12">
+                    <div class="card">
+                      <div class="card-header">
+                        <h3 class="card-title">Wymaga decyzji</h3>
+                        <div class="card-actions">
+                          <span class="badge <%= d.alerts.length ? 'bg-red-lt' : 'bg-green-lt' %>"><%= d.alerts.length %></span>
                         </div>
-                      <% }) %>
+                      </div>
+                      <% if (!d.alerts.length) { %>
+                        <div class="card-body text-secondary">Nic nie wymaga reakcji.</div>
+                      <% } else { %>
+                        <div class="list-group list-group-flush">
+                          <% d.alerts.forEach(item => { %>
+                            <div class="list-group-item">
+                              <div class="row align-items-center g-2">
+                                <div class="col-auto">
+                                  <span class="status-dot <%= item.level === 'urgent' ? 'status-dot-animated bg-red' : 'bg-yellow' %>"></span>
+                                </div>
+                                <div class="col">
+                                  <div><%= item.title %></div>
+                                  <div class="text-secondary small"><%= item.detail %></div>
+                                </div>
+                              </div>
+                            </div>
+                          <% }) %>
+                        </div>
+                      <% } %>
+                    </div>
+                  </div>
+
+                  <div class="col-12">
+                    <div class="card">
+                      <div class="card-header">
+                        <h3 class="card-title">Foldery zdjęć meczu</h3>
+                        <div class="card-actions"><a href="#" class="btn btn-link btn-sm" data-view="library">Biblioteka</a></div>
+                      </div>
+                      <% if (!d.folders.length) { %>
+                        <div class="card-body text-secondary">Do tego meczu nie przypisano folderów zdjęć.</div>
+                      <% } else { %>
+                        <div class="list-group list-group-flush">
+                          <% d.folders.forEach(folder => { %>
+                            <div class="list-group-item d-flex align-items-center">
+                              <svg class="icon me-2 text-secondary"><use href="#i-folder"></use></svg>
+                              <span class="flex-fill text-truncate"><%= folder.name %></span>
+                              <span class="badge bg-secondary-lt"><%= folder.photo_count %></span>
+                            </div>
+                          <% }) %>
+                        </div>
+                      <% } %>
+                    </div>
+                  </div>
+
+                  <div class="col-12">
+                    <div class="card">
+                      <div class="card-header">
+                        <h3 class="card-title">Ostatnie eksporty</h3>
+                        <div class="card-actions"><a href="#" class="btn btn-link btn-sm" data-view="history">Historia</a></div>
+                      </div>
+                      <% if (!d.exports.length) { %>
+                        <div class="card-body text-secondary">Nie wyeksportowano jeszcze żadnej grafiki.</div>
+                      <% } else { %>
+                        <div class="list-group list-group-flush">
+                          <% d.exports.forEach(item => { %>
+                            <div class="list-group-item d-flex align-items-center">
+                              <div class="flex-fill text-truncate">
+                                <div class="text-truncate"><%= item.design_title || item.template_name %></div>
+                                <div class="text-secondary small text-truncate">
+                                  <%= item.format.toUpperCase() %> <%= item.width %>×<%= item.height %>
+                                </div>
+                              </div>
+                              <span class="text-secondary small ms-2"><%= fmt.date(item.created_at) %></span>
+                            </div>
+                          <% }) %>
+                        </div>
+                      <% } %>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Materiały spoza kalendarza meczowego -->
-            <div class="col-12">
-              <div class="card">
-                <div class="card-header">
-                  <h3 class="card-title">Poza meczem</h3>
-                  <div class="card-actions"><a href="#" class="btn btn-link btn-sm" data-view="other">Inne grafiki</a></div>
-                </div>
-                <div class="table-responsive">
-                  <table class="table table-vcenter card-table">
-                    <thead>
-                      <tr><th class="w-1">Termin</th><th>Materiał</th><th>Format</th><th class="w-1">Status</th></tr>
-                    </thead>
-                    <tbody>
-                      <% d.offMatch.forEach(item => { %>
-                        <tr>
-                          <td class="text-secondary text-nowrap"><%= item.due %></td>
-                          <td><%= item.name %></td>
-                          <td class="text-secondary"><%= item.context %></td>
-                          <td><span class="badge <%= badgeByState[item.state] %>"><%= item.status %></span></td>
-                        </tr>
-                      <% }) %>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
-
-          </div>
+          <% } %>
         </div>
       </div>
 
@@ -305,50 +341,41 @@
         <div class="container-fluid">
           <div class="card">
             <div class="card-header">
-              <h3 class="card-title">Mecze sezonu <%= d.season %></h3>
-              <div class="card-actions">
+              <h3 class="card-title">
+                Mecze<% if (d.season) { %> — sezon <%= d.season.name %><% } %>
+              </h3>
+              <div class="card-actions d-flex gap-2">
                 <div class="input-group input-group-flat w-auto">
                   <span class="input-group-text"><svg class="icon"><use href="#i-search"></use></svg></span>
-                  <input type="search" class="form-control" placeholder="Szukaj meczu…" aria-label="Szukaj meczu">
+                  <input type="search" class="form-control" id="match-search" placeholder="Szukaj drużyny lub hali…" aria-label="Szukaj meczu">
                 </div>
+                <select class="form-select w-auto" id="match-status-filter" aria-label="Status">
+                  <option value="">Wszystkie statusy</option>
+                  <option value="planned">Zaplanowane</option>
+                  <option value="live">Na żywo</option>
+                  <option value="finished">Rozegrane</option>
+                  <option value="cancelled">Odwołane</option>
+                </select>
+                <% if (role === 'admin') { %>
+                  <button class="btn btn-primary" type="button" data-match-new data-bs-toggle="modal" data-bs-target="#match-modal">
+                    <svg class="icon"><use href="#i-plus"></use></svg>Dodaj mecz
+                  </button>
+                <% } %>
               </div>
             </div>
+
             <div class="table-responsive">
               <table class="table table-vcenter card-table table-hover">
                 <thead>
-                  <tr><th>Mecz</th><th>Termin</th><th>Wynik</th><th>Status</th><th>Materiały</th><th class="w-1"></th></tr>
+                  <tr>
+                    <th>Mecz</th><th>Termin</th><th>Wynik</th><th>Status</th><th>Materiały</th>
+                    <% if (role === 'admin') { %><th class="w-1"></th><% } %>
+                  </tr>
                 </thead>
-                <tbody>
-                  <tr data-match="zastal-anwil" style="cursor:pointer">
-                    <td><div><span class="text-green">Zastal</span> — Anwil Włocławek</div>
-                        <div class="text-secondary small">Hala CRS, Zielona Góra · kolejka 3</div></td>
-                    <td class="text-nowrap">27.09.2026<div class="text-secondary small">18:00</div></td>
-                    <td class="fw-bold">92 : 81</td>
-                    <td><span class="badge bg-green-lt">Rozegrany</span></td>
-                    <td class="text-secondary">8 / 8</td>
-                    <td><button class="btn btn-icon btn-ghost-secondary" aria-label="Więcej"><svg class="icon"><use href="#i-more"></use></svg></button></td>
-                  </tr>
-                  <tr>
-                    <td><div>Śląsk Wrocław — <span class="text-green">Zastal</span></div>
-                        <div class="text-secondary small">Hala Orbita, Wrocław · kolejka 4</div></td>
-                    <td class="text-nowrap">04.10.2026<div class="text-secondary small">17:30</div></td>
-                    <td class="text-secondary">— : —</td>
-                    <td><span class="badge bg-yellow-lt">W przygotowaniu</span></td>
-                    <td class="text-secondary">2 / 8</td>
-                    <td><button class="btn btn-icon btn-ghost-secondary" aria-label="Więcej"><svg class="icon"><use href="#i-more"></use></svg></button></td>
-                  </tr>
-                  <tr>
-                    <td><div><span class="text-green">Zastal</span> — King Szczecin</div>
-                        <div class="text-secondary small">Hala CRS, Zielona Góra · kolejka 5</div></td>
-                    <td class="text-nowrap">11.10.2026<div class="text-secondary small">16:00</div></td>
-                    <td class="text-secondary">— : —</td>
-                    <td><span class="badge bg-secondary-lt">Zaplanowany</span></td>
-                    <td class="text-secondary">0 / 7</td>
-                    <td><button class="btn btn-icon btn-ghost-secondary" aria-label="Więcej"><svg class="icon"><use href="#i-more"></use></svg></button></td>
-                  </tr>
-                </tbody>
+                <tbody id="matches-body"></tbody>
               </table>
             </div>
+            <div class="card-body text-secondary d-none" id="matches-empty"></div>
           </div>
         </div>
       </div>
@@ -374,7 +401,7 @@
                   <div class="datagrid">
                     <div class="datagrid-item"><div class="datagrid-title">Rozgrywki</div><div class="datagrid-content">ORLEN Basket Liga</div></div>
                     <div class="datagrid-item"><div class="datagrid-title">Kolejka</div><div class="datagrid-content">3</div></div>
-                    <div class="datagrid-item"><div class="datagrid-title">Sezon</div><div class="datagrid-content"><%= d.season %></div></div>
+                    <div class="datagrid-item"><div class="datagrid-title">Sezon</div><div class="datagrid-content"><%= d.season ? d.season.name : '—' %></div></div>
                   </div>
                 </div>
                 <div class="card-footer"><button class="btn btn-sm w-100" type="button">Edytuj dane meczu</button></div>
@@ -383,15 +410,19 @@
             <div class="col-lg-4">
               <div class="card">
                 <div class="card-header"><h3 class="card-title">Foldery zdjęć</h3></div>
-                <div class="list-group list-group-flush">
-                  <% d.folders.items.forEach(folder => { %>
-                    <a href="#" class="list-group-item list-group-item-action d-flex align-items-center">
-                      <svg class="icon me-2 text-secondary"><use href="#i-folder"></use></svg>
-                      <span class="flex-fill"><%= folder.name %></span>
-                      <span class="badge bg-secondary-lt"><%= folder.count %></span>
-                    </a>
-                  <% }) %>
-                </div>
+                <% if (!d.folders.length) { %>
+                  <div class="card-body text-secondary">Brak folderów przypisanych do tego meczu.</div>
+                <% } else { %>
+                  <div class="list-group list-group-flush">
+                    <% d.folders.forEach(folder => { %>
+                      <a href="#" class="list-group-item list-group-item-action d-flex align-items-center">
+                        <svg class="icon me-2 text-secondary"><use href="#i-folder"></use></svg>
+                        <span class="flex-fill"><%= folder.name %></span>
+                        <span class="badge bg-secondary-lt"><%= folder.photo_count %></span>
+                      </a>
+                    <% }) %>
+                  </div>
+                <% } %>
                 <div class="card-footer"><button class="btn btn-sm w-100" type="button">Zarządzaj folderami</button></div>
               </div>
             </div>
@@ -689,6 +720,30 @@
               <div class="card">
                 <div class="card-header">
                   <div>
+                    <h3 class="card-title">Sezony</h3>
+                    <div class="text-secondary small">Aktywny sezon decyduje, które mecze widać w aplikacji.</div>
+                  </div>
+                  <div class="card-actions">
+                    <button class="btn btn-primary btn-sm" type="button" data-season-new data-bs-toggle="modal" data-bs-target="#season-modal">
+                      <svg class="icon"><use href="#i-plus"></use></svg>Nowy sezon
+                    </button>
+                  </div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-vcenter card-table">
+                    <thead>
+                      <tr><th>Sezon</th><th>Okres</th><th>Mecze</th><th>Status</th><th class="w-1"></th></tr>
+                    </thead>
+                    <tbody id="seasons-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="card">
+                <div class="card-header">
+                  <div>
                     <h3 class="card-title">Integracje zewnętrzne</h3>
                     <div class="text-secondary small">Moduły, które wymagają kluczy dostępu wpisanych w pliku .env na serwerze.</div>
                   </div>
@@ -745,6 +800,117 @@
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+
+<!-- ==================== MODALE ==================== -->
+<div class="modal modal-blur fade" id="match-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="match-modal-title">Nowy mecz</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+      <form id="match-form" novalidate>
+        <div class="modal-body">
+          <div class="alert alert-danger d-none" id="match-form-error" role="alert"></div>
+          <input type="hidden" name="id">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label required" for="match-home">Gospodarz</label>
+              <input class="form-control" id="match-home" name="home_team" maxlength="160" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label required" for="match-away">Gość</label>
+              <input class="form-control" id="match-away" name="away_team" maxlength="160" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label required" for="match-date">Data i godzina</label>
+              <input class="form-control" id="match-date" name="match_date" type="datetime-local" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label required" for="match-season">Sezon</label>
+              <select class="form-select" id="match-season" name="season_id" required>
+                <% d.seasons.forEach(season => { %>
+                  <option value="<%= season.id %>" <%= d.season && season.id === d.season.id ? 'selected' : '' %>>
+                    <%= season.name %>
+                  </option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="match-competition">Rozgrywki</label>
+              <input class="form-control" id="match-competition" name="competition" maxlength="160" placeholder="ORLEN Basket Liga">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="match-round">Kolejka</label>
+              <input class="form-control" id="match-round" name="round_name" maxlength="80" placeholder="Kolejka 4">
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="match-venue">Hala</label>
+              <input class="form-control" id="match-venue" name="venue" maxlength="255" placeholder="Hala CRS, Zielona Góra">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="match-status">Status</label>
+              <select class="form-select" id="match-status" name="status">
+                <option value="planned">Zaplanowany</option>
+                <option value="live">Na żywo</option>
+                <option value="finished">Rozegrany</option>
+                <option value="cancelled">Odwołany</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="match-home-score">Wynik gospodarza</label>
+              <input class="form-control" id="match-home-score" name="home_score" type="number" min="0" max="300" placeholder="—">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="match-away-score">Wynik gościa</label>
+              <input class="form-control" id="match-away-score" name="away_score" type="number" min="0" max="300" placeholder="—">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Anuluj</button>
+          <button type="submit" class="btn btn-primary ms-auto" id="match-submit">Zapisz mecz</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal modal-blur fade" id="season-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="season-modal-title">Nowy sezon</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+      <form id="season-form" novalidate>
+        <div class="modal-body">
+          <div class="alert alert-danger d-none" id="season-form-error" role="alert"></div>
+          <input type="hidden" name="id">
+          <div class="mb-3">
+            <label class="form-label required" for="season-name">Nazwa sezonu</label>
+            <input class="form-control" id="season-name" name="name" maxlength="64" placeholder="2026 / 27" required>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="season-start">Początek</label>
+              <input class="form-control" id="season-start" name="starts_on" type="date">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="season-end">Koniec</label>
+              <input class="form-control" id="season-end" name="ends_on" type="date">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Anuluj</button>
+          <button type="submit" class="btn btn-primary ms-auto">Zapisz sezon</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

@@ -19,6 +19,14 @@ app.disable('x-powered-by');
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+// Niepoprawny JSON w żądaniu to błąd klienta, nie awaria serwera.
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ success: false, error: 'Nieprawidłowy format danych żądania.' });
+  }
+  return next(err);
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 
@@ -34,6 +42,9 @@ app.use(session({
     maxAge: 12 * 60 * 60 * 1000
   }
 }));
+
+// Pomocnik formatujący dostępny we wszystkich widokach.
+app.locals.fmt = require('./utils/club-format');
 
 app.use((req, res, next) => {
   res.locals.appName = process.env.APP_NAME || 'ZASTAL MARKETING CENTER';

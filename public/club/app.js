@@ -90,6 +90,7 @@ function showView(name) {
   if (eyebrow) eyebrow.textContent = viewContext[name] || seasonLabel;
   document.querySelector('.page-body')?.scrollTo({ top: 0 });
   if (name === 'social') loadSocialView();
+  if (name === 'matches' && !matchesLoaded) loadMatches();
 }
 
 document.querySelectorAll('[data-view]').forEach((el) => {
@@ -97,9 +98,6 @@ document.querySelectorAll('[data-view]').forEach((el) => {
     event.preventDefault();
     showView(el.dataset.view);
   });
-});
-document.querySelector('[data-match]')?.addEventListener('click', (event) => {
-  if (!event.target.closest('button')) showView('match');
 });
 
 /* ---------------- Grafiki meczowe ---------------- */
@@ -400,6 +398,305 @@ const historyBody = document.getElementById('history-body');
 
 renderTemplates();
 renderEditor();
+
+
+/* ================= Sezony i mecze (prawdziwe dane z API) ================= */
+
+const isAdmin = document.body.dataset.role === 'admin';
+
+async function api(url, options = {}) {
+  const response = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.success === false) {
+    const error = new Error(payload.error || 'Operacja nie powiodła się.');
+    error.field = payload.field;
+    throw error;
+  }
+  return payload;
+}
+
+const MATCH_STATUS = {
+  planned: { label: 'Zaplanowany', badge: 'bg-secondary-lt' },
+  live: { label: 'Na żywo', badge: 'bg-red-lt' },
+  finished: { label: 'Rozegrany', badge: 'bg-green-lt' },
+  cancelled: { label: 'Odwołany', badge: 'bg-secondary-lt' }
+};
+const CLUB_NAME = (document.body.dataset.club || 'Zastal').toLowerCase();
+
+function formatDate(value) {
+  const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? { date: `${m[3]}.${m[2]}.${m[1]}`, time: `${m[4]}:${m[5]}`, input: `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}` } : null;
+}
+
+function teamMarkup(name) {
+  const club = String(name || '').toLowerCase().includes(CLUB_NAME);
+  return `<span class="${club ? 'text-green' : ''}">${escapeHTML(name)}</span>`;
+}
+
+/* ---- lista meczów ---- */
+const matchesBody = document.getElementById('matches-body');
+const matchesEmpty = document.getElementById('matches-empty');
+const matchSearch = document.getElementById('match-search');
+const matchStatusFilter = document.getElementById('match-status-filter');
+let matchesLoaded = false;
+
+async function loadMatches() {
+  if (!matchesBody) return;
+  const params = new URLSearchParams();
+  if (matchSearch?.value.trim()) params.set('q', matchSearch.value.trim());
+  if (matchStatusFilter?.value) params.set('status', matchStatusFilter.value);
+  const season = document.getElementById('season-switch')?.value;
+  if (season) params.set('season', season);
+
+  try {
+    const { matches } = await api('/api/matches?' + params.toString());
+    renderMatches(matches);
+    matchesLoaded = true;
+  } catch (error) {
+    matchesBody.innerHTML = '';
+    showMatchesMessage(error.message);
+  }
+}
+
+function showMatchesMessage(message) {
+  if (!matchesEmpty) return;
+  matchesEmpty.textContent = message;
+  matchesEmpty.classList.toggle('d-none', !message);
+}
+
+function renderMatches(matches) {
+  if (!matches.length) {
+    matchesBody.innerHTML = '';
+    showMatchesMessage(matchSearch?.value || matchStatusFilter?.value
+      ? 'Żaden mecz nie pasuje do filtrów.'
+      : 'Brak meczów w tym sezonie.');
+    return;
+  }
+  showMatchesMessage('');
+  matchesBody.innerHTML = matches.map((match) => {
+    const when = formatDate(match.match_date);
+    const status = MATCH_STATUS[match.status] || MATCH_STATUS.planned;
+    const score = (match.home_score === null || match.away_score === null)
+      ? '<span class="text-secondary">— : —</span>'
+      : `<span class="fw-bold">${match.home_score} : ${match.away_score}</span>`;
+    const context = [match.venue, match.round_name].filter(Boolean).join(' · ');
+    return `<tr data-match-id="${match.id}">
+      <td>
+        <div>${teamMarkup(match.home_team)} <span class="text-secondary">—</span> ${teamMarkup(match.away_team)}</div>
+        ${context ? `<div class="text-secondary small">${escapeHTML(context)}</div>` : ''}
+      </td>
+      <td class="text-nowrap">${when ? when.date : '—'}<div class="text-secondary small">${when ? when.time : ''}</div></td>
+      <td>${score}</td>
+      <td><span class="badge ${status.badge}">${status.label}</span></td>
+      <td class="text-secondary text-nowrap">${match.materials_ready} / ${match.materials_total}</td>
+      ${isAdmin ? `<td>
+        <div class="btn-list flex-nowrap">
+          <button class="btn btn-icon btn-sm" type="button" data-match-edit="${match.id}" data-bs-toggle="modal" data-bs-target="#match-modal" aria-label="Edytuj mecz">
+            ${icon('edit')}
+          </button>
+          <button class="btn btn-icon btn-sm" type="button" data-match-delete="${match.id}" aria-label="Usuń mecz">
+            ${icon('trash')}
+          </button>
+        </div>
+      </td>` : ''}
+    </tr>`;
+  }).join('');
+}
+
+let searchTimer;
+matchSearch?.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadMatches, 250);
+});
+matchStatusFilter?.addEventListener('change', loadMatches);
+
+/* ---- formularz meczu ---- */
+// Tabler dołącza Bootstrapa, ale nie wystawia go jako window.bootstrap — modale
+// otwieramy atrybutami data-bs-*, a zamykamy klikając ukryty przycisk zamknięcia.
+function hideModal(modalEl) {
+  modalEl?.querySelector('[data-bs-dismiss="modal"]')?.click();
+}
+
+const matchModalEl = document.getElementById('match-modal');
+const matchForm = document.getElementById('match-form');
+const matchFormError = document.getElementById('match-form-error');
+
+function setFormError(box, message) {
+  if (!box) return;
+  box.textContent = message || '';
+  box.classList.toggle('d-none', !message);
+}
+
+function fillMatchForm(match) {
+  if (!matchForm) return;
+  matchForm.reset();
+  setFormError(matchFormError, '');
+  matchForm.elements.id.value = match?.id || '';
+  document.getElementById('match-modal-title').textContent = match ? 'Edytuj mecz' : 'Nowy mecz';
+
+  if (match) {
+    matchForm.elements.home_team.value = match.home_team || '';
+    matchForm.elements.away_team.value = match.away_team || '';
+    matchForm.elements.match_date.value = formatDate(match.match_date)?.input || '';
+    matchForm.elements.season_id.value = match.season_id;
+    matchForm.elements.competition.value = match.competition || '';
+    matchForm.elements.round_name.value = match.round_name || '';
+    matchForm.elements.venue.value = match.venue || '';
+    matchForm.elements.status.value = match.status;
+    matchForm.elements.home_score.value = match.home_score ?? '';
+    matchForm.elements.away_score.value = match.away_score ?? '';
+  }
+}
+
+// Formularz wypełniamy w momencie otwierania modalu — wiemy wtedy, który
+// przycisk go otworzył (nowy mecz czy edycja konkretnego wiersza).
+matchModalEl?.addEventListener('show.bs.modal', async (event) => {
+  const trigger = event.relatedTarget;
+  const editId = trigger?.dataset?.matchEdit;
+  fillMatchForm(null);
+  document.getElementById('match-modal-title').textContent = editId ? 'Edytuj mecz' : 'Nowy mecz';
+  if (!editId) return;
+  try {
+    const { match } = await api('/api/matches/' + editId);
+    fillMatchForm(match);
+  } catch (error) {
+    setFormError(matchFormError, error.message);
+  }
+});
+
+document.addEventListener('click', async (event) => {
+  const deleteBtn = event.target.closest('[data-match-delete]');
+  if (deleteBtn) {
+    const row = deleteBtn.closest('tr');
+    const label = row?.querySelector('td')?.textContent.trim() || 'ten mecz';
+    if (!confirm(`Usunąć ${label}? Operacji nie można cofnąć.`)) return;
+    try {
+      await api('/api/matches/' + deleteBtn.dataset.matchDelete, { method: 'DELETE' });
+      loadMatches();
+    } catch (error) { showMatchesMessage(error.message); }
+  }
+});
+
+matchForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submit = document.getElementById('match-submit');
+  const data = Object.fromEntries(new FormData(matchForm).entries());
+  const id = data.id;
+  delete data.id;
+
+  submit.disabled = true;
+  setFormError(matchFormError, '');
+  try {
+    await api(id ? '/api/matches/' + id : '/api/matches', {
+      method: id ? 'PATCH' : 'POST',
+      body: JSON.stringify(data)
+    });
+    hideModal(matchModalEl);
+    if (document.getElementById('view-dashboard')?.classList.contains('active-view')) {
+      window.location.reload();
+    } else {
+      loadMatches();
+    }
+  } catch (error) {
+    setFormError(matchFormError, error.message);
+    if (error.field && matchForm.elements[error.field]) matchForm.elements[error.field].focus();
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+/* ---- sezony ---- */
+const seasonsBody = document.getElementById('seasons-body');
+const seasonModalEl = document.getElementById('season-modal');
+const seasonForm = document.getElementById('season-form');
+const seasonFormError = document.getElementById('season-form-error');
+
+async function loadSeasons() {
+  if (!seasonsBody) return;
+  const { seasons } = await api('/api/seasons');
+  seasonsBody.innerHTML = seasons.map((season) => `
+    <tr>
+      <td>${escapeHTML(season.name)}</td>
+      <td class="text-secondary text-nowrap">
+        ${season.starts_on ? escapeHTML(season.starts_on) : '—'} – ${season.ends_on ? escapeHTML(season.ends_on) : '—'}
+      </td>
+      <td class="text-secondary">${season.match_count}</td>
+      <td>${season.is_active
+        ? '<span class="badge bg-green-lt">Aktywny</span>'
+        : '<button class="btn btn-sm" type="button" data-season-activate="' + season.id + '">Ustaw jako aktywny</button>'}</td>
+      <td>
+        <div class="btn-list flex-nowrap">
+          <button class="btn btn-icon btn-sm" type="button" data-season-edit='${escapeHTML(JSON.stringify(season))}' data-bs-toggle="modal" data-bs-target="#season-modal" aria-label="Edytuj sezon">${icon('edit')}</button>
+          <button class="btn btn-icon btn-sm" type="button" data-season-delete="${season.id}" aria-label="Usuń sezon">${icon('trash')}</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+seasonModalEl?.addEventListener('show.bs.modal', (event) => {
+  const raw = event.relatedTarget?.dataset?.seasonEdit;
+  seasonForm?.reset();
+  setFormError(seasonFormError, '');
+  if (!seasonForm) return;
+  if (!raw) {
+    seasonForm.elements.id.value = '';
+    document.getElementById('season-modal-title').textContent = 'Nowy sezon';
+    return;
+  }
+  const season = JSON.parse(raw);
+  seasonForm.elements.id.value = season.id;
+  seasonForm.elements.name.value = season.name;
+  seasonForm.elements.starts_on.value = season.starts_on || '';
+  seasonForm.elements.ends_on.value = season.ends_on || '';
+  document.getElementById('season-modal-title').textContent = 'Edytuj sezon';
+});
+
+document.addEventListener('click', async (event) => {
+  const activate = event.target.closest('[data-season-activate]');
+  if (activate) {
+    await api('/api/seasons/' + activate.dataset.seasonActivate + '/activate', { method: 'POST' });
+    window.location.reload();
+    return;
+  }
+  const remove = event.target.closest('[data-season-delete]');
+  if (remove) {
+    if (!confirm('Usunąć ten sezon?')) return;
+    try {
+      await api('/api/seasons/' + remove.dataset.seasonDelete, { method: 'DELETE' });
+      loadSeasons();
+    } catch (error) { alert(error.message); }
+  }
+});
+
+seasonForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(seasonForm).entries());
+  const id = data.id;
+  delete data.id;
+  setFormError(seasonFormError, '');
+  try {
+    await api(id ? '/api/seasons/' + id : '/api/seasons', {
+      method: id ? 'PATCH' : 'POST',
+      body: JSON.stringify(data)
+    });
+    hideModal(seasonModalEl);
+    window.location.reload();
+  } catch (error) {
+    setFormError(seasonFormError, error.message);
+  }
+});
+
+document.getElementById('season-switch')?.addEventListener('change', async (event) => {
+  try {
+    await api('/api/seasons/' + event.target.value + '/activate', { method: 'POST' });
+    window.location.reload();
+  } catch (error) { alert(error.message); }
+});
+
+if (seasonsBody) loadSeasons().catch(() => {});
 
 /* ---------------- Monitoring social ---------------- */
 const socialElements = {
