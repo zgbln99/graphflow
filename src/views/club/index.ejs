@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pl" data-bs-theme="<%= ui.theme %>">
+<html lang="pl" data-bs-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -20,49 +20,36 @@
   const d = dashboard;
   const m = d.nextMatch;
   const ready = d.facts.find(f => f.label === 'Materiały gotowe');
-  const vertical = ui.layout !== 'poziomy';
-  const partials = { branding, user, role, can, initials, roleLabels, d, vertical };
+  // Układ nawigacji: pasek górny (wariant wybrany przez właściciela projektu).
+  const partials = { branding, user, role, can, initials, roleLabels, d };
 %>
 <%- include('_icons') %>
 
 <div class="page">
   <!-- ======================= NAWIGACJA ======================= -->
-  <% if (vertical) { %>
-    <aside class="navbar navbar-vertical navbar-expand-lg" <%= ui.theme === 'dark' ? 'data-bs-theme="dark"' : '' %>>
-      <div class="container-fluid">
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"
-                aria-controls="sidebar-menu" aria-expanded="false" aria-label="Menu">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="navbar-brand navbar-brand-club"><%- include('_brand', partials) %></div>
-        <div class="collapse navbar-collapse" id="sidebar-menu">
-          <ul class="navbar-nav pt-lg-2"><%- include('_nav-items', partials) %></ul>
-          <div class="mt-auto pt-3">
-            <div class="alert alert-warning py-2 px-3 mb-3" role="status">
-              <div class="text-truncate small">Magazyn zdjęć: <strong>nieskonfigurowany</strong></div>
-            </div>
-            <div class="d-flex align-items-center border-top pt-3"><%- include('_user', partials) %></div>
-          </div>
+  <header class="navbar navbar-expand-md d-print-none" data-bs-theme="dark">
+    <div class="container-xl">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topbar-menu"
+              aria-controls="topbar-menu" aria-expanded="false" aria-label="Menu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="navbar-brand navbar-brand-club me-3 me-lg-4"><%- include('_brand', partials) %></div>
+
+      <div class="navbar-nav flex-row order-md-last ms-auto align-items-center">
+        <div class="nav-item status-magazyn d-none d-md-flex me-3">
+          <span class="status status-warning status-lite" title="Magazyn zdjęć nieskonfigurowany">
+            <span class="status-dot"></span>Magazyn
+          </span>
         </div>
+        <div class="d-flex align-items-center"><%- include('_user', partials) %></div>
       </div>
-    </aside>
-  <% } else { %>
-    <header class="navbar navbar-expand-md d-print-none" <%= ui.theme === 'dark' ? 'data-bs-theme="dark"' : '' %>>
-      <div class="container-xl">
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topbar-menu"
-                aria-controls="topbar-menu" aria-expanded="false" aria-label="Menu">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="navbar-brand navbar-brand-club me-4"><%- include('_brand', partials) %></div>
-        <div class="navbar-nav flex-row order-md-last ms-auto">
-          <div class="d-flex align-items-center"><%- include('_user', partials) %></div>
-        </div>
-        <div class="collapse navbar-collapse" id="topbar-menu">
-          <ul class="navbar-nav"><%- include('_nav-items', partials) %></ul>
-        </div>
+
+      <div class="collapse navbar-collapse" id="topbar-menu">
+        <ul class="navbar-nav"><%- include('_nav-items', partials) %></ul>
       </div>
-    </header>
-  <% } %>
+    </div>
+  </header>
 
   <!-- ======================= OBSZAR ROBOCZY ======================= -->
   <div class="page-wrapper">

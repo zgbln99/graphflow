@@ -84,7 +84,7 @@ function showView(name) {
   views.forEach((view) => view.classList.remove('active-view'));
   document.getElementById('view-' + name)?.classList.add('active-view');
   document.querySelectorAll('.navbar-nav .nav-item').forEach((item) => {
-    item.classList.toggle('active', item.querySelector('[data-view]')?.dataset.view === name);
+    item.classList.toggle('active', Boolean(item.querySelector(`[data-view="${name}"]`)));
   });
   if (pageTitle) pageTitle.textContent = viewLabels[name] || name;
   if (eyebrow) eyebrow.textContent = viewContext[name] || seasonLabel;
