@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pl" data-bs-theme="dark">
+<html lang="pl" data-bs-theme="<%= ui.theme %>">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -20,113 +20,49 @@
   const d = dashboard;
   const m = d.nextMatch;
   const ready = d.facts.find(f => f.label === 'Materiały gotowe');
+  const vertical = ui.layout !== 'poziomy';
+  const partials = { branding, user, role, can, initials, roleLabels, d, vertical };
 %>
 <%- include('_icons') %>
 
 <div class="page">
-  <!-- ======================= PANEL BOCZNY ======================= -->
-  <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
-    <div class="container-fluid">
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"
-              aria-controls="sidebar-menu" aria-expanded="false" aria-label="Menu">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-
-      <div class="navbar-brand navbar-brand-club">
-        <% if (branding && branding.logoUrl) { %>
-          <img src="<%= branding.logoUrl %>" alt="Logo klubu">
-        <% } else { %>
-          <span class="wordmark"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
-        <% } %>
-      </div>
-
-      <div class="collapse navbar-collapse" id="sidebar-menu">
-        <ul class="navbar-nav pt-lg-2">
-          <li class="nav-item active">
-            <a class="nav-link" href="#" data-view="dashboard">
-              <span class="nav-link-icon"><svg class="icon"><use href="#i-dashboard"></use></svg></span>
-              <span class="nav-link-title">Dashboard</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#" data-view="matches">
-              <span class="nav-link-icon"><svg class="icon"><use href="#i-match"></use></svg></span>
-              <span class="nav-link-title">Mecze</span>
-              <span class="badge bg-secondary-lt ms-auto">3</span>
-            </a>
-          </li>
-          <% if (can('admin','designer','social')) { %>
-          <li class="nav-item">
-            <a class="nav-link" href="#" data-view="other">
-              <span class="nav-link-icon"><svg class="icon"><use href="#i-other"></use></svg></span>
-              <span class="nav-link-title">Inne grafiki</span>
-            </a>
-          </li>
-          <% } %>
-          <% if (can('admin','social')) { %>
-          <li class="nav-item">
-            <a class="nav-link" href="#" data-view="social">
-              <span class="nav-link-icon"><svg class="icon"><use href="#i-social"></use></svg></span>
-              <span class="nav-link-title">Monitoring social</span>
-            </a>
-          </li>
-          <% } %>
-
-          <li class="nav-item mt-3"><div class="hr-text hr-text-left m-0 px-2"><span>Biblioteka</span></div></li>
-          <% if (can('admin','designer')) { %>
-          <li class="nav-item">
-            <a class="nav-link" href="#" data-view="templates">
-              <span class="nav-link-icon"><svg class="icon"><use href="#i-template"></use></svg></span>
-              <span class="nav-link-title">Szablony</span>
-            </a>
-          </li>
-          <% } %>
-          <li class="nav-item">
-            <a class="nav-link" href="#" data-view="library">
-              <span class="nav-link-icon"><svg class="icon"><use href="#i-photos"></use></svg></span>
-              <span class="nav-link-title">Biblioteka zdjęć</span>
-            </a>
-          </li>
-          <% if (can('admin','designer','social')) { %>
-          <li class="nav-item">
-            <a class="nav-link" href="#" data-view="history">
-              <span class="nav-link-icon"><svg class="icon"><use href="#i-history"></use></svg></span>
-              <span class="nav-link-title">Historia</span>
-            </a>
-          </li>
-          <% } %>
-
-          <% if (role === 'admin') { %>
-          <li class="nav-item mt-3"><div class="hr-text hr-text-left m-0 px-2"><span>Administracja</span></div></li>
-          <li class="nav-item">
-            <a class="nav-link" href="#" data-view="settings">
-              <span class="nav-link-icon"><svg class="icon"><use href="#i-settings"></use></svg></span>
-              <span class="nav-link-title">Ustawienia</span>
-            </a>
-          </li>
-          <% } %>
-        </ul>
-
-        <div class="mt-auto pt-3">
-          <div class="alert alert-warning py-2 px-3 mb-3" role="status">
-            <div class="text-truncate small">Magazyn zdjęć: <strong>nieskonfigurowany</strong></div>
-          </div>
-          <div class="d-flex align-items-center border-top pt-3">
-            <span class="avatar avatar-sm me-2"><%= initials %></span>
-            <div class="flex-fill lh-sm text-truncate">
-              <div class="text-truncate"><%= user.displayName %></div>
-              <div class="text-secondary small text-truncate"><%= roleLabels[role] || role %></div>
+  <!-- ======================= NAWIGACJA ======================= -->
+  <% if (vertical) { %>
+    <aside class="navbar navbar-vertical navbar-expand-lg" <%= ui.theme === 'dark' ? 'data-bs-theme="dark"' : '' %>>
+      <div class="container-fluid">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"
+                aria-controls="sidebar-menu" aria-expanded="false" aria-label="Menu">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="navbar-brand navbar-brand-club"><%- include('_brand', partials) %></div>
+        <div class="collapse navbar-collapse" id="sidebar-menu">
+          <ul class="navbar-nav pt-lg-2"><%- include('_nav-items', partials) %></ul>
+          <div class="mt-auto pt-3">
+            <div class="alert alert-warning py-2 px-3 mb-3" role="status">
+              <div class="text-truncate small">Magazyn zdjęć: <strong>nieskonfigurowany</strong></div>
             </div>
-            <form method="post" action="/logout" class="ms-2">
-              <button type="submit" class="btn btn-icon btn-ghost-secondary" title="Wyloguj się" aria-label="Wyloguj się">
-                <svg class="icon"><use href="#i-logout"></use></svg>
-              </button>
-            </form>
+            <div class="d-flex align-items-center border-top pt-3"><%- include('_user', partials) %></div>
           </div>
         </div>
       </div>
-    </div>
-  </aside>
+    </aside>
+  <% } else { %>
+    <header class="navbar navbar-expand-md d-print-none" <%= ui.theme === 'dark' ? 'data-bs-theme="dark"' : '' %>>
+      <div class="container-xl">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topbar-menu"
+                aria-controls="topbar-menu" aria-expanded="false" aria-label="Menu">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="navbar-brand navbar-brand-club me-4"><%- include('_brand', partials) %></div>
+        <div class="navbar-nav flex-row order-md-last ms-auto">
+          <div class="d-flex align-items-center"><%- include('_user', partials) %></div>
+        </div>
+        <div class="collapse navbar-collapse" id="topbar-menu">
+          <ul class="navbar-nav"><%- include('_nav-items', partials) %></ul>
+        </div>
+      </div>
+    </header>
+  <% } %>
 
   <!-- ======================= OBSZAR ROBOCZY ======================= -->
   <div class="page-wrapper">

@@ -1,0 +1,6 @@
+<%# Logo klubu — gdy wgrane, pokazujemy wyłącznie je (bez tekstu, bez ramki) %>
+<% if (branding && branding.logoUrl) { %>
+  <img src="<%= branding.logoUrl %>" alt="Logo klubu">
+<% } else { %>
+  <span class="wordmark"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
+<% } %>

@@ -54,6 +54,15 @@ function integrationErrorResponse(res, error) {
   });
 }
 
+// Warianty wyglądu do wyboru przez właściciela projektu: /?motyw=jasny&uklad=poziomy
+// Po wybraniu jednego z nich zostaje on ustawiony na stałe, a parametry znikają.
+function getUiVariant(req) {
+  return {
+    theme: req.query.motyw === 'jasny' ? 'light' : 'dark',
+    layout: req.query.uklad === 'poziomy' ? 'poziomy' : 'pionowy'
+  };
+}
+
 async function getBranding() {
   const row = await db.fetch(
     'SELECT setting_value FROM cg_settings WHERE setting_key = ? LIMIT 1',
@@ -71,7 +80,8 @@ router.get('/login', async (req, res, next) => {
     res.render('club/login', {
       title: 'Logowanie — ZASTAL MARKETING CENTER',
       error: null,
-      branding
+      branding,
+      ui: getUiVariant(req)
     });
   } catch (err) {
     next(err);
@@ -88,7 +98,8 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).render('club/login', {
         title: 'Logowanie — ZASTAL MARKETING CENTER',
         error: 'Podaj adres e-mail i hasło.',
-        branding
+        branding,
+        ui: getUiVariant(req)
       });
     }
 
@@ -105,7 +116,8 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).render('club/login', {
         title: 'Logowanie — ZASTAL MARKETING CENTER',
         error: 'Nieprawidłowy e-mail lub hasło.',
-        branding
+        branding,
+        ui: getUiVariant(req)
       });
     }
 
@@ -229,7 +241,8 @@ router.get('/', requireAuth, async (req, res, next) => {
       title: 'ZASTAL MARKETING CENTER',
       user: req.session.user,
       branding,
-      dashboard: getDashboardData()
+      dashboard: getDashboardData(),
+      ui: getUiVariant(req)
     });
   } catch (err) {
     next(err);
