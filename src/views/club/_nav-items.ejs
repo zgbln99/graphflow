@@ -42,7 +42,7 @@
   </div>
 </li>
 
-<% if (can('admin','social')) { %>
+<% if (can('admin','social') && integrations.facebook.configured) { %>
 <li class="nav-item">
   <a class="nav-link" href="#" data-view="social">
     <span class="nav-link-icon"><svg class="icon"><use href="#i-social"></use></svg></span>

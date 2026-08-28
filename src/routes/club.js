@@ -229,7 +229,8 @@ router.get('/', requireAuth, async (req, res, next) => {
       title: 'ZASTAL MARKETING CENTER',
       user: req.session.user,
       branding,
-      dashboard: getDashboardData()
+      dashboard: getDashboardData(),
+      integrations: getIntegrationStatus()
     });
   } catch (err) {
     next(err);

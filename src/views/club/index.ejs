@@ -21,7 +21,7 @@
   const m = d.nextMatch;
   const ready = d.facts.find(f => f.label === 'Materiały gotowe');
   // Układ nawigacji: pasek górny (wariant wybrany przez właściciela projektu).
-  const partials = { branding, user, role, can, initials, roleLabels, d };
+  const partials = { branding, user, role, can, initials, roleLabels, d, integrations };
 %>
 <%- include('_icons') %>
 
@@ -685,6 +685,62 @@
                 <div class="card-footer text-end"><button class="btn btn-primary" type="button">Zapisz ustawienia</button></div>
               </div>
             </div>
+            <div class="col-12">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h3 class="card-title">Integracje zewnętrzne</h3>
+                    <div class="text-secondary small">Moduły, które wymagają kluczy dostępu wpisanych w pliku .env na serwerze.</div>
+                  </div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-vcenter card-table">
+                    <thead>
+                      <tr><th>Integracja</th><th>Status</th><th>Wymagane w .env</th><th>Do czego służy</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Facebook (Meta Graph API)</td>
+                        <td>
+                          <% if (integrations.facebook.configured) { %>
+                            <span class="badge bg-green-lt">Połączony</span>
+                            <span class="text-secondary small ms-2">strona <%= integrations.facebook.pageId %></span>
+                          <% } else { %>
+                            <span class="badge bg-secondary-lt">Nieskonfigurowany</span>
+                          <% } %>
+                        </td>
+                        <td class="text-secondary"><code>META_PAGE_ID</code>, <code>META_PAGE_ACCESS_TOKEN</code></td>
+                        <td class="text-secondary">Monitoring publikacji i reakcji na profilu klubu. Bez tokenu pozycja „Monitoring social” jest ukryta w menu.</td>
+                      </tr>
+                      <tr>
+                        <td>OpenAI</td>
+                        <td>
+                          <% if (integrations.openai.configured) { %>
+                            <span class="badge bg-green-lt">Połączony</span>
+                            <span class="text-secondary small ms-2"><%= integrations.openai.model %></span>
+                          <% } else { %>
+                            <span class="badge bg-secondary-lt">Nieskonfigurowany</span>
+                          <% } %>
+                        </td>
+                        <td class="text-secondary"><code>OPENAI_API_KEY</code></td>
+                        <td class="text-secondary">Rekomendacje treści na podstawie danych z Facebooka. Bez danych z FB nie ma czego analizować.</td>
+                      </tr>
+                      <tr>
+                        <td>Magazyn zdjęć (S3 / MEGA)</td>
+                        <td><span class="badge bg-secondary-lt">Nieskonfigurowany</span></td>
+                        <td class="text-secondary">endpoint, bucket, klucze</td>
+                        <td class="text-secondary">Zdjęcia, assety i eksporty poza serwerem aplikacji. Na razie eksporty zapisują się lokalnie.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="card-footer text-secondary small">
+                  Po uzupełnieniu pliku <code>.env</code> wymagany jest restart procesu:
+                  <code>pm2 restart zastal-marketing-center</code>. Kluczy nie trzymamy w repozytorium.
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
