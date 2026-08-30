@@ -384,59 +384,58 @@
       <div id="view-match" class="view">
         <div class="container-fluid">
           <div class="row row-cards">
-            <div class="col-lg-4">
+            <div class="col-12">
               <div class="card">
-                <div class="card-body text-center">
-                  <div class="text-secondary text-uppercase small">Wynik końcowy</div>
-                  <div class="display-6 fw-bold my-2">92 : 81</div>
-                  <div>Zastal — Anwil Włocławek</div>
-                  <div class="text-secondary small mt-2">27.09.2026 · 18:00<br>Hala CRS, Zielona Góra</div>
+                <div class="card-header">
+                  <h3 class="card-title" id="match-detail-title">Mecz</h3>
+                  <div class="card-actions">
+                    <button class="btn btn-sm" type="button" data-view="matches">Wróć do listy</button>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div class="col-lg-4">
-              <div class="card">
-                <div class="card-header"><h3 class="card-title">Dane meczu</h3></div>
                 <div class="card-body">
-                  <div class="datagrid">
-                    <div class="datagrid-item"><div class="datagrid-title">Rozgrywki</div><div class="datagrid-content">ORLEN Basket Liga</div></div>
-                    <div class="datagrid-item"><div class="datagrid-title">Kolejka</div><div class="datagrid-content">3</div></div>
-                    <div class="datagrid-item"><div class="datagrid-title">Sezon</div><div class="datagrid-content"><%= d.season ? d.season.name : '—' %></div></div>
-                  </div>
+                  <div class="datagrid" id="match-detail-grid"></div>
                 </div>
-                <div class="card-footer"><button class="btn btn-sm w-100" type="button">Edytuj dane meczu</button></div>
-              </div>
-            </div>
-            <div class="col-lg-4">
-              <div class="card">
-                <div class="card-header"><h3 class="card-title">Foldery zdjęć</h3></div>
-                <% if (!d.folders.length) { %>
-                  <div class="card-body text-secondary">Brak folderów przypisanych do tego meczu.</div>
-                <% } else { %>
-                  <div class="list-group list-group-flush">
-                    <% d.folders.forEach(folder => { %>
-                      <a href="#" class="list-group-item list-group-item-action d-flex align-items-center">
-                        <svg class="icon me-2 text-secondary"><use href="#i-folder"></use></svg>
-                        <span class="flex-fill"><%= folder.name %></span>
-                        <span class="badge bg-secondary-lt"><%= folder.photo_count %></span>
-                      </a>
-                    <% }) %>
-                  </div>
-                <% } %>
-                <div class="card-footer"><button class="btn btn-sm w-100" type="button">Zarządzaj folderami</button></div>
               </div>
             </div>
 
             <div class="col-12">
               <div class="card">
                 <div class="card-header">
-                  <h3 class="card-title">Grafiki meczowe</h3>
+                  <h3 class="card-title">Materiały meczowe</h3>
                   <div class="card-actions">
-                    <button class="btn btn-primary btn-sm" type="button"><svg class="icon"><use href="#i-plus"></use></svg>Dodaj grafikę</button>
+                    <% if (can('admin','designer')) { %>
+                      <div class="d-flex gap-2">
+                        <select class="form-select form-select-sm w-auto" id="material-template"></select>
+                        <input class="form-control form-control-sm w-auto" id="material-deadline" type="datetime-local"
+                               aria-label="Termin materiału">
+                        <select class="form-select form-select-sm w-auto" id="material-owner" aria-label="Odpowiedzialny">
+                          <option value="">Odpowiedzialny…</option>
+                          <option value="designer">Grafik</option>
+                          <option value="social">Social media</option>
+                          <option value="photographer">Fotograf</option>
+                          <option value="admin">Administrator</option>
+                        </select>
+                        <button class="btn btn-primary btn-sm text-nowrap" type="button" id="material-add">
+                          <svg class="icon"><use href="#i-plus"></use></svg>Dodaj
+                        </button>
+                      </div>
+                    <% } %>
                   </div>
                 </div>
-                <div class="card-body">
-                  <div class="row row-cards" id="graphic-grid"></div>
+                <div class="alert alert-danger m-3 d-none" id="material-error" role="alert"></div>
+                <div class="table-responsive">
+                  <table class="table table-vcenter card-table">
+                    <thead>
+                      <tr>
+                        <th>Materiał</th><th>Format</th><th>Termin</th><th>Odpowiedzialny</th><th style="width:170px">Status</th>
+                        <% if (can('admin','designer')) { %><th class="w-1"></th><% } %>
+                      </tr>
+                    </thead>
+                    <tbody id="materials-body"></tbody>
+                  </table>
+                </div>
+                <div class="card-body text-secondary d-none" id="materials-empty">
+                  Do tego meczu nie przypisano jeszcze materiałów.
                 </div>
               </div>
             </div>
@@ -527,25 +526,73 @@
                 <div class="card-header">
                   <h3 class="card-title">Szablony</h3>
                   <div class="card-actions">
-                    <button class="btn btn-primary btn-sm" id="create-template" type="button"><svg class="icon"><use href="#i-plus"></use></svg>Nowy</button>
+                    <% if (can('admin','designer')) { %>
+                      <button class="btn btn-primary btn-sm" id="template-new" type="button">
+                        <svg class="icon"><use href="#i-plus"></use></svg>Nowy
+                      </button>
+                    <% } %>
                   </div>
                 </div>
                 <div class="list-group list-group-flush" id="template-list"></div>
-              </div>
-            </div>
-            <div class="col-lg-4">
-              <div class="card">
-                <div class="card-header"><h3 class="card-title">Warstwy</h3></div>
-                <div class="list-group list-group-flush" id="layers-list"></div>
-                <div class="card-footer">
-                  <button id="add-layer" class="btn btn-sm w-100" type="button"><svg class="icon"><use href="#i-plus"></use></svg>Dodaj warstwę</button>
+                <div class="card-body text-secondary d-none" id="template-list-empty">
+                  Nie ma jeszcze żadnego szablonu.
                 </div>
               </div>
             </div>
-            <div class="col-lg-4">
-              <div class="card">
-                <div class="card-header"><h3 class="card-title">Właściwości warstwy</h3></div>
-                <div class="card-body" id="layer-properties"><p class="text-secondary">Wybierz warstwę z listy.</p></div>
+
+            <div class="col-lg-8">
+              <div class="card" id="template-editor-card">
+                <div class="card-header">
+                  <h3 class="card-title" id="template-editor-title">Wybierz szablon</h3>
+                  <div class="card-actions" id="template-editor-actions"></div>
+                </div>
+                <div class="card-body" id="template-editor-empty">
+                  <p class="text-secondary mb-0">
+                    Wybierz szablon z listy albo utwórz nowy. Szablon opisuje, jakie pola
+                    zobaczy osoba przygotowująca grafikę — aplikacja nie ma żadnych pól na stałe.
+                  </p>
+                </div>
+                <form id="template-form" class="d-none">
+                  <div class="card-body">
+                    <div class="alert alert-danger d-none" id="template-form-error" role="alert"></div>
+                    <input type="hidden" name="id">
+                    <div class="row g-3 mb-4">
+                      <div class="col-md-6">
+                        <label class="form-label required" for="template-name">Nazwa</label>
+                        <input class="form-control" id="template-name" name="name" maxlength="160" required>
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label" for="template-category">Rodzaj</label>
+                        <select class="form-select" id="template-category" name="category">
+                          <option value="match">Meczowy</option>
+                          <option value="other">Inny</option>
+                        </select>
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label" for="template-width">Szerokość</label>
+                        <input class="form-control" id="template-width" name="width" type="number" min="100" max="8000">
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label" for="template-height">Wysokość</label>
+                        <input class="form-control" id="template-height" name="height" type="number" min="100" max="8000">
+                      </div>
+                    </div>
+
+                    <div class="hr-text hr-text-left">Pola formularza</div>
+                    <p class="text-secondary small">
+                      Te pola zobaczy osoba przygotowująca grafikę. Klucz służy do podpięcia
+                      pola pod warstwę i musi być unikalny w obrębie szablonu.
+                    </p>
+                    <div id="template-fields"></div>
+                    <button class="btn btn-sm mt-2" type="button" id="template-add-field">
+                      <svg class="icon"><use href="#i-plus"></use></svg>Dodaj pole
+                    </button>
+                  </div>
+                  <div class="card-footer d-flex">
+                    <button class="btn btn-link link-secondary" type="button" id="template-cancel">Anuluj</button>
+                    <button class="btn btn-primary ms-auto" type="submit">Zapisz szablon</button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
@@ -596,6 +643,9 @@
                 <thead><tr><th class="w-1">Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead>
                 <tbody id="history-body"></tbody>
               </table>
+            </div>
+            <div class="card-body text-secondary d-none" id="history-empty">
+              Nie wyeksportowano jeszcze żadnej grafiki.
             </div>
           </div>
         </div>

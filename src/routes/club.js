@@ -315,6 +315,78 @@ router.delete('/api/matches/:id', requireAuth, requireRole('admin'), async (req,
   } catch (err) { handleRepoError(res, next, err); }
 });
 
+/* ---------------------------- szablony i materiały --------------------------- */
+
+router.get('/api/templates', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, templates: await repo.listTemplates({ category: req.query.category || null }) });
+  } catch (err) { next(err); }
+});
+
+router.get('/api/templates/:id', requireAuth, async (req, res, next) => {
+  try {
+    const template = await repo.getTemplate(req.params.id);
+    if (!template) return res.status(404).json({ success: false, error: 'Nie znaleziono szablonu.' });
+    res.json({ success: true, template });
+  } catch (err) { next(err); }
+});
+
+router.post('/api/templates', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    const template = await repo.createTemplate(req.body || {}, req.session.user.id);
+    res.status(201).json({ success: true, template });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.patch('/api/templates/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    res.json({ success: true, template: await repo.updateTemplate(req.params.id, req.body || {}) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.delete('/api/templates/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    await repo.deleteTemplate(req.params.id);
+    res.json({ success: true });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.get('/api/matches/:id/materials', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, materials: await repo.getMatchMaterials(req.params.id) });
+  } catch (err) { next(err); }
+});
+
+router.post('/api/matches/:id/materials', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    const material = await repo.addMatchMaterial(req.params.id, req.body || {});
+    res.status(201).json({ success: true, material });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+// Social media oznacza materiał jako gotowy, ale nie zmienia terminów ani przypisań.
+router.patch('/api/materials/:id', requireAuth, requireRole('admin', 'designer', 'social'), async (req, res, next) => {
+  try {
+    const payload = req.session.user.role === 'social'
+      ? { status: (req.body || {}).status }
+      : (req.body || {});
+    res.json({ success: true, material: await repo.updateMatchMaterial(req.params.id, payload) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.delete('/api/materials/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    await repo.deleteMatchMaterial(req.params.id);
+    res.json({ success: true });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.get('/api/exports', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, exports: await repo.listExports() });
+  } catch (err) { next(err); }
+});
+
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const branding = await getBranding();

@@ -66,7 +66,7 @@ const seasonLabel = eyebrow ? eyebrow.textContent.trim() : '';
 const viewLabels = {
   dashboard: 'Dashboard',
   matches: 'Mecze',
-  match: 'Zastal — Anwil',
+  match: 'Mecz',
   editor: 'Edytor grafiki',
   other: 'Inne grafiki',
   social: 'Monitoring social',
@@ -76,8 +76,7 @@ const viewLabels = {
   settings: 'Ustawienia'
 };
 const viewContext = {
-  match: 'Mecz · 27.09.2026',
-  editor: 'Mecz · Final Score'
+  editor: 'Edytor grafiki'
 };
 
 function showView(name) {
@@ -91,6 +90,9 @@ function showView(name) {
   document.querySelector('.page-body')?.scrollTo({ top: 0 });
   if (name === 'social') loadSocialView();
   if (name === 'matches' && !matchesLoaded) loadMatches();
+  if (name === 'templates' && !templates.length) loadTemplates().catch(() => {});
+  if (name === 'other') loadOtherTemplates().catch(() => {});
+  if (name === 'history') loadHistory().catch(() => {});
 }
 
 document.querySelectorAll('[data-view]').forEach((el) => {
@@ -99,306 +101,6 @@ document.querySelectorAll('[data-view]').forEach((el) => {
     showView(el.dataset.view);
   });
 });
-
-/* ---------------- Grafiki meczowe ---------------- */
-const graphics = [
-  { name: 'Matchday', ready: true }, { name: 'Starting Five', ready: true },
-  { name: 'Q1', ready: true }, { name: 'Halftime', ready: true },
-  { name: 'Q3', ready: false }, { name: 'Final Score', ready: false },
-  { name: 'MVP', ready: false }, { name: 'Player Stats', ready: false }
-];
-const graphicGrid = document.getElementById('graphic-grid');
-graphics.forEach((graphic) => {
-  const col = document.createElement('div');
-  col.className = 'col-6 col-md-4 col-xl-3';
-  col.innerHTML = `
-    <div class="card card-sm cursor-pointer">
-      <div class="thumb-45"></div>
-      <div class="card-body p-2 d-flex align-items-center justify-content-between">
-        <span class="text-truncate">${escapeHTML(graphic.name)}</span>
-        <span class="badge ${graphic.ready ? 'bg-green-lt' : 'bg-secondary-lt'}">${graphic.ready ? 'Gotowe' : 'Do zrobienia'}</span>
-      </div>
-    </div>`;
-  col.addEventListener('click', () => {
-    state.currentTemplate = graphic.name === 'Final Score' ? 'final' : 'matchday';
-    renderEditor();
-    showView('editor');
-  });
-  graphicGrid?.appendChild(col);
-});
-
-/* ---------------- Pola dynamiczne szablonu ---------------- */
-function renderDynamicFields() {
-  const root = document.getElementById('dynamic-fields');
-  if (!root) return;
-  const template = state.templates.find((item) => item.id === state.currentTemplate);
-  const nameNode = document.getElementById('editor-template-name');
-  if (nameNode) nameNode.textContent = template.name;
-  root.innerHTML = '';
-
-  template.fields.forEach((field) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'mb-3';
-    const label = document.createElement('label');
-    label.className = 'form-label';
-    label.textContent = field.label;
-    wrap.appendChild(label);
-
-    let input;
-    if (field.type === 'select') {
-      input = document.createElement('select');
-      input.className = 'form-select';
-      field.options.forEach((option) => input.add(new Option(option, option)));
-      input.value = field.value;
-    } else if (field.type === 'photo') {
-      input = document.createElement('button');
-      input.type = 'button';
-      input.className = 'btn w-100';
-      input.textContent = 'Wybierz z folderów meczu';
-    } else {
-      input = document.createElement('input');
-      input.className = 'form-control';
-      input.type = field.type === 'number' ? 'number' : 'text';
-      input.value = field.value;
-    }
-    if (input.tagName !== 'BUTTON') {
-      input.addEventListener('input', (event) => {
-        field.value = event.target.value;
-        drawCanvas();
-      });
-    }
-    wrap.appendChild(input);
-    root.appendChild(wrap);
-  });
-}
-
-/* ---------------- Zdjęcia ---------------- */
-function photoTile(file, extraClass = '') {
-  const col = document.createElement('div');
-  col.className = 'col-4';
-  col.innerHTML = `<div class="photo-tile ${extraClass}" title="${escapeHTML(file || '')}"></div>`;
-  return col;
-}
-
-const photoGrid = document.getElementById('photo-grid');
-for (let i = 4231; i < 4255; i += 1) {
-  const file = 'IMG_' + i;
-  const col = photoTile(file);
-  col.querySelector('.photo-tile').addEventListener('click', (event) => {
-    document.querySelectorAll('#photo-grid .photo-tile').forEach((tile) => tile.classList.remove('selected'));
-    event.currentTarget.classList.add('selected');
-    const template = state.templates.find((item) => item.id === state.currentTemplate);
-    const field = template.fields.find((item) => item.type === 'photo');
-    if (field) field.value = file;
-    drawCanvas();
-  });
-  photoGrid?.appendChild(col);
-}
-
-const libraryGrid = document.getElementById('library-grid');
-for (let i = 0; i < 24; i += 1) {
-  const col = photoTile('', 'photo-tile-43');
-  col.className = 'col-6 col-md-3 col-xl-2';
-  libraryGrid?.appendChild(col);
-}
-
-/* ---------------- Podgląd na płótnie ---------------- */
-function drawCanvas() {
-  const canvas = document.getElementById('design-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const template = state.templates.find((item) => item.id === state.currentTemplate);
-  const photo = template.fields.find((item) => item.type === 'photo');
-  const home = template.fields.find((item) => item.key === 'home_score');
-  const away = template.fields.find((item) => item.key === 'away_score');
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#0b0d0d';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#111917';
-  ctx.fillRect(70, 110, canvas.width - 140, 360);
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#6f7a77';
-  ctx.font = '16px sans-serif';
-  ctx.fillText(photo ? photo.value : 'PHOTO', canvas.width / 2, 300);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 34px sans-serif';
-  ctx.fillText(template.name.toUpperCase(), canvas.width / 2, 80);
-
-  if (home && away) {
-    ctx.font = 'bold 88px sans-serif';
-    ctx.fillText(String(home.value), 165, 585);
-    ctx.fillText(String(away.value), 375, 585);
-    ctx.fillStyle = '#0d8f4f';
-    ctx.font = 'bold 34px sans-serif';
-    ctx.fillText('VS', 270, 575);
-  }
-  ctx.strokeStyle = '#0d8f4f';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(40, 40, canvas.width - 80, canvas.height - 80);
-  ctx.fillStyle = '#c9d1ce';
-  ctx.font = '14px sans-serif';
-  ctx.fillText('27.09.2026 · HALA CRS, ZIELONA GÓRA', canvas.width / 2, 635);
-}
-
-function renderEditor() {
-  renderDynamicFields();
-  drawCanvas();
-}
-
-/* ---------------- Szablony i warstwy ---------------- */
-function renderTemplates() {
-  const list = document.getElementById('template-list');
-  if (!list) return;
-  list.innerHTML = '';
-  state.templates.forEach((template) => {
-    const row = document.createElement('a');
-    row.href = '#';
-    row.className = 'list-group-item list-group-item-action d-flex align-items-center'
-      + (template.id === state.currentTemplate ? ' active' : '');
-    row.innerHTML = `
-      <div class="flex-fill">
-        <div>${escapeHTML(template.name)}</div>
-        <div class="text-secondary small">${escapeHTML(template.category)} · ${escapeHTML(template.size)}</div>
-      </div>
-      ${icon('chevron', 'text-secondary')}`;
-    row.addEventListener('click', (event) => {
-      event.preventDefault();
-      state.currentTemplate = template.id;
-      state.selectedLayer = template.layers[0]?.id;
-      renderTemplates();
-      renderEditor();
-    });
-    list.appendChild(row);
-  });
-  renderLayers();
-}
-
-function renderLayers() {
-  const template = state.templates.find((item) => item.id === state.currentTemplate);
-  const root = document.getElementById('layers-list');
-  if (!root) return;
-  root.innerHTML = '';
-  [...template.layers].sort((a, b) => b.z - a.z).forEach((layer) => {
-    const row = document.createElement('a');
-    row.href = '#';
-    row.className = 'list-group-item list-group-item-action d-flex align-items-center'
-      + (layer.id === state.selectedLayer ? ' active' : '');
-    row.innerHTML = `
-      <span class="text-secondary me-2">${icon('grip')}</span>
-      <div class="flex-fill">
-        <div>${escapeHTML(layer.name)}</div>
-        <div class="text-secondary small">${escapeHTML(layer.type)}${layer.field ? ' · ' + escapeHTML(layer.field) : ''}</div>
-      </div>
-      <span class="text-secondary">${icon(layer.locked ? 'lock' : 'eye')}</span>`;
-    row.addEventListener('click', (event) => {
-      event.preventDefault();
-      state.selectedLayer = layer.id;
-      renderLayers();
-    });
-    root.appendChild(row);
-  });
-  renderLayerProps();
-}
-
-function renderLayerProps() {
-  const template = state.templates.find((item) => item.id === state.currentTemplate);
-  const layer = template.layers.find((item) => item.id === state.selectedLayer);
-  const root = document.getElementById('layer-properties');
-  if (!root) return;
-  if (!layer) {
-    root.innerHTML = '<p class="text-secondary mb-0">Wybierz warstwę z listy.</p>';
-    return;
-  }
-  root.innerHTML = `
-    <div class="mb-3"><label class="form-label">Nazwa</label>
-      <input class="form-control" id="lp-name" value="${escapeHTML(layer.name)}"></div>
-    <div class="mb-3"><label class="form-label">Typ</label>
-      <select class="form-select" id="lp-type">
-        ${['background', 'photo', 'text', 'overlay', 'logo', 'shape']
-          .map((type) => `<option ${type === layer.type ? 'selected' : ''}>${type}</option>`).join('')}
-      </select></div>
-    <div class="mb-3"><label class="form-label">Warstwa (z-index)</label>
-      <input class="form-control" type="number" id="lp-z" value="${layer.z}"></div>
-    <label class="form-check form-switch">
-      <input class="form-check-input" type="checkbox" id="lp-visible" ${layer.visible ? 'checked' : ''}>
-      <span class="form-check-label">Widoczna</span></label>
-    <label class="form-check form-switch">
-      <input class="form-check-input" type="checkbox" id="lp-locked" ${layer.locked ? 'checked' : ''}>
-      <span class="form-check-label">Zablokowana dla social media</span></label>
-    ${layer.type === 'photo' ? `
-      <label class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" checked>
-        <span class="form-check-label">Kadrowanie w masce</span></label>
-      <div class="mt-3"><label class="form-label">Tryb dopasowania</label>
-        <select class="form-select"><option>cover</option><option>contain</option></select></div>` : ''}`;
-
-  root.querySelector('#lp-name').oninput = (event) => { layer.name = event.target.value; };
-  root.querySelector('#lp-type').onchange = (event) => { layer.type = event.target.value; renderLayers(); };
-  root.querySelector('#lp-z').oninput = (event) => { layer.z = Number(event.target.value); renderLayers(); };
-  root.querySelector('#lp-visible').onchange = (event) => { layer.visible = event.target.checked; };
-  root.querySelector('#lp-locked').onchange = (event) => { layer.locked = event.target.checked; };
-}
-
-document.getElementById('add-layer')?.addEventListener('click', () => {
-  const template = state.templates.find((item) => item.id === state.currentTemplate);
-  const id = 'layer_' + Date.now();
-  template.layers.push({ id, name: 'Nowa warstwa', type: 'photo', locked: false, visible: true, z: template.layers.length + 1 });
-  state.selectedLayer = id;
-  renderLayers();
-});
-
-document.getElementById('create-template')?.addEventListener('click', () => {
-  const id = 'template_' + Date.now();
-  state.templates.push({
-    id, name: 'Nowy szablon', category: 'Mecz', size: '1080×1350', fields: [],
-    layers: [
-      { id: 'overlay', name: 'Overlay PNG', type: 'overlay', locked: true, visible: true, z: 2 },
-      { id: 'photo', name: 'Zdjęcie', type: 'photo', locked: false, visible: true, z: 1 }
-    ]
-  });
-  state.currentTemplate = id;
-  state.selectedLayer = 'photo';
-  renderTemplates();
-});
-
-/* ---------------- Inne grafiki i historia ---------------- */
-const otherGrid = document.getElementById('other-grid');
-['Urodziny', 'Transfer', 'Nowy sponsor', 'Komunikat klubowy', 'MVP miesiąca', 'Kontuzja'].forEach((name) => {
-  const col = document.createElement('div');
-  col.className = 'col-6 col-md-4 col-xl-3';
-  col.innerHTML = `
-    <div class="card card-sm cursor-pointer">
-      <div class="thumb-1610"></div>
-      <div class="card-body p-2">
-        <div class="text-truncate">${escapeHTML(name)}</div>
-        <div class="text-secondary small">Szablon dynamiczny</div>
-      </div>
-    </div>`;
-  otherGrid?.appendChild(col);
-});
-
-const historyBody = document.getElementById('history-body');
-[
-  ['Final Score', 'Zastal — Anwil', '27.09.2026 19:32', 'PNG 1080×1350'],
-  ['Halftime', 'Zastal — Anwil', '27.09.2026 18:45', 'PNG 1080×1920'],
-  ['Matchday', 'Zastal — Anwil', '27.09.2026 12:10', 'PNG 1080×1350'],
-  ['Urodziny', 'Piotr Nowak', '26.09.2026 08:00', 'PNG 1080×1080']
-].forEach((row) => {
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td><span class="d-block rounded border" style="width:44px;height:32px"></span></td>
-    <td>${escapeHTML(row[0])}</td>
-    <td class="text-secondary">${escapeHTML(row[1])}</td>
-    <td class="text-secondary text-nowrap">${escapeHTML(row[2])}</td>
-    <td class="text-secondary">${escapeHTML(row[3])}</td>
-    <td class="text-secondary">${escapeHTML(document.querySelector('.navbar-vertical .flex-fill .text-truncate')?.textContent.trim() || 'Użytkownik')}</td>`;
-  historyBody?.appendChild(tr);
-});
-
-renderTemplates();
-renderEditor();
-
 
 /* ================= Sezony i mecze (prawdziwe dane z API) ================= */
 
@@ -567,6 +269,13 @@ matchModalEl?.addEventListener('show.bs.modal', async (event) => {
   }
 });
 
+// Kliknięcie wiersza (poza przyciskami) otwiera centrum meczu.
+matchesBody?.addEventListener('click', (event) => {
+  if (event.target.closest('button')) return;
+  const row = event.target.closest('[data-match-id]');
+  if (row) openMatch(row.dataset.matchId);
+});
+
 document.addEventListener('click', async (event) => {
   const deleteBtn = event.target.closest('[data-match-delete]');
   if (deleteBtn) {
@@ -697,6 +406,376 @@ document.getElementById('season-switch')?.addEventListener('change', async (even
 });
 
 if (seasonsBody) loadSeasons().catch(() => {});
+
+/* ================= Szablony z polami dynamicznymi ================= */
+
+const FIELD_TYPE_LABELS = {
+  text: 'Tekst', textarea: 'Tekst wielolinijkowy', number: 'Liczba',
+  select: 'Lista wyboru', date: 'Data', photo: 'Zdjęcie'
+};
+
+const canEditTemplates = ['admin', 'designer'].includes(document.body.dataset.role);
+const templateList = document.getElementById('template-list');
+const templateForm = document.getElementById('template-form');
+const templateFields = document.getElementById('template-fields');
+const templateFormError = document.getElementById('template-form-error');
+let templates = [];
+let currentTemplateId = null;
+
+function fieldRow(field = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'card card-sm mb-2';
+  wrap.dataset.field = '1';
+  wrap.innerHTML = `
+    <div class="card-body p-2">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Klucz</label>
+          <input class="form-control form-control-sm" data-f="key" value="${escapeHTML(field.key || '')}"
+                 placeholder="home_score" maxlength="40">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Etykieta</label>
+          <input class="form-control form-control-sm" data-f="label" value="${escapeHTML(field.label || '')}"
+                 placeholder="Wynik gospodarzy" maxlength="80">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-1">Typ</label>
+          <select class="form-select form-select-sm" data-f="type">
+            ${Object.entries(FIELD_TYPE_LABELS).map(([value, label]) =>
+              `<option value="${value}" ${field.type === value ? 'selected' : ''}>${label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-1">Domyślnie</label>
+          <input class="form-control form-control-sm" data-f="default" value="${escapeHTML(field.default || '')}">
+        </div>
+        <div class="col-md-1">
+          <label class="form-check form-switch mb-1">
+            <input class="form-check-input" type="checkbox" data-f="required" ${field.required ? 'checked' : ''}>
+            <span class="form-check-label small">Wym.</span>
+          </label>
+        </div>
+        <div class="col-md-1 text-end">
+          <div class="btn-list flex-nowrap justify-content-end">
+            <button class="btn btn-icon btn-sm" type="button" data-field-up aria-label="Przesuń w górę">${icon('up')}</button>
+            <button class="btn btn-icon btn-sm" type="button" data-field-down aria-label="Przesuń w dół">${icon('down')}</button>
+            <button class="btn btn-icon btn-sm" type="button" data-field-remove aria-label="Usuń pole">${icon('trash')}</button>
+          </div>
+        </div>
+        <div class="col-12 ${field.type === 'select' ? '' : 'd-none'}" data-options-wrap>
+          <label class="form-label small mb-1">Opcje listy (jedna w wierszu)</label>
+          <textarea class="form-control form-control-sm" rows="3" data-f="options">${escapeHTML((field.options || []).join('\n'))}</textarea>
+        </div>
+      </div>
+    </div>`;
+
+  wrap.querySelector('[data-f=type]').addEventListener('change', (event) => {
+    wrap.querySelector('[data-options-wrap]').classList.toggle('d-none', event.target.value !== 'select');
+  });
+  wrap.querySelector('[data-field-remove]').addEventListener('click', () => wrap.remove());
+  wrap.querySelector('[data-field-up]').addEventListener('click', () => {
+    const previous = wrap.previousElementSibling;
+    if (previous) wrap.parentNode.insertBefore(wrap, previous);
+  });
+  wrap.querySelector('[data-field-down]').addEventListener('click', () => {
+    const next = wrap.nextElementSibling;
+    if (next) wrap.parentNode.insertBefore(next, wrap);
+  });
+  return wrap;
+}
+
+function collectFields() {
+  return [...templateFields.querySelectorAll('[data-field]')].map((row) => {
+    const get = (name) => row.querySelector(`[data-f=${name}]`);
+    return {
+      key: get('key').value,
+      label: get('label').value,
+      type: get('type').value,
+      default: get('default').value,
+      required: get('required').checked,
+      options: get('options').value.split('\n').map((line) => line.trim()).filter(Boolean)
+    };
+  });
+}
+
+function renderTemplateList() {
+  if (!templateList) return;
+  document.getElementById('template-list-empty')?.classList.toggle('d-none', templates.length > 0);
+  templateList.innerHTML = templates.map((template) => `
+    <a href="#" class="list-group-item list-group-item-action d-flex align-items-center${template.id === currentTemplateId ? ' active' : ''}"
+       data-template="${template.id}">
+      <div class="flex-fill">
+        <div>${escapeHTML(template.name)}</div>
+        <div class="text-secondary small">
+          ${template.category === 'match' ? 'Meczowy' : 'Inny'} · ${template.width}×${template.height} ·
+          ${template.field_count} ${template.field_count === 1 ? 'pole' : 'pól'}
+        </div>
+      </div>
+      ${icon('chevron', 'text-secondary')}
+    </a>`).join('');
+}
+
+function showTemplateEditor(template) {
+  const empty = document.getElementById('template-editor-empty');
+  const actions = document.getElementById('template-editor-actions');
+  if (!templateForm) return;
+
+  currentTemplateId = template?.id || null;
+  setFormError(templateFormError, '');
+  templateForm.classList.remove('d-none');
+  empty?.classList.add('d-none');
+  document.getElementById('template-editor-title').textContent = template ? template.name : 'Nowy szablon';
+
+  templateForm.elements.id.value = template?.id || '';
+  templateForm.elements.name.value = template?.name || '';
+  templateForm.elements.category.value = template?.category || 'match';
+  templateForm.elements.width.value = template?.width || 1080;
+  templateForm.elements.height.value = template?.height || 1350;
+
+  templateFields.innerHTML = '';
+  (template?.definition?.fields || []).forEach((field) => templateFields.appendChild(fieldRow(field)));
+
+  actions.innerHTML = template && canEditTemplates
+    ? `<button class="btn btn-icon btn-sm" type="button" id="template-delete" aria-label="Usuń szablon">${icon('trash')}</button>`
+    : '';
+  document.getElementById('template-delete')?.addEventListener('click', async () => {
+    if (!confirm(`Usunąć szablon „${template.name}”?`)) return;
+    try {
+      await api('/api/templates/' + template.id, { method: 'DELETE' });
+      await loadTemplates();
+      hideTemplateEditor();
+    } catch (error) { setFormError(templateFormError, error.message); }
+  });
+  renderTemplateList();
+}
+
+function hideTemplateEditor() {
+  currentTemplateId = null;
+  templateForm?.classList.add('d-none');
+  document.getElementById('template-editor-empty')?.classList.remove('d-none');
+  document.getElementById('template-editor-title').textContent = 'Wybierz szablon';
+  document.getElementById('template-editor-actions').innerHTML = '';
+  renderTemplateList();
+}
+
+async function loadTemplates() {
+  if (!templateList) return;
+  const payload = await api('/api/templates');
+  templates = payload.templates;
+  renderTemplateList();
+  fillMaterialTemplateSelect();
+}
+
+templateList?.addEventListener('click', (event) => {
+  const link = event.target.closest('[data-template]');
+  if (!link) return;
+  event.preventDefault();
+  const template = templates.find((item) => item.id === Number(link.dataset.template));
+  if (template) showTemplateEditor(template);
+});
+
+document.getElementById('template-new')?.addEventListener('click', () => showTemplateEditor(null));
+document.getElementById('template-cancel')?.addEventListener('click', hideTemplateEditor);
+document.getElementById('template-add-field')?.addEventListener('click', () => {
+  templateFields.appendChild(fieldRow({ type: 'text' }));
+});
+
+templateForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const id = templateForm.elements.id.value;
+  const body = {
+    name: templateForm.elements.name.value,
+    category: templateForm.elements.category.value,
+    width: templateForm.elements.width.value,
+    height: templateForm.elements.height.value,
+    definition: { fields: collectFields() }
+  };
+  setFormError(templateFormError, '');
+  try {
+    const { template } = await api(id ? '/api/templates/' + id : '/api/templates', {
+      method: id ? 'PATCH' : 'POST',
+      body: JSON.stringify(body)
+    });
+    await loadTemplates();
+    showTemplateEditor(template);
+  } catch (error) {
+    setFormError(templateFormError, error.message);
+  }
+});
+
+/* ================= Materiały meczowe ================= */
+
+const MATERIAL_STATUS = {
+  todo: { label: 'Do zrobienia', badge: 'bg-secondary-lt' },
+  ready: { label: 'Gotowe', badge: 'bg-green-lt' },
+  published: { label: 'Opublikowane', badge: 'bg-azure-lt' }
+};
+const ROLE_LABELS = { admin: 'Administrator', designer: 'Grafik', social: 'Social media', photographer: 'Fotograf' };
+const canEditMaterials = ['admin', 'designer'].includes(document.body.dataset.role);
+const canSetStatus = ['admin', 'designer', 'social'].includes(document.body.dataset.role);
+
+const materialsBody = document.getElementById('materials-body');
+const materialError = document.getElementById('material-error');
+let currentMatch = null;
+
+function fillMaterialTemplateSelect() {
+  const select = document.getElementById('material-template');
+  if (!select) return;
+  const matchTemplates = templates.filter((template) => template.category === 'match');
+  select.innerHTML = matchTemplates.length
+    ? matchTemplates.map((template) => `<option value="${template.id}">${escapeHTML(template.name)}</option>`).join('')
+    : '<option value="">Brak szablonów meczowych</option>';
+}
+
+async function openMatch(matchId) {
+  try {
+    const { match } = await api('/api/matches/' + matchId);
+    currentMatch = match;
+    const when = formatDate(match.match_date);
+    const label = `${match.home_team} — ${match.away_team}`;
+    document.getElementById('match-detail-title').textContent = label;
+    // Pasek górny nazywa faktycznie otwarty mecz, a nie wpis z listy etykiet.
+    viewLabels.match = label;
+    viewContext.match = when ? `Mecz · ${when.date}` : 'Mecz';
+    document.getElementById('match-detail-grid').innerHTML = [
+      ['Termin', when ? `${when.date} · ${when.time}` : '—'],
+      ['Hala', match.venue || '—'],
+      ['Rozgrywki', match.competition || '—'],
+      ['Kolejka', match.round_name || '—'],
+      ['Sezon', match.season_name],
+      ['Wynik', (match.home_score === null || match.away_score === null) ? '—' : `${match.home_score} : ${match.away_score}`]
+    ].map(([title, value]) => `
+      <div class="datagrid-item">
+        <div class="datagrid-title">${title}</div>
+        <div class="datagrid-content">${escapeHTML(String(value))}</div>
+      </div>`).join('');
+    await loadMaterials();
+    showView('match');
+  } catch (error) {
+    showMatchesMessage(error.message);
+  }
+}
+
+async function loadMaterials() {
+  if (!materialsBody || !currentMatch) return;
+  const { materials } = await api('/api/matches/' + currentMatch.id + '/materials');
+  document.getElementById('materials-empty')?.classList.toggle('d-none', materials.length > 0);
+  materialsBody.innerHTML = materials.map((item) => {
+    const status = MATERIAL_STATUS[item.status] || MATERIAL_STATUS.todo;
+    const deadline = formatDate(item.deadline_at);
+    const statusCell = canSetStatus
+      ? `<select class="form-select form-select-sm" data-material-status="${item.id}">
+           ${Object.entries(MATERIAL_STATUS).map(([value, meta]) =>
+             `<option value="${value}" ${item.status === value ? 'selected' : ''}>${meta.label}</option>`).join('')}
+         </select>`
+      : `<span class="badge ${status.badge}">${status.label}</span>`;
+    return `<tr>
+      <td>
+        <div>${escapeHTML(item.template_name)}</div>
+        ${item.note ? `<div class="text-secondary small">${escapeHTML(item.note)}</div>` : ''}
+      </td>
+      <td class="text-secondary text-nowrap">${item.width}×${item.height}</td>
+      <td class="text-secondary text-nowrap">${deadline ? deadline.date + ' · ' + deadline.time : '—'}</td>
+      <td class="text-secondary">${item.owner_role ? ROLE_LABELS[item.owner_role] : '—'}</td>
+      <td>${statusCell}</td>
+      ${canEditMaterials ? `<td>
+        <button class="btn btn-icon btn-sm" type="button" data-material-delete="${item.id}" aria-label="Odepnij materiał">
+          ${icon('trash')}
+        </button>
+      </td>` : ''}
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('material-add')?.addEventListener('click', async () => {
+  if (!currentMatch) return;
+  const templateId = document.getElementById('material-template').value;
+  if (!templateId) return;
+  setFormError(materialError, '');
+  try {
+    await api('/api/matches/' + currentMatch.id + '/materials', {
+      method: 'POST',
+      body: JSON.stringify({
+        template_id: templateId,
+        deadline_at: document.getElementById('material-deadline').value || null,
+        owner_role: document.getElementById('material-owner').value || null
+      })
+    });
+    document.getElementById('material-deadline').value = '';
+    await loadMaterials();
+  } catch (error) { setFormError(materialError, error.message); }
+});
+
+materialsBody?.addEventListener('change', async (event) => {
+  const select = event.target.closest('[data-material-status]');
+  if (!select) return;
+  setFormError(materialError, '');
+  try {
+    await api('/api/materials/' + select.dataset.materialStatus, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: select.value })
+    });
+  } catch (error) { setFormError(materialError, error.message); }
+});
+
+materialsBody?.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-material-delete]');
+  if (!button) return;
+  if (!confirm('Odpiąć ten materiał od meczu?')) return;
+  setFormError(materialError, '');
+  try {
+    await api('/api/materials/' + button.dataset.materialDelete, { method: 'DELETE' });
+    await loadMaterials();
+  } catch (error) { setFormError(materialError, error.message); }
+});
+
+
+/* ================= Inne grafiki i historia eksportów ================= */
+
+const otherGrid = document.getElementById('other-grid');
+async function loadOtherTemplates() {
+  if (!otherGrid) return;
+  if (!templates.length) await loadTemplates();
+  const others = templates.filter((template) => template.category === 'other');
+  otherGrid.innerHTML = others.length
+    ? others.map((template) => `
+        <div class="col-6 col-md-4 col-xl-3">
+          <div class="card card-sm">
+            <div class="thumb-1610"></div>
+            <div class="card-body p-2">
+              <div class="text-truncate">${escapeHTML(template.name)}</div>
+              <div class="text-secondary small">
+                ${template.width}×${template.height} · ${template.field_count} ${template.field_count === 1 ? 'pole' : 'pól'}
+              </div>
+            </div>
+          </div>
+        </div>`).join('')
+    : `<div class="col-12 text-secondary">
+         Nie ma jeszcze szablonów spoza kalendarza meczowego.
+         Utwórz szablon z rodzajem „Inny” w bibliotece szablonów.
+       </div>`;
+}
+
+const historyBody = document.getElementById('history-body');
+const historyEmpty = document.getElementById('history-empty');
+async function loadHistory() {
+  if (!historyBody) return;
+  const { exports } = await api('/api/exports');
+  historyEmpty?.classList.toggle('d-none', exports.length > 0);
+  historyBody.innerHTML = exports.map((item) => {
+    const when = formatDate(item.created_at);
+    const context = item.home_team ? `${item.home_team} — ${item.away_team}` : 'Poza meczem';
+    return `<tr>
+      <td><span class="d-block rounded border" style="width:44px;height:32px"></span></td>
+      <td>${escapeHTML(item.design_title || item.template_name)}</td>
+      <td class="text-secondary">${escapeHTML(context)}</td>
+      <td class="text-secondary text-nowrap">${when ? when.date + ' · ' + when.time : '—'}</td>
+      <td class="text-secondary">${escapeHTML(item.format.toUpperCase())} ${item.width}×${item.height}</td>
+      <td class="text-secondary">${escapeHTML(item.user_name || '—')}</td>
+    </tr>`;
+  }).join('');
+}
 
 /* ---------------- Monitoring social ---------------- */
 const socialElements = {

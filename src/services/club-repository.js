@@ -231,6 +231,229 @@ async function deleteMatch(id) {
   return true;
 }
 
+
+/* -------------------------------------------------------------- szablony */
+
+const FIELD_TYPES = ['text', 'textarea', 'number', 'select', 'date', 'photo'];
+const TEMPLATE_CATEGORIES = ['match', 'other'];
+const OWNER_ROLES = ['admin', 'designer', 'social', 'photographer'];
+
+/** MariaDB zwraca JSON już sparsowany, MySQL bywa różny — przyjmujemy oba. */
+function parseJson(value, fallback) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(value); } catch { return fallback; }
+}
+
+/**
+ * Sprawdza definicję szablonu. Pola dynamiczne to sedno aplikacji — aplikacja
+ * nie ma żadnych pól wpisanych na stałe, więc walidacja musi być szczelna.
+ */
+function normalizeDefinition(raw) {
+  const definition = parseJson(raw, {}) || {};
+  const fields = Array.isArray(definition.fields) ? definition.fields : [];
+  const seen = new Set();
+
+  const normalized = fields.map((field, index) => {
+    const key = String(field.key || '').trim().toLowerCase();
+    if (!/^[a-z][a-z0-9_]{0,39}$/.test(key)) {
+      throw new ValidationError(
+        `Pole ${index + 1}: klucz może zawierać tylko małe litery, cyfry i podkreślenia, i musi zaczynać się od litery.`,
+        'fields'
+      );
+    }
+    if (seen.has(key)) throw new ValidationError(`Pole „${key}” występuje dwa razy.`, 'fields');
+    seen.add(key);
+
+    const label = String(field.label || '').trim();
+    if (!label) throw new ValidationError(`Pole „${key}” nie ma etykiety.`, 'fields');
+    if (label.length > 80) throw new ValidationError(`Etykieta pola „${key}” jest za długa.`, 'fields');
+
+    const type = FIELD_TYPES.includes(field.type) ? field.type : 'text';
+    const options = type === 'select'
+      ? (Array.isArray(field.options) ? field.options : String(field.options || '').split('\n'))
+        .map((option) => String(option).trim()).filter(Boolean)
+      : [];
+    if (type === 'select' && options.length === 0) {
+      throw new ValidationError(`Pole „${key}” typu lista musi mieć co najmniej jedną opcję.`, 'fields');
+    }
+
+    return {
+      key,
+      label,
+      type,
+      required: Boolean(field.required),
+      default: field.default === undefined || field.default === null ? '' : String(field.default).slice(0, 500),
+      options
+    };
+  });
+
+  return {
+    version: 1,
+    fields: normalized,
+    // Warstwy uzupełni layer engine; zachowujemy je przy edycji pól.
+    layers: Array.isArray(definition.layers) ? definition.layers : []
+  };
+}
+
+function normalizeTemplate(payload) {
+  const name = String(payload.name || '').trim();
+  if (!name) throw new ValidationError('Podaj nazwę szablonu.', 'name');
+  if (name.length > 160) throw new ValidationError('Nazwa szablonu może mieć maksymalnie 160 znaków.', 'name');
+
+  const category = TEMPLATE_CATEGORIES.includes(payload.category) ? payload.category : 'match';
+  const size = (value, field, fallback) => {
+    const number = Number(value ?? fallback);
+    if (!Number.isInteger(number) || number < 100 || number > 8000) {
+      throw new ValidationError('Wymiar musi być liczbą całkowitą z zakresu 100–8000 pikseli.', field);
+    }
+    return number;
+  };
+
+  return {
+    name,
+    category,
+    width: size(payload.width, 'width', 1080),
+    height: size(payload.height, 'height', 1350),
+    is_active: payload.is_active === false ? 0 : 1,
+    definition: JSON.stringify(normalizeDefinition(payload.definition))
+  };
+}
+
+function decorateTemplate(row) {
+  if (!row) return null;
+  const definition = parseJson(row.definition, { fields: [], layers: [] });
+  return {
+    ...row,
+    definition,
+    field_count: Array.isArray(definition.fields) ? definition.fields.length : 0
+  };
+}
+
+async function listTemplates({ category = null } = {}) {
+  const where = [];
+  const params = [];
+  if (category && TEMPLATE_CATEGORIES.includes(category)) { where.push('category = ?'); params.push(category); }
+
+  const rows = await db.query(`
+    SELECT id, name, category, width, height, is_active, definition, updated_at
+    FROM cg_templates
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    ORDER BY category, name
+  `, params);
+  return rows.map(decorateTemplate);
+}
+
+async function getTemplate(id) {
+  return decorateTemplate(await db.fetch(`
+    SELECT id, name, category, width, height, is_active, definition, updated_at
+    FROM cg_templates WHERE id = ?
+  `, [Number(id)]));
+}
+
+async function createTemplate(payload, userId = null) {
+  const data = normalizeTemplate(payload);
+  const clash = await db.fetch('SELECT id FROM cg_templates WHERE name = ? LIMIT 1', [data.name]);
+  if (clash) throw new ValidationError('Szablon o tej nazwie już istnieje.', 'name');
+  const id = await db.insert('cg_templates', { ...data, created_by: userId });
+  return getTemplate(id);
+}
+
+async function updateTemplate(id, payload) {
+  const current = await getTemplate(id);
+  if (!current) throw new ValidationError('Nie znaleziono szablonu.');
+  const data = normalizeTemplate({ ...current, ...payload });
+  const clash = await db.fetch('SELECT id FROM cg_templates WHERE name = ? AND id <> ? LIMIT 1', [data.name, Number(id)]);
+  if (clash) throw new ValidationError('Szablon o tej nazwie już istnieje.', 'name');
+  await db.update('cg_templates', data, 'id = ?', [Number(id)]);
+  return getTemplate(id);
+}
+
+async function deleteTemplate(id) {
+  const template = await getTemplate(id);
+  if (!template) throw new ValidationError('Nie znaleziono szablonu.');
+
+  const used = await db.fetch(
+    'SELECT (SELECT COUNT(*) FROM cg_match_templates WHERE template_id = ?) AS matches,'
+    + ' (SELECT COUNT(*) FROM cg_designs WHERE template_id = ?) AS designs',
+    [Number(id), Number(id)]
+  );
+  if (Number(used.matches) > 0 || Number(used.designs) > 0) {
+    throw new ValidationError(
+      `Szablon jest w użyciu (mecze: ${used.matches}, projekty: ${used.designs}). `
+      + 'Odepnij go od meczów albo oznacz jako nieaktywny.'
+    );
+  }
+
+  await db.delete('cg_templates', 'id = ?', [Number(id)]);
+  return true;
+}
+
+/* ------------------------------------------------- materiały meczowe */
+
+async function addMatchMaterial(matchId, payload) {
+  const match = await getMatch(matchId);
+  if (!match) throw new ValidationError('Nie znaleziono meczu.');
+  const template = await getTemplate(payload.template_id);
+  if (!template) throw new ValidationError('Wybierz szablon.', 'template_id');
+
+  const existing = await db.fetch(
+    'SELECT id FROM cg_match_templates WHERE match_id = ? AND template_id = ? LIMIT 1',
+    [Number(matchId), template.id]
+  );
+  if (existing) throw new ValidationError('Ten szablon jest już przypisany do meczu.', 'template_id');
+
+  const last = await db.fetch('SELECT MAX(sort_order) AS max_order FROM cg_match_templates WHERE match_id = ?', [Number(matchId)]);
+  const id = await db.insert('cg_match_templates', {
+    match_id: Number(matchId),
+    template_id: template.id,
+    sort_order: Number(last.max_order || 0) + 1,
+    status: 'todo',
+    deadline_at: toMysqlDateTime(payload.deadline_at),
+    owner_role: OWNER_ROLES.includes(payload.owner_role) ? payload.owner_role : null,
+    note: payload.note ? String(payload.note).trim().slice(0, 255) : null
+  });
+  return getMatchMaterial(id);
+}
+
+async function getMatchMaterial(id) {
+  return db.fetch(`
+    SELECT mt.id, mt.match_id, mt.template_id, mt.status, mt.deadline_at, mt.owner_role, mt.note, mt.sort_order,
+           t.name AS template_name, t.width, t.height, t.category
+    FROM cg_match_templates mt
+    JOIN cg_templates t ON t.id = mt.template_id
+    WHERE mt.id = ?
+  `, [Number(id)]);
+}
+
+async function updateMatchMaterial(id, payload) {
+  const current = await getMatchMaterial(id);
+  if (!current) throw new ValidationError('Nie znaleziono materiału.');
+
+  const data = {};
+  if (payload.status !== undefined) {
+    if (!MATERIAL_STATUSES.includes(payload.status)) throw new ValidationError('Nieznany status materiału.', 'status');
+    data.status = payload.status;
+  }
+  if (payload.deadline_at !== undefined) data.deadline_at = toMysqlDateTime(payload.deadline_at);
+  if (payload.owner_role !== undefined) {
+    data.owner_role = OWNER_ROLES.includes(payload.owner_role) ? payload.owner_role : null;
+  }
+  if (payload.note !== undefined) data.note = payload.note ? String(payload.note).trim().slice(0, 255) : null;
+  if (payload.sort_order !== undefined) data.sort_order = Number(payload.sort_order) || 0;
+
+  if (Object.keys(data).length === 0) return current;
+  await db.update('cg_match_templates', data, 'id = ?', [Number(id)]);
+  return getMatchMaterial(id);
+}
+
+async function deleteMatchMaterial(id) {
+  const material = await getMatchMaterial(id);
+  if (!material) throw new ValidationError('Nie znaleziono materiału.');
+  await db.delete('cg_match_templates', 'id = ?', [Number(id)]);
+  return true;
+}
+
 /* ------------------------------------------------------------- dashboard */
 
 async function getNextMatch(seasonId) {
@@ -292,6 +515,23 @@ async function getRecentExports(limit = 6) {
     JOIN cg_designs d ON d.id = e.design_id
     JOIN cg_templates t ON t.id = d.template_id
     LEFT JOIN cg_matches m ON m.id = d.match_id
+    ORDER BY e.created_at DESC
+    LIMIT ${safeLimit}
+  `);
+}
+
+/** Pełna historia eksportów dla widoku Historia. */
+async function listExports(limit = 100) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
+  return db.query(`
+    SELECT e.id, e.format, e.width, e.height, e.created_at,
+           d.title AS design_title, t.name AS template_name,
+           m.home_team, m.away_team, u.display_name AS user_name
+    FROM cg_exports e
+    JOIN cg_designs d ON d.id = e.design_id
+    JOIN cg_templates t ON t.id = d.template_id
+    LEFT JOIN cg_matches m ON m.id = d.match_id
+    LEFT JOIN cg_users u ON u.id = e.created_by
     ORDER BY e.created_at DESC
     LIMIT ${safeLimit}
   `);
@@ -400,6 +640,20 @@ module.exports = {
   ValidationError,
   MATCH_STATUSES,
   MATERIAL_STATUSES,
+  FIELD_TYPES,
+  TEMPLATE_CATEGORIES,
+  OWNER_ROLES,
+  listExports,
+  listTemplates,
+  getTemplate,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  getMatchMaterials,
+  getMatchMaterial,
+  addMatchMaterial,
+  updateMatchMaterial,
+  deleteMatchMaterial,
   listSeasons,
   getActiveSeason,
   getSeason,
