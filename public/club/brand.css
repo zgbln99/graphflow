@@ -65,7 +65,9 @@
   #topbar-menu{min-width:0;overflow-x:auto;scrollbar-width:none}
   #topbar-menu::-webkit-scrollbar{display:none}
 }
-@media (max-width:1399.98px){
+/* Wskaźnik magazynu ustępuje miejsca pozycjom menu dopiero na wąskich ekranach —
+   pasek jest płaski, więc mieści się razem z nim aż do ~1200 px. */
+@media (max-width:1199.98px){
   .navbar .status-magazyn{display:none!important}
 }
 

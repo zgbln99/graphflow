@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-edytor-1';
+const APP_BUILD = '2026-08-31-nawigacja-1';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -139,11 +139,13 @@ function showView(name) {
   if (name === 'editor' && !design) showEditorEmpty(true);
 }
 
-document.querySelectorAll('[data-view]').forEach((el) => {
-  el.addEventListener('click', (event) => {
-    event.preventDefault();
-    showView(el.dataset.view);
-  });
+// Delegacja zamiast wiązania po elementach: działa też dla przycisków
+// dorysowanych później, więc żaden odnośnik do widoku nie zostanie martwy.
+document.addEventListener('click', (event) => {
+  const target = event.target.closest('[data-view]');
+  if (!target) return;
+  event.preventDefault();
+  showView(target.dataset.view);
 });
 
 /* ================= Sezony i mecze (prawdziwe dane z API) ================= */
