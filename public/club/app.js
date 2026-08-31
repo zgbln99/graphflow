@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-warstwy-kursywa';
+const APP_BUILD = '2026-08-31-kolejnosc-warstw';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -615,8 +615,46 @@ function collectFields() {
 
 /* ---- warstwy ---- */
 
+/**
+ * Najczęstsza pomyłka przy układaniu szablonu: zdjęcie albo tło rozciągnięte
+ * na cały dokument ląduje nad gotową grafiką i zasłania ją w całości.
+ * W podglądzie wygląda to tak, jakby grafika w ogóle się nie wczytała.
+ */
+/** Przesuwa warstwę o jedno miejsce w górę (+1) albo w dół (-1) stosu. */
+function moveLayer(id, direction) {
+  const ordered = [...workingLayers].sort((a, b) => a.z - b.z);
+  const index = ordered.findIndex((layer) => layer.id === id);
+  const target = index + direction;
+  if (index === -1 || target < 0 || target >= ordered.length) return;
+
+  [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+  reindexLayers(ordered);
+}
+
+function checkLayerOrder() {
+  const box = document.getElementById('layer-warning');
+  if (!box) return;
+
+  const covering = workingLayers.filter((layer) => layer.visible !== false
+    && (layer.type === 'photo' || layer.type === 'background'));
+
+  const hidden = workingLayers.filter((layer) => layer.visible !== false
+    && (layer.type === 'overlay' || layer.type === 'logo')
+    && layer.asset_id
+    && covering.some((cover) => cover.z > layer.z
+      && cover.x <= layer.x && cover.y <= layer.y
+      && cover.x + cover.w >= layer.x + layer.w
+      && cover.y + cover.h >= layer.y + layer.h));
+
+  box.classList.toggle('d-none', !hidden.length);
+  if (!hidden.length) return;
+  box.textContent = `Zdjęcie lub tło zasłania warstwy: ${hidden.map((layer) => layer.name).join(', ')}. `
+    + 'Przesuń je strzałkami wyżej na liście albo zdjęcie niżej — na liście wierzch jest u góry.';
+}
+
 function renderLayerList() {
   if (!layerList) return;
+  checkLayerOrder();
   const ordered = [...workingLayers].sort((a, b) => b.z - a.z); // na górze listy to, co na wierzchu
   layerList.innerHTML = ordered.length ? ordered.map((layer) => `
     <div class="list-group-item d-flex align-items-center gap-2 ${layer.id === selectedLayerId ? 'active' : ''}"
@@ -625,7 +663,7 @@ function renderLayerList() {
               aria-label="Widoczność">${icon(layer.visible ? 'eye' : 'lock')}</button>
       <div class="flex-fill text-truncate">
         <div class="text-truncate">${escapeHTML(layer.name)}</div>
-        <div class="text-secondary small">${LAYER_TYPE_LABELS[layer.type]} · z=${layer.z}${layer.field ? ' · ' + escapeHTML(layer.field) : ''}</div>
+        <div class="text-secondary small">${LAYER_TYPE_LABELS[layer.type]}${layer.field ? ' · ' + escapeHTML(layer.field) : ''}</div>
       </div>
       <button class="btn btn-icon btn-sm" type="button" data-layer-up="${layer.id}" aria-label="Wyżej">${icon('up')}</button>
       <button class="btn btn-icon btn-sm" type="button" data-layer-down="${layer.id}" aria-label="Niżej">${icon('down')}</button>
@@ -793,11 +831,10 @@ layerList?.addEventListener('click', (event) => {
   if (visible) {
     const layer = find(visible.dataset.layerVisible);
     layer.visible = !layer.visible;
-  } else if (up) {
-    find(up.dataset.layerUp).z += 1;
-  } else if (down) {
-    const layer = find(down.dataset.layerDown);
-    layer.z = Math.max(0, layer.z - 1);
+  } else if (up || down) {
+    // Zamiana miejscami zamiast zmiany „z" o jeden: dwie warstwy o tej samej
+    // wartości miały nieokreśloną kolejność rysowania.
+    moveLayer((up || down).dataset.layerUp || (up || down).dataset.layerDown, up ? 1 : -1);
   } else if (remove) {
     workingLayers = workingLayers.filter((layer) => layer.id !== remove.dataset.layerRemove);
     if (selectedLayerId === remove.dataset.layerRemove) selectedLayerId = null;
@@ -811,22 +848,45 @@ layerList?.addEventListener('click', (event) => {
   refreshPreview();
 });
 
+/**
+ * Naturalna kolejność rysowania w grafice na social media: na spodzie tło
+ * i zdjęcie, nad nimi kształty i gotowa grafika z przezroczystością, a na
+ * wierzchu teksty i logo.
+ *
+ * Wcześniej każda nowa warstwa lądowała na samej górze, więc zdjęcie dodane
+ * po grafice zasłaniało ją w całości — i wyglądało to na błąd rysowania,
+ * a było kwestią kolejności.
+ */
+const LAYER_ORDER = { background: 0, photo: 1, shape: 2, overlay: 3, logo: 4, text: 5 };
+
+/** Numeruje warstwy od dołu, żeby „z" nie rozjechało się po wstawieniu nowej. */
+function reindexLayers(ordered) {
+  ordered.forEach((layer, index) => { layer.z = index + 1; });
+  workingLayers = ordered;
+}
+
 document.getElementById('layer-add')?.addEventListener('click', () => {
   const type = document.getElementById('layer-type').value;
   const width = Number(templateForm.elements.width.value) || 1080;
   const height = Number(templateForm.elements.height.value) || 1350;
-  const maxZ = workingLayers.reduce((max, layer) => Math.max(max, layer.z), 0);
   const layer = {
     id: 'l' + Math.random().toString(36).slice(2, 9),
     name: LAYER_TYPE_LABELS[type],
-    type, z: maxZ + 1, visible: true, locked: false, opacity: 1,
+    type, z: 0, visible: true, locked: false, opacity: 1,
     x: 0, y: 0, w: width, h: height, rotation: 0, field: null, asset_id: null
   };
   if (type === 'photo') Object.assign(layer, { fit: 'cover', mask: 'rect', radius: 0 });
   if (type === 'text') Object.assign(layer, { color: '#ffffff', fontFamily: 'talk', italic: false, fontSize: 96, fontWeight: 700, align: 'left', lineHeight: 1.1, letterSpacing: 0, uppercase: false, text: '' });
   if (type === 'background' || type === 'shape') Object.assign(layer, { color: type === 'background' ? '#0b0d0d' : '#0d8f4f', radius: 0 });
 
-  workingLayers.push(layer);
+  // Wstawiamy nad ostatnią warstwą tego samego lub niższego rodzaju.
+  const ordered = [...workingLayers].sort((a, b) => a.z - b.z);
+  const rank = LAYER_ORDER[type] ?? 5;
+  let index = ordered.length;
+  while (index > 0 && (LAYER_ORDER[ordered[index - 1].type] ?? 5) > rank) index -= 1;
+  ordered.splice(index, 0, layer);
+  reindexLayers(ordered);
+
   selectedLayerId = layer.id;
   renderLayerList();
   renderLayerProps();
@@ -987,6 +1047,7 @@ function renderLayerHandles() {
   const scale = previewScale();
   const toScreen = (value) => `${value / scale}px`;
 
+  checkLayerOrder();
   previewHandles.innerHTML = [...workingLayers]
     .sort((a, b) => a.z - b.z)
     .filter((layer) => layer.visible !== false)

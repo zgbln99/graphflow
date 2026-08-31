@@ -63,6 +63,12 @@ Prawdziwą kursywę można wgrać: w zakładce **Pliki** rodzaj „Czcionka” p
 i WOFF, a raz wgrany krój jest do wyboru we wszystkich szablonach. Podgląd i eksport rysuje
 ten sam silnik, więc krój w podglądzie jest tym, który wyjdzie w pliku.
 
+Nowa warstwa trafia od razu na właściwą wysokość stosu: tło i zdjęcie na spód, kształty
+i gotowa grafika nad nie, teksty i logo na wierzch. Wcześniej każda lądowała na samej górze,
+więc zdjęcie dodane po grafice zasłaniało ją w całości — w podglądzie wyglądało to tak,
+jakby grafika w ogóle się nie wczytała. Gdy mimo to zdjęcie albo tło zasłoni warstwę z plikiem,
+lista warstw mówi o tym wprost.
+
 Warstwę wybiera się klikając na podglądzie — kolejne kliknięcia w to samo miejsce
 przechodzą przez warstwy leżące pod spodem i zapętlają się. Bez tego zdjęcie albo nakładka
 rozciągnięte na cały dokument zasłaniałyby wszystko inne. Przeciągnięcie przesuwa warstwę
