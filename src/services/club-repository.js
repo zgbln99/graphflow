@@ -249,7 +249,89 @@ function parseJson(value, fallback) {
  * Sprawdza definicję szablonu. Pola dynamiczne to sedno aplikacji — aplikacja
  * nie ma żadnych pól wpisanych na stałe, więc walidacja musi być szczelna.
  */
-function normalizeDefinition(raw) {
+
+const LAYER_TYPES = ['background', 'photo', 'text', 'overlay', 'logo', 'shape'];
+const FIT_MODES = ['cover', 'contain'];
+const ALIGNMENTS = ['left', 'center', 'right'];
+const MASK_SHAPES = ['rect', 'circle'];
+
+/**
+ * Warstwy szablonu. Kolejność rysowania wynika z pola z (rosnąco), więc overlay
+ * z przezroczystością można położyć nad zdjęciem — to główny przypadek użycia.
+ * Współrzędne są w pikselach szablonu, niezależne od skali podglądu.
+ */
+function normalizeLayers(rawLayers, { width, height, fieldKeys }) {
+  const layers = Array.isArray(rawLayers) ? rawLayers : [];
+  const seen = new Set();
+
+  const number = (value, fallback, min, max) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(Math.max(parsed, min), max);
+  };
+
+  return layers.map((layer, index) => {
+    const type = LAYER_TYPES.includes(layer.type) ? layer.type : 'shape';
+    const name = String(layer.name || '').trim() || `Warstwa ${index + 1}`;
+
+    let id = String(layer.id || '').trim();
+    if (!/^[a-z0-9_-]{1,40}$/i.test(id) || seen.has(id)) id = `l${index + 1}_${Math.random().toString(36).slice(2, 8)}`;
+    seen.add(id);
+
+    // Powiązanie z polem dynamicznym — tylko dla warstw, które biorą treść z formularza.
+    let field = null;
+    if (type === 'text' || type === 'photo') {
+      const key = String(layer.field || '').trim();
+      if (key && !fieldKeys.includes(key)) {
+        throw new ValidationError(
+          `Warstwa „${name}” wskazuje pole „${key}”, którego nie ma w szablonie.`, 'layers'
+        );
+      }
+      field = key || null;
+    }
+
+    const base = {
+      id,
+      name: name.slice(0, 80),
+      type,
+      z: number(layer.z, index + 1, 0, 999),
+      visible: layer.visible !== false,
+      locked: Boolean(layer.locked),
+      opacity: number(layer.opacity, 1, 0, 1),
+      x: Math.round(number(layer.x, 0, -width * 2, width * 3)),
+      y: Math.round(number(layer.y, 0, -height * 2, height * 3)),
+      w: Math.round(number(layer.w, width, 1, width * 3)),
+      h: Math.round(number(layer.h, height, 1, height * 3)),
+      rotation: number(layer.rotation, 0, -360, 360),
+      field,
+      asset_id: layer.asset_id ? Number(layer.asset_id) : null
+    };
+
+    if (type === 'photo') {
+      base.fit = FIT_MODES.includes(layer.fit) ? layer.fit : 'cover';
+      base.mask = MASK_SHAPES.includes(layer.mask) ? layer.mask : 'rect';
+      base.radius = Math.round(number(layer.radius, 0, 0, 2000));
+    }
+    if (type === 'text') {
+      base.color = /^#[0-9a-f]{3,8}$/i.test(layer.color || '') ? layer.color : '#ffffff';
+      base.fontSize = Math.round(number(layer.fontSize, 64, 6, 800));
+      base.fontWeight = [400, 500, 600, 700].includes(Number(layer.fontWeight)) ? Number(layer.fontWeight) : 700;
+      base.align = ALIGNMENTS.includes(layer.align) ? layer.align : 'left';
+      base.lineHeight = number(layer.lineHeight, 1.1, 0.6, 3);
+      base.letterSpacing = number(layer.letterSpacing, 0, -20, 60);
+      base.uppercase = Boolean(layer.uppercase);
+      base.text = layer.text ? String(layer.text).slice(0, 300) : '';
+    }
+    if (type === 'background' || type === 'shape') {
+      base.color = /^#[0-9a-f]{3,8}$/i.test(layer.color || '') ? layer.color : '#111111';
+      base.radius = Math.round(number(layer.radius, 0, 0, 2000));
+    }
+
+    return base;
+  }).sort((a, b) => a.z - b.z);
+}
+
+function normalizeDefinition(raw, options = {}) {
   const definition = parseJson(raw, {}) || {};
   const fields = Array.isArray(definition.fields) ? definition.fields : [];
   const seen = new Set();
@@ -291,8 +373,11 @@ function normalizeDefinition(raw) {
   return {
     version: 1,
     fields: normalized,
-    // Warstwy uzupełni layer engine; zachowujemy je przy edycji pól.
-    layers: Array.isArray(definition.layers) ? definition.layers : []
+    layers: normalizeLayers(definition.layers, {
+      width: Number(options.width) || 1080,
+      height: Number(options.height) || 1350,
+      fieldKeys: normalized.map((field) => field.key)
+    })
   };
 }
 
@@ -316,7 +401,10 @@ function normalizeTemplate(payload) {
     width: size(payload.width, 'width', 1080),
     height: size(payload.height, 'height', 1350),
     is_active: payload.is_active === false ? 0 : 1,
-    definition: JSON.stringify(normalizeDefinition(payload.definition))
+    definition: JSON.stringify(normalizeDefinition(payload.definition, {
+      width: size(payload.width, 'width', 1080),
+      height: size(payload.height, 'height', 1350)
+    }))
   };
 }
 
@@ -344,11 +432,13 @@ async function listTemplates({ category = null } = {}) {
   return rows.map(decorateTemplate);
 }
 
-async function getTemplate(id) {
-  return decorateTemplate(await db.fetch(`
+async function getTemplate(id, { withAssets = false } = {}) {
+  const template = decorateTemplate(await db.fetch(`
     SELECT id, name, category, width, height, is_active, definition, updated_at
     FROM cg_templates WHERE id = ?
   `, [Number(id)]));
+  if (template && withAssets) template.assets = await listTemplateAssets(template.id);
+  return template;
 }
 
 async function createTemplate(payload, userId = null) {
@@ -387,6 +477,43 @@ async function deleteTemplate(id) {
 
   await db.delete('cg_templates', 'id = ?', [Number(id)]);
   return true;
+}
+
+
+/* ------------------------------------------------- zasoby szablonów */
+
+const ASSET_KINDS = ['overlay', 'background', 'mask', 'font', 'image'];
+
+async function listTemplateAssets(templateId) {
+  return db.query(`
+    SELECT id, template_id, kind, object_key, metadata, created_at
+    FROM cg_template_assets WHERE template_id = ? ORDER BY id
+  `, [Number(templateId)]);
+}
+
+async function addTemplateAsset(templateId, { kind, objectKey, metadata = null }) {
+  const template = await getTemplate(templateId);
+  if (!template) throw new ValidationError('Nie znaleziono szablonu.');
+  if (!ASSET_KINDS.includes(kind)) throw new ValidationError('Nieznany rodzaj zasobu.', 'kind');
+
+  const id = await db.insert('cg_template_assets', {
+    template_id: Number(templateId),
+    kind,
+    object_key: objectKey,
+    metadata: metadata ? JSON.stringify(metadata) : null
+  });
+  return db.fetch('SELECT id, template_id, kind, object_key, metadata FROM cg_template_assets WHERE id = ?', [id]);
+}
+
+async function getTemplateAsset(id) {
+  return db.fetch('SELECT id, template_id, kind, object_key FROM cg_template_assets WHERE id = ?', [Number(id)]);
+}
+
+async function deleteTemplateAsset(id) {
+  const asset = await getTemplateAsset(id);
+  if (!asset) throw new ValidationError('Nie znaleziono zasobu.');
+  await db.delete('cg_template_assets', 'id = ?', [Number(id)]);
+  return asset;
 }
 
 /* ------------------------------------------------- materiały meczowe */
@@ -644,6 +771,12 @@ module.exports = {
   TEMPLATE_CATEGORIES,
   OWNER_ROLES,
   listExports,
+  LAYER_TYPES,
+  ASSET_KINDS,
+  listTemplateAssets,
+  addTemplateAsset,
+  getTemplateAsset,
+  deleteTemplateAsset,
   listTemplates,
   getTemplate,
   createTemplate,

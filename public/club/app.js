@@ -407,11 +407,15 @@ document.getElementById('season-switch')?.addEventListener('change', async (even
 
 if (seasonsBody) loadSeasons().catch(() => {});
 
-/* ================= Szablony z polami dynamicznymi ================= */
+/* ================= Szablony: pola, warstwy, pliki, podgląd ================= */
 
 const FIELD_TYPE_LABELS = {
   text: 'Tekst', textarea: 'Tekst wielolinijkowy', number: 'Liczba',
   select: 'Lista wyboru', date: 'Data', photo: 'Zdjęcie'
+};
+const LAYER_TYPE_LABELS = {
+  background: 'Tło', photo: 'Zdjęcie', text: 'Tekst',
+  overlay: 'Overlay', logo: 'Logo', shape: 'Kształt'
 };
 
 const canEditTemplates = ['admin', 'designer'].includes(document.body.dataset.role);
@@ -419,8 +423,17 @@ const templateList = document.getElementById('template-list');
 const templateForm = document.getElementById('template-form');
 const templateFields = document.getElementById('template-fields');
 const templateFormError = document.getElementById('template-form-error');
+const layerList = document.getElementById('layer-list');
+const layerProps = document.getElementById('layer-props');
+const assetList = document.getElementById('asset-list');
+const previewCanvas = document.getElementById('template-preview');
+
 let templates = [];
-let currentTemplateId = null;
+let currentTemplate = null;       // pełny szablon z zasobami
+let workingLayers = [];           // warstwy w trakcie edycji
+let selectedLayerId = null;
+
+/* ---- pola dynamiczne ---- */
 
 function fieldRow(field = {}) {
   const wrap = document.createElement('div');
@@ -472,8 +485,9 @@ function fieldRow(field = {}) {
 
   wrap.querySelector('[data-f=type]').addEventListener('change', (event) => {
     wrap.querySelector('[data-options-wrap]').classList.toggle('d-none', event.target.value !== 'select');
+    refreshPreview();
   });
-  wrap.querySelector('[data-field-remove]').addEventListener('click', () => wrap.remove());
+  wrap.querySelector('[data-field-remove]').addEventListener('click', () => { wrap.remove(); refreshPreview(); });
   wrap.querySelector('[data-field-up]').addEventListener('click', () => {
     const previous = wrap.previousElementSibling;
     if (previous) wrap.parentNode.insertBefore(wrap, previous);
@@ -482,6 +496,7 @@ function fieldRow(field = {}) {
     const next = wrap.nextElementSibling;
     if (next) wrap.parentNode.insertBefore(next, wrap);
   });
+  wrap.addEventListener('input', refreshPreview);
   return wrap;
 }
 
@@ -499,11 +514,314 @@ function collectFields() {
   });
 }
 
+/* ---- warstwy ---- */
+
+function renderLayerList() {
+  if (!layerList) return;
+  const ordered = [...workingLayers].sort((a, b) => b.z - a.z); // na górze listy to, co na wierzchu
+  layerList.innerHTML = ordered.length ? ordered.map((layer) => `
+    <div class="list-group-item d-flex align-items-center gap-2 ${layer.id === selectedLayerId ? 'active' : ''}"
+         data-layer="${layer.id}" style="cursor:pointer">
+      <button class="btn btn-icon btn-sm" type="button" data-layer-visible="${layer.id}"
+              aria-label="Widoczność">${icon(layer.visible ? 'eye' : 'lock')}</button>
+      <div class="flex-fill text-truncate">
+        <div class="text-truncate">${escapeHTML(layer.name)}</div>
+        <div class="text-secondary small">${LAYER_TYPE_LABELS[layer.type]} · z=${layer.z}${layer.field ? ' · ' + escapeHTML(layer.field) : ''}</div>
+      </div>
+      <button class="btn btn-icon btn-sm" type="button" data-layer-up="${layer.id}" aria-label="Wyżej">${icon('up')}</button>
+      <button class="btn btn-icon btn-sm" type="button" data-layer-down="${layer.id}" aria-label="Niżej">${icon('down')}</button>
+      <button class="btn btn-icon btn-sm" type="button" data-layer-remove="${layer.id}" aria-label="Usuń">${icon('trash')}</button>
+    </div>`).join('')
+    : '<div class="list-group-item text-secondary">Brak warstw.</div>';
+}
+
+function layerInput(label, key, value, attrs = '') {
+  return `<div class="col-6 col-md-4">
+    <label class="form-label small mb-1">${label}</label>
+    <input class="form-control form-control-sm" data-l="${key}" value="${escapeHTML(String(value ?? ''))}" ${attrs}>
+  </div>`;
+}
+
+function renderLayerProps() {
+  if (!layerProps) return;
+  const layer = workingLayers.find((item) => item.id === selectedLayerId);
+  if (!layer) {
+    layerProps.innerHTML = '<div class="text-secondary small">Wybierz warstwę z listy.</div>';
+    return;
+  }
+
+  const fieldOptions = collectFields()
+    .filter((field) => (layer.type === 'photo' ? field.type === 'photo' : field.type !== 'photo'))
+    .map((field) => `<option value="${escapeHTML(field.key)}" ${layer.field === field.key ? 'selected' : ''}>${escapeHTML(field.label)} (${escapeHTML(field.key)})</option>`)
+    .join('');
+
+  const assetOptions = (currentTemplate?.assets || [])
+    .map((asset) => `<option value="${asset.id}" ${Number(layer.asset_id) === asset.id ? 'selected' : ''}>${escapeHTML(asset.kind)} · ${escapeHTML(asset.object_key.split('/').pop())}</option>`)
+    .join('');
+
+  layerProps.innerHTML = `
+    <div class="row g-2">
+      <div class="col-12">
+        <label class="form-label small mb-1">Nazwa warstwy</label>
+        <input class="form-control form-control-sm" data-l="name" value="${escapeHTML(layer.name)}" maxlength="80">
+      </div>
+      ${layerInput('X', 'x', layer.x, 'type="number"')}
+      ${layerInput('Y', 'y', layer.y, 'type="number"')}
+      ${layerInput('Kolejność (z)', 'z', layer.z, 'type="number" min="0" max="999"')}
+      ${layerInput('Szerokość', 'w', layer.w, 'type="number" min="1"')}
+      ${layerInput('Wysokość', 'h', layer.h, 'type="number" min="1"')}
+      ${layerInput('Obrót', 'rotation', layer.rotation, 'type="number" min="-360" max="360"')}
+      <div class="col-6 col-md-4">
+        <label class="form-label small mb-1">Krycie</label>
+        <input class="form-range" type="range" min="0" max="1" step="0.05" data-l="opacity" value="${layer.opacity}">
+      </div>
+      <div class="col-6 col-md-4">
+        <label class="form-check form-switch mt-4">
+          <input class="form-check-input" type="checkbox" data-l="locked" ${layer.locked ? 'checked' : ''}>
+          <span class="form-check-label small">Zablokowana</span>
+        </label>
+      </div>
+
+      ${(layer.type === 'text' || layer.type === 'photo') ? `
+        <div class="col-12">
+          <label class="form-label small mb-1">Pole formularza</label>
+          <select class="form-select form-select-sm" data-l="field">
+            <option value="">— brak —</option>${fieldOptions}
+          </select>
+        </div>` : ''}
+
+      ${(layer.type === 'overlay' || layer.type === 'logo' || layer.type === 'background') ? `
+        <div class="col-12">
+          <label class="form-label small mb-1">Plik szablonu</label>
+          <select class="form-select form-select-sm" data-l="asset_id">
+            <option value="">— brak —</option>${assetOptions}
+          </select>
+        </div>` : ''}
+
+      ${layer.type === 'photo' ? `
+        <div class="col-6 col-md-4">
+          <label class="form-label small mb-1">Dopasowanie</label>
+          <select class="form-select form-select-sm" data-l="fit">
+            <option value="cover" ${layer.fit === 'cover' ? 'selected' : ''}>Wypełnij</option>
+            <option value="contain" ${layer.fit === 'contain' ? 'selected' : ''}>Zmieść</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small mb-1">Maska</label>
+          <select class="form-select form-select-sm" data-l="mask">
+            <option value="rect" ${layer.mask === 'rect' ? 'selected' : ''}>Prostokąt</option>
+            <option value="circle" ${layer.mask === 'circle' ? 'selected' : ''}>Koło</option>
+          </select>
+        </div>
+        ${layerInput('Zaokrąglenie', 'radius', layer.radius, 'type="number" min="0"')}` : ''}
+
+      ${layer.type === 'text' ? `
+        ${layerInput('Rozmiar', 'fontSize', layer.fontSize, 'type="number" min="6" max="800"')}
+        <div class="col-6 col-md-4">
+          <label class="form-label small mb-1">Grubość</label>
+          <select class="form-select form-select-sm" data-l="fontWeight">
+            ${[400, 500, 600, 700].map((weight) => `<option value="${weight}" ${layer.fontWeight === weight ? 'selected' : ''}>${weight}</option>`).join('')}
+          </select>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small mb-1">Wyrównanie</label>
+          <select class="form-select form-select-sm" data-l="align">
+            <option value="left" ${layer.align === 'left' ? 'selected' : ''}>Do lewej</option>
+            <option value="center" ${layer.align === 'center' ? 'selected' : ''}>Do środka</option>
+            <option value="right" ${layer.align === 'right' ? 'selected' : ''}>Do prawej</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small mb-1">Kolor</label>
+          <input class="form-control form-control-color form-control-sm" type="color" data-l="color" value="${layer.color || '#ffffff'}">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-check form-switch mt-4">
+            <input class="form-check-input" type="checkbox" data-l="uppercase" ${layer.uppercase ? 'checked' : ''}>
+            <span class="form-check-label small">WERSALIKI</span>
+          </label>
+        </div>
+        <div class="col-12">
+          <label class="form-label small mb-1">Tekst stały (gdy nie podpięto pola)</label>
+          <input class="form-control form-control-sm" data-l="text" value="${escapeHTML(layer.text || '')}" maxlength="300">
+        </div>` : ''}
+
+      ${(layer.type === 'background' || layer.type === 'shape') ? `
+        <div class="col-6 col-md-4">
+          <label class="form-label small mb-1">Kolor</label>
+          <input class="form-control form-control-color form-control-sm" type="color" data-l="color" value="${layer.color || '#111111'}">
+        </div>
+        ${layerInput('Zaokrąglenie', 'radius', layer.radius, 'type="number" min="0"')}` : ''}
+    </div>`;
+
+  layerProps.querySelectorAll('[data-l]').forEach((input) => {
+    const handler = () => {
+      const key = input.dataset.l;
+      let value = input.type === 'checkbox' ? input.checked : input.value;
+      if (['x', 'y', 'z', 'w', 'h', 'rotation', 'fontSize', 'fontWeight', 'radius'].includes(key)) value = Number(value) || 0;
+      if (key === 'opacity') value = Number(value);
+      if (key === 'asset_id') value = value ? Number(value) : null;
+      layer[key] = value;
+      if (['name', 'z'].includes(key)) renderLayerList();
+      refreshPreview();
+    };
+    input.addEventListener(input.tagName === 'SELECT' || input.type === 'checkbox' ? 'change' : 'input', handler);
+  });
+}
+
+layerList?.addEventListener('click', (event) => {
+  const visible = event.target.closest('[data-layer-visible]');
+  const up = event.target.closest('[data-layer-up]');
+  const down = event.target.closest('[data-layer-down]');
+  const remove = event.target.closest('[data-layer-remove]');
+  const row = event.target.closest('[data-layer]');
+
+  const find = (id) => workingLayers.find((layer) => layer.id === id);
+
+  if (visible) {
+    const layer = find(visible.dataset.layerVisible);
+    layer.visible = !layer.visible;
+  } else if (up) {
+    find(up.dataset.layerUp).z += 1;
+  } else if (down) {
+    const layer = find(down.dataset.layerDown);
+    layer.z = Math.max(0, layer.z - 1);
+  } else if (remove) {
+    workingLayers = workingLayers.filter((layer) => layer.id !== remove.dataset.layerRemove);
+    if (selectedLayerId === remove.dataset.layerRemove) selectedLayerId = null;
+  } else if (row) {
+    selectedLayerId = row.dataset.layer;
+  } else {
+    return;
+  }
+  renderLayerList();
+  renderLayerProps();
+  refreshPreview();
+});
+
+document.getElementById('layer-add')?.addEventListener('click', () => {
+  const type = document.getElementById('layer-type').value;
+  const width = Number(templateForm.elements.width.value) || 1080;
+  const height = Number(templateForm.elements.height.value) || 1350;
+  const maxZ = workingLayers.reduce((max, layer) => Math.max(max, layer.z), 0);
+  const layer = {
+    id: 'l' + Math.random().toString(36).slice(2, 9),
+    name: LAYER_TYPE_LABELS[type],
+    type, z: maxZ + 1, visible: true, locked: false, opacity: 1,
+    x: 0, y: 0, w: width, h: height, rotation: 0, field: null, asset_id: null
+  };
+  if (type === 'photo') Object.assign(layer, { fit: 'cover', mask: 'rect', radius: 0 });
+  if (type === 'text') Object.assign(layer, { color: '#ffffff', fontSize: 96, fontWeight: 700, align: 'left', lineHeight: 1.1, letterSpacing: 0, uppercase: false, text: '' });
+  if (type === 'background' || type === 'shape') Object.assign(layer, { color: type === 'background' ? '#0b0d0d' : '#0d8f4f', radius: 0 });
+
+  workingLayers.push(layer);
+  selectedLayerId = layer.id;
+  renderLayerList();
+  renderLayerProps();
+  refreshPreview();
+});
+
+/* ---- pliki szablonu ---- */
+
+function renderAssets() {
+  if (!assetList) return;
+  const assets = currentTemplate?.assets || [];
+  assetList.innerHTML = assets.length ? assets.map((asset) => `
+    <div class="col-6 col-md-4">
+      <div class="card card-sm">
+        <div class="thumb-1610" style="background-image:url('${escapeHTML(asset.object_key)}');background-size:contain;background-position:center;background-repeat:no-repeat"></div>
+        <div class="card-body p-2 d-flex align-items-center">
+          <div class="flex-fill text-truncate">
+            <div class="text-truncate small">${escapeHTML(asset.object_key.split('/').pop())}</div>
+            <div class="text-secondary small">${escapeHTML(asset.kind)}</div>
+          </div>
+          <button class="btn btn-icon btn-sm" type="button" data-asset-delete="${asset.id}" aria-label="Usuń plik">${icon('trash')}</button>
+        </div>
+      </div>
+    </div>`).join('')
+    : '<div class="col-12 text-secondary small">Szablon nie ma jeszcze żadnych plików.</div>';
+}
+
+assetList?.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-asset-delete]');
+  if (!button || !confirm('Usunąć ten plik z szablonu?')) return;
+  try {
+    await api('/api/assets/' + button.dataset.assetDelete, { method: 'DELETE' });
+    currentTemplate.assets = currentTemplate.assets.filter((asset) => asset.id !== Number(button.dataset.assetDelete));
+    workingLayers.forEach((layer) => {
+      if (Number(layer.asset_id) === Number(button.dataset.assetDelete)) layer.asset_id = null;
+    });
+    renderAssets();
+    renderLayerProps();
+    refreshPreview();
+  } catch (error) { setFormError(templateFormError, error.message); }
+});
+
+document.getElementById('asset-file')?.addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  if (!file || !currentTemplate?.id) return;
+  const form = new FormData();
+  form.append('file', file);
+  form.append('kind', document.getElementById('asset-kind').value);
+  setFormError(templateFormError, '');
+  try {
+    const response = await fetch('/api/templates/' + currentTemplate.id + '/assets', { method: 'POST', body: form });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.error || 'Nie udało się wgrać pliku.');
+    currentTemplate.assets = [...(currentTemplate.assets || []), payload.asset];
+    renderAssets();
+    renderLayerProps();
+    refreshPreview();
+  } catch (error) {
+    setFormError(templateFormError, error.message);
+  } finally {
+    event.target.value = '';
+  }
+});
+
+/* ---- podgląd ---- */
+
+let previewTimer;
+function refreshPreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(drawPreview, 120);
+}
+
+async function drawPreview() {
+  if (!previewCanvas || !templateForm || templateForm.closest('.d-none')) return;
+  const width = Number(templateForm.elements.width.value) || 1080;
+  const height = Number(templateForm.elements.height.value) || 1350;
+  const maxWidth = 420;
+  const scale = Math.min(1, maxWidth / width);
+
+  previewCanvas.width = Math.round(width * scale);
+  previewCanvas.height = Math.round(height * scale);
+  document.getElementById('preview-size').textContent = `${width} × ${height} px`;
+
+  // Wartości podglądowe: etykiety pól tekstowych, żeby grafik widział rozmieszczenie.
+  // Pola zdjęć zostają puste — wtedy renderer rysuje obrys maski wyznaczonej przez grafika.
+  const values = {};
+  collectFields().forEach((field) => {
+    if (field.type === 'photo') return;
+    values[field.key] = field.default || field.label;
+  });
+
+  await window.ZmcRenderer.render(
+    previewCanvas,
+    { width, height, definition: { layers: workingLayers } },
+    values,
+    currentTemplate?.assets || [],
+    { placeholders: true }
+  );
+}
+
+/* ---- lista i zapis szablonu ---- */
+
 function renderTemplateList() {
   if (!templateList) return;
   document.getElementById('template-list-empty')?.classList.toggle('d-none', templates.length > 0);
   templateList.innerHTML = templates.map((template) => `
-    <a href="#" class="list-group-item list-group-item-action d-flex align-items-center${template.id === currentTemplateId ? ' active' : ''}"
+    <a href="#" class="list-group-item list-group-item-action d-flex align-items-center${template.id === currentTemplate?.id ? ' active' : ''}"
        data-template="${template.id}">
       <div class="flex-fill">
         <div>${escapeHTML(template.name)}</div>
@@ -517,13 +835,17 @@ function renderTemplateList() {
 }
 
 function showTemplateEditor(template) {
+  const editor = document.getElementById('template-editor');
   const empty = document.getElementById('template-editor-empty');
   const actions = document.getElementById('template-editor-actions');
   if (!templateForm) return;
 
-  currentTemplateId = template?.id || null;
+  currentTemplate = template ? { ...template, assets: template.assets || [] } : null;
+  workingLayers = template ? JSON.parse(JSON.stringify(template.definition.layers || [])) : [];
+  selectedLayerId = workingLayers[0]?.id || null;
+
   setFormError(templateFormError, '');
-  templateForm.classList.remove('d-none');
+  editor.classList.remove('d-none');
   empty?.classList.add('d-none');
   document.getElementById('template-editor-title').textContent = template ? template.name : 'Nowy szablon';
 
@@ -547,12 +869,18 @@ function showTemplateEditor(template) {
       hideTemplateEditor();
     } catch (error) { setFormError(templateFormError, error.message); }
   });
+
   renderTemplateList();
+  renderLayerList();
+  renderLayerProps();
+  renderAssets();
+  refreshPreview();
 }
 
 function hideTemplateEditor() {
-  currentTemplateId = null;
-  templateForm?.classList.add('d-none');
+  currentTemplate = null;
+  workingLayers = [];
+  document.getElementById('template-editor')?.classList.add('d-none');
   document.getElementById('template-editor-empty')?.classList.remove('d-none');
   document.getElementById('template-editor-title').textContent = 'Wybierz szablon';
   document.getElementById('template-editor-actions').innerHTML = '';
@@ -567,18 +895,24 @@ async function loadTemplates() {
   fillMaterialTemplateSelect();
 }
 
-templateList?.addEventListener('click', (event) => {
+templateList?.addEventListener('click', async (event) => {
   const link = event.target.closest('[data-template]');
   if (!link) return;
   event.preventDefault();
-  const template = templates.find((item) => item.id === Number(link.dataset.template));
-  if (template) showTemplateEditor(template);
+  try {
+    const { template } = await api('/api/templates/' + link.dataset.template);
+    showTemplateEditor(template);
+  } catch (error) { setFormError(templateFormError, error.message); }
 });
 
 document.getElementById('template-new')?.addEventListener('click', () => showTemplateEditor(null));
 document.getElementById('template-cancel')?.addEventListener('click', hideTemplateEditor);
 document.getElementById('template-add-field')?.addEventListener('click', () => {
   templateFields.appendChild(fieldRow({ type: 'text' }));
+  renderLayerProps();
+});
+templateForm?.querySelectorAll('[name=width],[name=height]').forEach((input) => {
+  input.addEventListener('input', refreshPreview);
 });
 
 templateForm?.addEventListener('submit', async (event) => {
@@ -589,7 +923,7 @@ templateForm?.addEventListener('submit', async (event) => {
     category: templateForm.elements.category.value,
     width: templateForm.elements.width.value,
     height: templateForm.elements.height.value,
-    definition: { fields: collectFields() }
+    definition: { fields: collectFields(), layers: workingLayers }
   };
   setFormError(templateFormError, '');
   try {
@@ -598,7 +932,8 @@ templateForm?.addEventListener('submit', async (event) => {
       body: JSON.stringify(body)
     });
     await loadTemplates();
-    showTemplateEditor(template);
+    const full = await api('/api/templates/' + template.id);
+    showTemplateEditor(full.template);
   } catch (error) {
     setFormError(templateFormError, error.message);
   }

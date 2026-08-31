@@ -19,6 +19,27 @@ const db = Database.getInstance();
 const brandingDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'branding');
 fs.mkdirSync(brandingDir, { recursive: true });
 
+// Pliki szablonów (overlay, tła, maski) — docelowo trafią do magazynu S3,
+// na razie leżą lokalnie i są serwowane statycznie jak logo klubu.
+const templateDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'templates');
+fs.mkdirSync(templateDir, { recursive: true });
+
+const uploadTemplateAsset = multer({
+  storage: multer.diskStorage({
+    destination: templateDir,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase().slice(0, 10);
+      cb(null, `tpl-${req.params.id}-${Date.now()}${ext}`);
+    }
+  }),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    if (!allowed.includes(file.mimetype)) return cb(new Error('Dozwolone formaty: PNG, JPG, WEBP, SVG.'));
+    cb(null, true);
+  }
+});
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: brandingDir,
@@ -325,7 +346,7 @@ router.get('/api/templates', requireAuth, async (req, res, next) => {
 
 router.get('/api/templates/:id', requireAuth, async (req, res, next) => {
   try {
-    const template = await repo.getTemplate(req.params.id);
+    const template = await repo.getTemplate(req.params.id, { withAssets: true });
     if (!template) return res.status(404).json({ success: false, error: 'Nie znaleziono szablonu.' });
     res.json({ success: true, template });
   } catch (err) { next(err); }
@@ -377,6 +398,32 @@ router.patch('/api/materials/:id', requireAuth, requireRole('admin', 'designer',
 router.delete('/api/materials/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
   try {
     await repo.deleteMatchMaterial(req.params.id);
+    res.json({ success: true });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.post('/api/templates/:id/assets', requireAuth, requireRole('admin', 'designer'),
+  uploadTemplateAsset.single('file'), async (req, res, next) => {
+    try {
+      if (!req.file) return res.status(400).json({ success: false, error: 'Nie wybrano pliku.' });
+      const asset = await repo.addTemplateAsset(req.params.id, {
+        kind: req.body.kind || 'overlay',
+        objectKey: `/uploads/templates/${req.file.filename}`,
+        metadata: { originalName: req.file.originalname, size: req.file.size }
+      });
+      res.status(201).json({ success: true, asset });
+    } catch (err) {
+      if (req.file) fs.unlink(path.join(templateDir, req.file.filename), () => {});
+      handleRepoError(res, next, err);
+    }
+  });
+
+router.delete('/api/assets/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    const asset = await repo.deleteTemplateAsset(req.params.id);
+    if (asset.object_key.startsWith('/uploads/templates/')) {
+      fs.unlink(path.join(templateDir, path.basename(asset.object_key)), () => {});
+    }
     res.json({ success: true });
   } catch (err) { handleRepoError(res, next, err); }
 });
