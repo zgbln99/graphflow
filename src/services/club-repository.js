@@ -620,18 +620,22 @@ async function getMatchMaterials(matchId) {
   `, [Number(matchId)]);
 }
 
-async function getMatchFolders(matchId) {
-  if (!matchId) return [];
-  return db.query(`
-    SELECT f.id, f.name, f.role, f.prefix_path,
-           COUNT(p.id) AS photo_count,
+/** Ile zdjęć ma mecz — foldery są szczegółem technicznym, licznik nie jest. */
+async function getMatchPhotoStats(matchId) {
+  if (!matchId) return { total: 0, selected: 0, lastIndexedAt: null };
+  const row = await db.fetch(`
+    SELECT COUNT(p.id) AS total,
+           COALESCE(SUM(p.is_selected), 0) AS selected,
            MAX(p.indexed_at) AS last_indexed_at
     FROM cg_s3_folders f
     LEFT JOIN cg_photo_index p ON p.folder_id = f.id
     WHERE f.match_id = ?
-    GROUP BY f.id
-    ORDER BY f.name
   `, [Number(matchId)]);
+  return {
+    total: Number(row?.total) || 0,
+    selected: Number(row?.selected) || 0,
+    lastIndexedAt: row?.last_indexed_at || null
+  };
 }
 
 /* --------------------------------------------------------------- grafiki */
@@ -836,80 +840,19 @@ async function recordExport({ designId, objectKey, format, width, height, fileSi
   return db.fetch('SELECT id, design_id, object_key, format, width, height, created_at FROM cg_exports WHERE id = ?', [id]);
 }
 
-/* ------------------------------------------------- foldery magazynu (S3) */
-
-const FOLDER_ROLES = ['photographer', 'social', 'selected', 'archive', 'custom'];
+/* --------------------------------------------------- zbiory zdjęć (S3) */
 
 /**
- * Folder to wskaźnik na prefix w buckecie — sam w sobie nie tworzy niczego
- * w magazynie. Usunięcie folderu kasuje tylko indeks, pliki zostają w S3.
+ * Zdjęcia należą do meczu — nie ma podziału na fotografa, wybrane czy archiwum.
+ * Jeden mecz to jeden katalog w magazynie; osobny zbiór „poza meczem" zbiera
+ * zdjęcia do grafik spoza kalendarza (urodziny, transfery).
+ *
+ * Katalog w buckecie tworzy się sam przy pierwszym zdjęciu, a jego ścieżka
+ * powstaje z danych, które i tak są w bazie: sezon → kolejka → data i drużyny.
+ * Dzięki temu magazyn czyta się tak samo jak kalendarz rozgrywek.
  */
-function normalizeFolder(payload, { requireAll = true } = {}) {
-  const data = {};
 
-  if (requireAll || payload.name !== undefined) {
-    const name = String(payload.name || '').trim();
-    if (!name) throw new ValidationError('Podaj nazwę folderu.', 'name');
-    if (name.length > 160) throw new ValidationError('Nazwa folderu może mieć maksymalnie 160 znaków.', 'name');
-    data.name = name;
-  }
-
-  if (requireAll || payload.prefix_path !== undefined) {
-    let prefix;
-    try {
-      prefix = storage.normalizePrefix(payload.prefix_path);
-    } catch (error) {
-      throw new ValidationError(error.message, 'prefix_path');
-    }
-    if (!prefix) throw new ValidationError('Podaj ścieżkę (prefix) w buckecie.', 'prefix_path');
-    data.prefix_path = prefix;
-  }
-
-  if (requireAll || payload.role !== undefined) {
-    const role = String(payload.role || 'custom').trim();
-    if (!FOLDER_ROLES.includes(role)) {
-      throw new ValidationError(`Nieznana rola folderu: ${role}.`, 'role');
-    }
-    data.role = role;
-  }
-
-  if (requireAll || payload.bucket !== undefined) {
-    const bucket = String(payload.bucket || storage.getBucket() || '').trim();
-    if (!bucket) throw new ValidationError('Brak nazwy bucketa — uzupełnij S3_BUCKET w .env.', 'bucket');
-    data.bucket = bucket.slice(0, 190);
-  }
-
-  if (requireAll || payload.match_id !== undefined) {
-    const matchId = payload.match_id === undefined || payload.match_id === null || payload.match_id === ''
-      ? null
-      : Number(payload.match_id);
-    if (matchId !== null && !Number.isInteger(matchId)) {
-      throw new ValidationError('Nieprawidłowy mecz.', 'match_id');
-    }
-    data.match_id = matchId;
-  }
-
-  if (requireAll || payload.is_upload_enabled !== undefined) {
-    data.is_upload_enabled = payload.is_upload_enabled === false || payload.is_upload_enabled === 'false'
-      || payload.is_upload_enabled === 0 || payload.is_upload_enabled === '0' ? 0 : 1;
-  }
-
-  return data;
-}
-
-/**
- * Ścieżkę w buckecie układa aplikacja, a nie człowiek. Struktura idzie od
- * ogółu do szczegółu: sezon → kolejka (jeśli podana) → mecz → przeznaczenie.
- * Dzięki temu katalog magazynu czyta się tak samo jak kalendarz rozgrywek,
- * a zdjęcia z jednego meczu nigdy nie rozjadą się po dwóch miejscach.
- */
-const FOLDER_ROLE_SEGMENTS = {
-  photographer: 'fotograf',
-  selected: 'wybrane',
-  social: 'social',
-  archive: 'archiwum',
-  custom: 'inne'
-};
+const OFF_MATCH_KEY = 'inne';
 
 /** Nazwa → bezpieczny segment ścieżki: bez polskich znaków, spacji i ukośników. */
 function slug(value, fallback = '') {
@@ -924,114 +867,114 @@ function slug(value, fallback = '') {
   return text || fallback;
 }
 
-async function suggestFolderPrefix({ matchId = null, seasonId = null, role = 'custom' } = {}) {
-  const segments = [];
-  let match = null;
-
-  if (matchId) {
-    match = await db.fetch(`
-      SELECT m.id, m.home_team, m.away_team, m.match_date, m.round_name, s.name AS season_name
-      FROM cg_matches m JOIN cg_seasons s ON s.id = m.season_id
-      WHERE m.id = ? LIMIT 1
-    `, [Number(matchId)]);
-    if (!match) throw new ValidationError('Nie znaleziono meczu.', 'match_id');
+async function buildPrefix(match) {
+  if (!match) {
+    const season = await getActiveSeason();
+    return `${slug(season?.name, 'sezon')}/poza-meczem/`;
   }
-
-  const season = match
-    ? match.season_name
-    : (seasonId ? (await getSeason(seasonId))?.name : (await getActiveSeason())?.name);
-  segments.push(slug(season, 'sezon'));
-
-  if (match) {
-    if (match.round_name) segments.push(slug(match.round_name));
-    // Data z przodu układa mecze chronologicznie także w kliencie S3 na pulpicie.
-    const date = String(match.match_date || '').slice(0, 10);
-    segments.push([date, slug(match.home_team, 'gospodarz'), slug(match.away_team, 'gosc')].filter(Boolean).join('-'));
-  } else {
-    segments.push('poza-meczem');
-  }
-
-  segments.push(FOLDER_ROLE_SEGMENTS[role] || FOLDER_ROLE_SEGMENTS.custom);
-  return `${segments.filter(Boolean).join('/')}/`;
+  const segments = [slug(match.season_name, 'sezon')];
+  if (match.round_name) segments.push(slug(match.round_name));
+  // Data z przodu układa mecze chronologicznie także w kliencie S3 na pulpicie.
+  segments.push([
+    String(match.match_date || '').slice(0, 10),
+    slug(match.home_team, 'gospodarz'),
+    slug(match.away_team, 'gosc')
+  ].filter(Boolean).join('-'));
+  return `${segments.join('/')}/`;
 }
 
-async function listFolders({ matchId = null } = {}) {
-  const conditions = [];
-  const params = [];
-  if (matchId !== null && matchId !== undefined && matchId !== '') {
-    conditions.push('f.match_id = ?');
-    params.push(Number(matchId));
-  }
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+/**
+ * Zbiory zdjęć do wyboru: mecze sezonu plus zbiór spoza kalendarza.
+ * Zwracamy też mecze, które nie mają jeszcze katalogu — dopiero wysyłka
+ * pierwszego zdjęcia go zakłada, więc lista nie zależy od stanu magazynu.
+ */
+async function listPhotoSets({ seasonId = null } = {}) {
+  const season = seasonId ? await getSeason(seasonId) : await getActiveSeason();
 
-  return db.query(`
-    SELECT f.id, f.match_id, f.name, f.bucket, f.prefix_path, f.role,
-           f.is_upload_enabled, f.created_at,
-           m.home_team, m.away_team, m.match_date,
-           COUNT(p.id) AS photo_count,
-           SUM(p.is_selected) AS selected_count,
-           MAX(p.indexed_at) AS last_indexed_at
+  const matches = season ? await db.query(`
+    SELECT m.id, m.home_team, m.away_team, m.match_date, m.round_name, m.status,
+           f.id AS folder_id,
+           COUNT(p.id) AS photo_count
+    FROM cg_matches m
+    LEFT JOIN cg_s3_folders f ON f.match_id = m.id
+    LEFT JOIN cg_photo_index p ON p.folder_id = f.id
+    WHERE m.season_id = ?
+    GROUP BY m.id, f.id
+    ORDER BY m.match_date DESC
+  `, [season.id]) : [];
+
+  const offMatch = await db.fetch(`
+    SELECT f.id AS folder_id, COUNT(p.id) AS photo_count
     FROM cg_s3_folders f
     LEFT JOIN cg_photo_index p ON p.folder_id = f.id
-    LEFT JOIN cg_matches m ON m.id = f.match_id
-    ${where}
+    WHERE f.match_id IS NULL
     GROUP BY f.id
-    ORDER BY COALESCE(m.match_date, f.created_at) DESC, f.name
-  `, params);
+    LIMIT 1
+  `);
+
+  return [
+    ...matches.map((match) => ({
+      key: String(match.id),
+      match_id: match.id,
+      label: `${match.home_team} – ${match.away_team}`,
+      match_date: match.match_date,
+      round_name: match.round_name,
+      status: match.status,
+      folder_id: match.folder_id,
+      photo_count: Number(match.photo_count) || 0
+    })),
+    {
+      key: OFF_MATCH_KEY,
+      match_id: null,
+      label: 'Poza meczem',
+      match_date: null,
+      round_name: null,
+      status: null,
+      folder_id: offMatch?.folder_id || null,
+      photo_count: Number(offMatch?.photo_count) || 0
+    }
+  ];
 }
 
-async function getFolder(id) {
-  return db.fetch(`
-    SELECT f.id, f.match_id, f.name, f.bucket, f.prefix_path, f.role,
-           f.is_upload_enabled, f.created_at
-    FROM cg_s3_folders f WHERE f.id = ? LIMIT 1
-  `, [Number(id)]);
+async function findFolder({ matchId = null }) {
+  return matchId
+    ? db.fetch('SELECT * FROM cg_s3_folders WHERE match_id = ? ORDER BY id LIMIT 1', [Number(matchId)])
+    : db.fetch('SELECT * FROM cg_s3_folders WHERE match_id IS NULL ORDER BY id LIMIT 1');
 }
 
-async function requireFolder(id) {
-  const folder = await getFolder(id);
-  if (!folder) throw new ValidationError('Nie znaleziono folderu.', 'id');
-  return folder;
-}
-
-async function createFolder(payload) {
-  const data = normalizeFolder(payload);
-  if (data.match_id) {
-    const match = await getMatch(data.match_id);
-    if (!match) throw new ValidationError('Nie znaleziono meczu.', 'match_id');
-  }
-  const duplicate = await db.fetch(
-    'SELECT id FROM cg_s3_folders WHERE bucket = ? AND prefix_path = ? LIMIT 1',
-    [data.bucket, data.prefix_path]
-  );
-  if (duplicate) throw new ValidationError('Folder o tym prefixie już istnieje.', 'prefix_path');
-
-  const id = await db.insert('cg_s3_folders', data);
-  return getFolder(id);
-}
-
-async function updateFolder(id, payload) {
-  await requireFolder(id);
-  const data = normalizeFolder(payload, { requireAll: false });
-  if (!Object.keys(data).length) return getFolder(id);
-
-  if (data.prefix_path) {
-    const bucket = data.bucket || (await getFolder(id)).bucket;
-    const duplicate = await db.fetch(
-      'SELECT id FROM cg_s3_folders WHERE bucket = ? AND prefix_path = ? AND id <> ? LIMIT 1',
-      [bucket, data.prefix_path, Number(id)]
-    );
-    if (duplicate) throw new ValidationError('Folder o tym prefixie już istnieje.', 'prefix_path');
+/**
+ * Zbiór zdjęć dla klucza z interfejsu: numer meczu albo „inne".
+ * Katalog zakładamy dopiero wtedy, gdy jest potrzebny.
+ */
+async function resolvePhotoSet(key, { create = false } = {}) {
+  const isOffMatch = String(key) === OFF_MATCH_KEY;
+  const matchId = isOffMatch ? null : Number(key);
+  if (!isOffMatch && !Number.isInteger(matchId)) {
+    throw new ValidationError('Nieprawidłowy zbiór zdjęć.', 'key');
   }
 
-  await db.update('cg_s3_folders', data, 'id = ?', [Number(id)]);
-  return getFolder(id);
-}
+  const match = matchId ? await db.fetch(`
+    SELECT m.id, m.home_team, m.away_team, m.match_date, m.round_name, s.name AS season_name
+    FROM cg_matches m JOIN cg_seasons s ON s.id = m.season_id WHERE m.id = ? LIMIT 1
+  `, [matchId]) : null;
+  if (matchId && !match) throw new ValidationError('Nie znaleziono meczu.', 'key');
 
-async function deleteFolder(id) {
-  await requireFolder(id);
-  // Kasujemy tylko wpis i indeks — pliki w buckecie zostają nietknięte.
-  await db.delete('cg_s3_folders', 'id = ?', [Number(id)]);
+  const existing = await findFolder({ matchId });
+  if (existing) return { folder: existing, match, key: String(key) };
+  if (!create) return { folder: null, match, key: String(key) };
+
+  const bucket = storage.getBucket();
+  if (!bucket) throw new ValidationError('Brak nazwy bucketa — uzupełnij S3_BUCKET w .env.', 'bucket');
+
+  const id = await db.insert('cg_s3_folders', {
+    match_id: matchId,
+    name: match ? `${match.home_team} – ${match.away_team}` : 'Poza meczem',
+    bucket,
+    prefix_path: await buildPrefix(match),
+    role: 'custom',
+    is_upload_enabled: 1
+  });
+  return { folder: await db.fetch('SELECT * FROM cg_s3_folders WHERE id = ?', [id]), match, key: String(key) };
 }
 
 /* ------------------------------------------------------- indeks zdjęć */
@@ -1185,7 +1128,7 @@ async function getOffMatchMaterials(limit = 6) {
  * Lista rzeczy wymagających reakcji — wyliczana z danych, nie wpisana na sztywno.
  * Kolejność: zaległe terminy, potem braki w konfiguracji meczu.
  */
-function buildAlerts({ season, nextMatch, materials, folders }) {
+function buildAlerts({ season, nextMatch, materials, photos }) {
   const alerts = [];
 
   if (!season) {
@@ -1216,11 +1159,11 @@ function buildAlerts({ season, nextMatch, materials, folders }) {
     });
   }
 
-  if (folders.length === 0) {
+  if (photos.total === 0) {
     alerts.push({
       level: 'soon',
-      title: 'Mecz bez folderów zdjęć',
-      detail: 'Bez folderu fotograf nie ma gdzie wrzucić zdjęć.'
+      title: 'Mecz bez zdjęć',
+      detail: 'Fotograf nie wgrał jeszcze żadnego kadru z tego spotkania.'
     });
   }
 
@@ -1232,14 +1175,13 @@ async function getDashboard() {
   const season = seasons.find((item) => item.is_active) || seasons[0] || null;
   const nextMatch = season ? await getNextMatch(season.id) : null;
 
-  const [materials, folders, exports, offMatch] = await Promise.all([
+  const [materials, photos, exports, offMatch] = await Promise.all([
     getMatchMaterials(nextMatch?.id),
-    getMatchFolders(nextMatch?.id),
+    getMatchPhotoStats(nextMatch?.id),
     getRecentExports(),
     getOffMatchMaterials()
   ]);
 
-  const photoCount = folders.reduce((sum, folder) => sum + Number(folder.photo_count || 0), 0);
   const weekExports = await db.fetch(
     'SELECT COUNT(*) AS total FROM cg_exports WHERE created_at >= NOW() - INTERVAL 7 DAY'
   );
@@ -1252,15 +1194,15 @@ async function getDashboard() {
   return {
     seasons,
     season,
-    alerts: buildAlerts({ season, nextMatch, materials, folders }),
+    alerts: buildAlerts({ season, nextMatch, materials, photos }),
     matchCount: Number(matchCount.total),
     nextMatch,
     materials,
-    folders,
+    photos,
     exports,
     offMatch,
     counters: {
-      photoCount,
+      photoCount: photos.total,
       weekExports: Number(weekExports.total),
       materialsReady: readyCount,
       materialsTotal: materials.length
@@ -1277,13 +1219,9 @@ module.exports = {
   updateDesign,
   deleteDesign,
   recordExport,
-  FOLDER_ROLES,
-  suggestFolderPrefix,
-  listFolders,
-  getFolder,
-  createFolder,
-  updateFolder,
-  deleteFolder,
+  OFF_MATCH_KEY,
+  listPhotoSets,
+  resolvePhotoSet,
   listPhotos,
   getPhoto,
   upsertPhotos,

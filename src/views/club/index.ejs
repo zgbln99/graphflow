@@ -287,22 +287,31 @@
                   <div class="col-12">
                     <div class="card">
                       <div class="card-header">
-                        <h3 class="card-title">Foldery zdjęć meczu</h3>
-                        <div class="card-actions"><a href="#" class="btn btn-link btn-sm" data-view="library">Biblioteka</a></div>
+                        <h3 class="card-title">Zdjęcia z meczu</h3>
+                        <div class="card-actions"><a href="#" class="btn btn-link btn-sm" data-view="library">Otwórz</a></div>
                       </div>
-                      <% if (!d.folders.length) { %>
-                        <div class="card-body text-secondary">Do tego meczu nie przypisano folderów zdjęć.</div>
-                      <% } else { %>
-                        <div class="list-group list-group-flush">
-                          <% d.folders.forEach(folder => { %>
-                            <div class="list-group-item d-flex align-items-center">
-                              <svg class="icon me-2 text-secondary"><use href="#i-folder"></use></svg>
-                              <span class="flex-fill text-truncate"><%= folder.name %></span>
-                              <span class="badge bg-secondary-lt"><%= folder.photo_count %></span>
+                      <div class="card-body">
+                        <% if (!d.photos.total) { %>
+                          <p class="text-secondary mb-0">Nie ma jeszcze zdjęć z tego spotkania.</p>
+                        <% } else { %>
+                          <div class="datagrid">
+                            <div class="datagrid-item">
+                              <div class="datagrid-title">W magazynie</div>
+                              <div class="datagrid-content"><%= d.photos.total %></div>
                             </div>
-                          <% }) %>
-                        </div>
-                      <% } %>
+                            <div class="datagrid-item">
+                              <div class="datagrid-title">Wybrane do grafik</div>
+                              <div class="datagrid-content"><%= d.photos.selected %></div>
+                            </div>
+                            <div class="datagrid-item">
+                              <div class="datagrid-title">Ostatnia synchronizacja</div>
+                              <div class="datagrid-content">
+                                <%= d.photos.lastIndexedAt ? fmt.dateTime(d.photos.lastIndexedAt) : '—' %>
+                              </div>
+                            </div>
+                          </div>
+                        <% } %>
+                      </div>
                     </div>
                   </div>
 
@@ -512,13 +521,12 @@
                     </button>
                   </div>
                 </div>
-                <div class="card-body pb-2">
-                  <select class="form-select form-select-sm" id="picker-folder" aria-label="Folder ze zdjęciami"></select>
-                </div>
-                <div class="card-body pt-2 scroll-y">
+                <div class="card-body scroll-y">
+                  <select class="form-select form-select-sm mb-3" id="picker-folder"
+                          aria-label="Mecz, z którego wybierasz zdjęcie"></select>
                   <div class="row g-2" id="picker-grid"></div>
                   <p class="text-secondary small mb-0 d-none" id="picker-empty">
-                    W tym folderze nie ma zdjęć. Wgraj je w Bibliotece zdjęć.
+                    Ten mecz nie ma jeszcze zdjęć. Wgraj je w zakładce Zdjęcia.
                   </p>
                 </div>
                 <div class="card-footer d-none" id="picker-crop">
@@ -754,19 +762,14 @@
             <div class="col-lg-4 col-xl-3">
               <div class="card">
                 <div class="card-header">
-                  <h3 class="card-title">Foldery</h3>
-                  <% if (can('admin', 'designer')) { %>
-                    <div class="card-actions">
-                      <button class="btn btn-primary btn-sm" type="button" data-folder-new
-                              data-bs-toggle="modal" data-bs-target="#folder-modal" <%= st.configured ? '' : 'disabled' %>>
-                        <svg class="icon"><use href="#i-plus"></use></svg>Nowy
-                      </button>
-                    </div>
-                  <% } %>
+                  <div>
+                    <h3 class="card-title">Mecze</h3>
+                    <div class="text-secondary small">Zdjęcia są przypisane do spotkania</div>
+                  </div>
                 </div>
-                <div class="list-group list-group-flush" id="folders-list"></div>
-                <div class="card-body text-secondary d-none" id="folders-empty">
-                  Brak folderów. Folder wskazuje katalog (prefix) w buckecie — np. <code>2026-27/kolejka-1/</code>.
+                <div class="list-group list-group-flush scroll-y" id="sets-list"></div>
+                <div class="card-body text-secondary d-none" id="sets-empty">
+                  Sezon nie ma jeszcze meczów. Dodaj mecz, żeby wgrywać do niego zdjęcia.
                 </div>
               </div>
             </div>
@@ -774,9 +777,9 @@
             <div class="col-lg-8 col-xl-9">
               <div class="card">
                 <div class="card-header">
-                  <div>
+                  <div class="min-w-0">
                     <h3 class="card-title" id="library-title">Biblioteka zdjęć</h3>
-                    <div class="text-secondary small" id="library-subtitle">Wybierz folder z listy po lewej.</div>
+                    <div class="text-secondary small text-truncate" id="library-subtitle">Wybierz mecz z listy po lewej.</div>
                   </div>
                   <div class="card-actions btn-list">
                     <div class="form-check form-check-inline mb-0 d-none" id="library-filter">
@@ -800,7 +803,7 @@
                     <div class="progress-bar progress-bar-indeterminate"></div>
                   </div>
                   <div class="alert alert-danger d-none" id="library-error" role="alert"></div>
-                  <div class="text-secondary" id="library-empty">Wybierz folder, żeby zobaczyć zdjęcia.</div>
+                  <div class="text-secondary" id="library-empty">Wybierz mecz, żeby zobaczyć zdjęcia.</div>
                   <div class="row g-2" id="library-grid"></div>
                 </div>
 
@@ -1086,67 +1089,6 @@
 
 
 <!-- ==================== MODALE ==================== -->
-<div class="modal modal-blur fade" id="folder-modal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="folder-modal-title">Nowy folder</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
-      </div>
-      <form id="folder-form" novalidate>
-        <div class="modal-body">
-          <div class="alert alert-danger d-none" id="folder-form-error" role="alert"></div>
-          <input type="hidden" name="id">
-          <div class="mb-3">
-            <label class="form-label required" for="folder-name">Nazwa</label>
-            <input class="form-control" id="folder-name" name="name" maxlength="160" required
-                   placeholder="Zastal – Legia, zdjęcia z meczu">
-          </div>
-          <div class="mb-3">
-            <label class="form-label required" for="folder-prefix">Ścieżka w buckecie</label>
-            <div class="input-group">
-              <span class="input-group-text"><%= st.bucket || 'bucket' %>/</span>
-              <input class="form-control" id="folder-prefix" name="prefix_path" maxlength="700" required
-                     placeholder="2026-27/kolejka-1/">
-            </div>
-            <div class="form-hint">
-              Układa się sam z sezonu, kolejki i meczu — możesz go nadpisać, jeśli potrzebujesz.
-              Katalog powstanie w magazynie przy pierwszym pliku.
-            </div>
-          </div>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label" for="folder-role">Przeznaczenie</label>
-              <select class="form-select" id="folder-role" name="role">
-                <option value="photographer">Zdjęcia od fotografa</option>
-                <option value="selected">Wybrane do grafik</option>
-                <option value="social">Social media</option>
-                <option value="archive">Archiwum</option>
-                <option value="custom" selected>Inne</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="folder-match">Mecz</label>
-              <select class="form-select" id="folder-match" name="match_id">
-                <option value="">Bez meczu</option>
-              </select>
-            </div>
-          </div>
-          <label class="form-check mt-3 mb-0">
-            <input class="form-check-input" type="checkbox" id="folder-upload-enabled" name="is_upload_enabled" checked>
-            <span class="form-check-label">Zezwól na wysyłkę zdjęć do tego folderu</span>
-          </label>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Anuluj</button>
-          <button type="submit" class="btn btn-primary">Zapisz</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-
 <div class="modal modal-blur fade" id="match-modal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
     <div class="modal-content">

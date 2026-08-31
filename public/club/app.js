@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-psd-1';
+const APP_BUILD = '2026-08-31-zdjecia-2';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -135,7 +135,7 @@ function showView(name) {
   if (name === 'templates' && !templates.length) loadTemplates().catch(() => {});
   if (name === 'other') loadOtherTemplates().catch(() => {});
   if (name === 'history') loadHistory().catch(() => {});
-  if (name === 'library' && !foldersLoaded) loadFolders();
+  if (name === 'library' && !setsLoaded) loadPhotoSets();
   if (name === 'editor' && !design) showEditorEmpty(true);
 }
 
@@ -1371,24 +1371,18 @@ socialElements.analyze?.addEventListener('click', async () => {
   }
 });
 
-/* ================= Magazyn zdjęć (S3 / MEGA S4) ================= */
+/* ================= Zdjęcia (magazyn MEGA S4) ================= */
 
-const FOLDER_ROLE_LABELS = {
-  photographer: 'Fotograf',
-  selected: 'Wybrane',
-  social: 'Social media',
-  archive: 'Archiwum',
-  custom: 'Inne'
-};
+/* Zdjęcia należą do meczu — bez podziału na fotografa, wybrane czy archiwum.
+   Katalog w buckecie zakłada się sam przy pierwszym zdjęciu. */
 
-const canManageFolders = ['admin', 'designer'].includes(document.body.dataset.role);
 const canUploadPhotos = ['admin', 'designer', 'photographer'].includes(document.body.dataset.role);
 const canSelectPhotos = ['admin', 'designer', 'social'].includes(document.body.dataset.role);
 const canDeletePhotos = ['admin', 'photographer'].includes(document.body.dataset.role);
 
 const lib = {
-  list: document.getElementById('folders-list'),
-  empty: document.getElementById('folders-empty'),
+  list: document.getElementById('sets-list'),
+  empty: document.getElementById('sets-empty'),
   grid: document.getElementById('library-grid'),
   gridEmpty: document.getElementById('library-empty'),
   title: document.getElementById('library-title'),
@@ -1404,10 +1398,10 @@ const lib = {
   dropzone: document.getElementById('library-dropzone')
 };
 
-let folders = [];
-let currentFolder = null;
+let photoSets = [];
+let currentSet = null;
 let photos = [];
-let foldersLoaded = false;
+let setsLoaded = false;
 
 function setLibraryError(message) {
   setFormError(lib.error, message);
@@ -1418,29 +1412,25 @@ function setLibraryBusy(busy) {
   [lib.syncBtn, lib.uploadBtn].forEach((button) => { if (button) button.disabled = busy; });
 }
 
-function folderSubtitle(folder) {
-  const parts = [FOLDER_ROLE_LABELS[folder.role] || folder.role];
-  if (folder.home_team) parts.push(`${folder.home_team} – ${folder.away_team}`);
-  return parts.join(' · ');
+function setSubtitle(set) {
+  const date = formatDate(set.match_date);
+  return [set.round_name, date ? `${date.date} · ${date.time}` : null]
+    .filter(Boolean).join(' · ') || 'Grafiki spoza kalendarza meczowego';
 }
 
-function renderFolders() {
+function renderSets() {
   if (!lib.list) return;
-  lib.empty?.classList.toggle('d-none', folders.length > 0);
+  lib.empty?.classList.toggle('d-none', photoSets.length > 1);
 
-  lib.list.innerHTML = folders.map((folder) => `
-    <div class="list-group-item list-group-item-action d-flex align-items-center ${currentFolder?.id === folder.id ? 'active' : ''}"
-         data-folder-id="${folder.id}" role="button">
-      <span class="me-2 text-secondary">${icon('folder')}</span>
+  lib.list.innerHTML = photoSets.map((set) => `
+    <div class="list-group-item list-group-item-action d-flex align-items-center ${currentSet?.key === set.key ? 'active' : ''}"
+         data-set-key="${escapeHTML(set.key)}" role="button">
+      <span class="me-2 text-secondary">${icon(set.match_id ? 'match' : 'other')}</span>
       <div class="flex-fill min-w-0">
-        <div class="text-truncate">${escapeHTML(folder.name)}</div>
-        <div class="text-secondary small text-truncate">${escapeHTML(folderSubtitle(folder))}</div>
+        <div class="text-truncate">${escapeHTML(set.label)}</div>
+        <div class="text-secondary small text-truncate">${escapeHTML(setSubtitle(set))}</div>
       </div>
-      <span class="badge bg-secondary-lt ms-2">${Number(folder.photo_count) || 0}</span>
-      ${canManageFolders ? `
-        <button class="btn btn-icon btn-sm btn-ghost-secondary ms-1" type="button"
-                data-folder-edit="${folder.id}" title="Edytuj folder"
-                data-bs-toggle="modal" data-bs-target="#folder-modal">${icon('edit')}</button>` : ''}
+      <span class="badge ${set.photo_count ? 'bg-green-lt' : 'bg-secondary-lt'} ms-2">${set.photo_count}</span>
     </div>
   `).join('');
 }
@@ -1450,9 +1440,9 @@ function renderPhotos() {
 
   const visible = lib.selectedOnly?.checked ? photos.filter((photo) => Number(photo.is_selected) === 1) : photos;
 
-  if (!currentFolder) {
+  if (!currentSet) {
     lib.grid.innerHTML = '';
-    lib.gridEmpty.textContent = 'Wybierz folder, żeby zobaczyć zdjęcia.';
+    lib.gridEmpty.textContent = 'Wybierz mecz, żeby zobaczyć zdjęcia.';
     lib.gridEmpty.classList.remove('d-none');
     lib.footer?.classList.add('d-none');
     return;
@@ -1461,13 +1451,26 @@ function renderPhotos() {
   lib.gridEmpty.classList.toggle('d-none', visible.length > 0);
   if (!visible.length) {
     lib.gridEmpty.textContent = photos.length
-      ? 'Żadne zdjęcie w tym folderze nie zostało jeszcze wybrane.'
-      : 'Folder jest pusty. Przeciągnij tu zdjęcia albo kliknij „Synchronizuj”, jeśli wrzucono je klientem S3.';
+      ? 'Żadne zdjęcie z tego meczu nie zostało jeszcze wybrane.'
+      : 'Brak zdjęć. Przeciągnij je tutaj albo kliknij „Synchronizuj”, jeśli wrzucono je klientem S3.';
   }
 
-  lib.grid.innerHTML = visible.map((photo) => `
+  lib.grid.innerHTML = visible.map(photoTile).join('');
+
+  const selected = photos.filter((photo) => Number(photo.is_selected) === 1).length;
+  if (lib.footer) {
+    lib.footer.classList.remove('d-none');
+    lib.footer.textContent = `${photos.length} ${plural(photos.length, 'zdjęcie', 'zdjęcia', 'zdjęć')}`
+      + ` · ${selected} ${plural(selected, 'wybrane', 'wybrane', 'wybranych')}`
+      + (currentSet.prefix ? ` · ${currentSet.prefix}` : '');
+  }
+}
+
+function photoTile(photo) {
+  const selected = Number(photo.is_selected) === 1;
+  return `
     <div class="col-6 col-md-4 col-xl-3">
-      <div class="photo-tile photo-tile-43 ${Number(photo.is_selected) === 1 ? 'selected' : ''}"
+      <div class="photo-tile photo-tile-43 ${selected ? 'selected' : ''}"
            data-photo-id="${photo.id}" title="${escapeHTML(photo.file_name)}">
         ${photo.url ? `<img src="${escapeHTML(photo.url)}" alt="${escapeHTML(photo.file_name)}" loading="lazy"
              class="position-absolute top-0 start-0 w-100 h-100 object-cover rounded"
@@ -1475,54 +1478,49 @@ function renderPhotos() {
         <span class="photo-missing-note">Nie ma go już w magazynie — kliknij „Synchronizuj”</span>
         <div class="position-absolute bottom-0 start-0 end-0 p-1 d-flex align-items-center gap-1">
           ${canSelectPhotos ? `
-            <button class="btn btn-icon btn-sm ${Number(photo.is_selected) === 1 ? 'btn-primary' : ''}"
+            <button class="btn btn-icon btn-sm ${selected ? 'btn-primary' : ''}"
                     type="button" data-photo-select="${photo.id}"
-                    title="${Number(photo.is_selected) === 1 ? 'Odznacz' : 'Oznacz jako wybrane'}">${icon('check')}</button>` : ''}
+                    title="${selected ? 'Odznacz' : 'Oznacz jako wybrane'}">${icon('check')}</button>` : ''}
           ${canDeletePhotos ? `
             <button class="btn btn-icon btn-sm ms-auto" type="button" data-photo-delete="${photo.id}"
                     title="Usuń z magazynu">${icon('trash')}</button>` : ''}
         </div>
       </div>
       <div class="text-secondary small text-truncate mt-1" title="${escapeHTML(photo.file_name)}">${escapeHTML(photo.file_name)}</div>
-    </div>
-  `).join('');
-
-  const selected = photos.filter((photo) => Number(photo.is_selected) === 1).length;
-  if (lib.footer) {
-    lib.footer.classList.remove('d-none');
-    lib.footer.textContent = `${photos.length} ${plural(photos.length, 'zdjęcie', 'zdjęcia', 'zdjęć')} w indeksie`
-      + ` · ${selected} ${plural(selected, 'wybrane', 'wybrane', 'wybranych')}`
-      + ` · bucket ${currentFolder.bucket}/${currentFolder.prefix_path}`;
-  }
+    </div>`;
 }
 
-async function loadFolders() {
+async function loadPhotoSets() {
   if (!lib.list) return;
   try {
-    const payload = await api('/api/folders');
-    folders = payload.folders;
-    foldersLoaded = true;
-    if (currentFolder) currentFolder = folders.find((folder) => folder.id === currentFolder.id) || null;
-    renderFolders();
+    const payload = await api('/api/photo-sets');
+    photoSets = payload.sets;
+    setsLoaded = true;
+    if (currentSet) {
+      const refreshed = photoSets.find((set) => set.key === currentSet.key);
+      if (refreshed) currentSet = { ...refreshed, prefix: currentSet.prefix };
+    }
+    renderSets();
   } catch (error) {
     setLibraryError(error.message);
   }
 }
 
-async function selectFolder(id) {
+async function selectSet(key) {
   setLibraryError('');
   setLibraryBusy(true);
   try {
-    const payload = await api(`/api/folders/${id}/photos`);
-    currentFolder = payload.folder;
+    const payload = await api(`/api/photo-sets/${encodeURIComponent(key)}/photos`);
+    const set = photoSets.find((item) => item.key === String(key));
+    currentSet = { ...set, prefix: payload.folder ? `${payload.folder.bucket}/${payload.folder.prefix_path}` : null };
     photos = payload.photos;
-    lib.title.textContent = currentFolder.name;
-    lib.subtitle.textContent = `${currentFolder.bucket}/${currentFolder.prefix_path}`;
+
+    lib.title.textContent = currentSet.label;
+    lib.subtitle.textContent = setSubtitle(currentSet);
     lib.syncBtn?.classList.remove('d-none');
     lib.filter?.classList.remove('d-none');
-    if (canUploadPhotos && currentFolder.is_upload_enabled) lib.uploadBtn?.classList.remove('d-none');
-    else lib.uploadBtn?.classList.add('d-none');
-    renderFolders();
+    if (canUploadPhotos) lib.uploadBtn?.classList.remove('d-none');
+    renderSets();
     renderPhotos();
   } catch (error) {
     setLibraryError(error.message);
@@ -1532,25 +1530,23 @@ async function selectFolder(id) {
 }
 
 lib.list?.addEventListener('click', (event) => {
-  const editButton = event.target.closest('[data-folder-edit]');
-  if (editButton) return;                                  // modal otworzy się z data-bs-*
-  const row = event.target.closest('[data-folder-id]');
-  if (row) selectFolder(Number(row.dataset.folderId));
+  const row = event.target.closest('[data-set-key]');
+  if (row) selectSet(row.dataset.setKey);
 });
 
 lib.selectedOnly?.addEventListener('change', renderPhotos);
 
 lib.syncBtn?.addEventListener('click', async () => {
-  if (!currentFolder) return;
+  if (!currentSet) return;
   setLibraryError('');
   setLibraryBusy(true);
   try {
-    const payload = await api(`/api/folders/${currentFolder.id}/sync`, { method: 'POST', body: '{}' });
+    const payload = await api(`/api/photo-sets/${encodeURIComponent(currentSet.key)}/sync`, { method: 'POST', body: '{}' });
     photos = payload.photos;
     renderPhotos();
-    await loadFolders();
+    await loadPhotoSets();
     if (payload.truncated) {
-      setLibraryError('Folder zawiera więcej plików, niż mieści się w jednym odczycie — zawęź prefix.');
+      setLibraryError('W katalogu jest więcej plików, niż mieści się w jednym odczycie.');
     }
   } catch (error) {
     setLibraryError(error.message);
@@ -1575,7 +1571,6 @@ lib.grid?.addEventListener('click', async (event) => {
       });
       Object.assign(photo, payload.photo);
       renderPhotos();
-      await loadFolders();
       return;
     }
 
@@ -1585,7 +1580,7 @@ lib.grid?.addEventListener('click', async (event) => {
     await api(`/api/photos/${id}?purge=1`, { method: 'DELETE' });
     photos = photos.filter((item) => item.id !== id);
     renderPhotos();
-    await loadFolders();
+    await loadPhotoSets();
   } catch (error) {
     setLibraryError(error.message);
   }
@@ -1621,17 +1616,17 @@ function setUploadProgress(done, total) {
   const percent = Math.round(done / total * 100);
   bar.className = 'progress-bar';
   bar.style.width = `${percent}%`;
-  bar.textContent = `${done} / ${total}`;
+  bar.textContent = `${Math.round(done)} / ${total}`;
 }
 
 /** XHR zamiast fetch — tylko on daje postęp wysyłki. */
-function sendBatch(folderId, files, onProgress) {
+function sendBatch(setKey, files, onProgress) {
   return new Promise((resolve, reject) => {
     const form = new FormData();
     files.forEach((file) => form.append('files', file, file.name));
 
     const request = new XMLHttpRequest();
-    request.open('POST', `/api/folders/${folderId}/upload`);
+    request.open('POST', `/api/photo-sets/${encodeURIComponent(setKey)}/upload`);
     request.upload.addEventListener('progress', (event) => {
       if (event.lengthComputable) onProgress(event.loaded / event.total);
     });
@@ -1650,12 +1645,12 @@ async function uploadFiles(fileList) {
   const all = [...fileList];
   const files = all.filter((file) => file.type.startsWith('image/'));
   const skipped = all.length - files.length;
-  if (!currentFolder) return;
+  if (!currentSet) return;
 
   // Pliki inne niż zdjęcia odrzucamy od razu, ale mówimy o tym wprost —
   // po przeciągnięciu całego katalogu łatwo nie zauważyć, że część nie poszła.
   setLibraryError(skipped
-    ? `Pominięto ${skipped} ${plural(skipped, 'plik', 'pliki', 'plików')}, ${plural(skipped, 'który nie jest zdjęciem', 'które nie są zdjęciami', 'które nie są zdjęciami')}.`
+    ? `Pominięto ${skipped} ${plural(skipped, 'plik', 'pliki', 'plików')}, które nie są zdjęciami.`
     : '');
   if (!files.length) return;
 
@@ -1666,20 +1661,20 @@ async function uploadFiles(fileList) {
   try {
     for (let i = 0; i < files.length; i += UPLOAD_BATCH) {
       const batch = files.slice(i, i + UPLOAD_BATCH);
-      const payload = await sendBatch(currentFolder.id, batch,
+      const payload = await sendBatch(currentSet.key, batch,
         (ratio) => setUploadProgress(sent + ratio * batch.length, files.length));
       sent += batch.length;
       setUploadProgress(sent, files.length);
       photos = payload.photos;
     }
     renderPhotos();
-    await loadFolders();
+    await loadPhotoSets();
   } catch (error) {
     // Partie wysłane przed błędem są już w magazynie — pokazujemy je zamiast udawać, że nic się nie stało.
     setLibraryError(sent
       ? `${error.message} Wysłano ${sent} z ${files.length} — pozostałe spróbuj ponownie.`
       : error.message);
-    if (sent) await selectFolder(currentFolder.id);
+    if (sent) await selectSet(currentSet.key);
   } finally {
     setLibraryBusy(false);
     setUploadProgress(null, null);
@@ -1692,7 +1687,7 @@ lib.fileInput?.addEventListener('change', (event) => uploadFiles(event.target.fi
 
 ['dragenter', 'dragover'].forEach((type) => {
   lib.dropzone?.addEventListener(type, (event) => {
-    if (!currentFolder || !canUploadPhotos) return;
+    if (!currentSet || !canUploadPhotos) return;
     event.preventDefault();
     lib.dropzone.classList.add('is-dropping');
   });
@@ -1701,110 +1696,8 @@ lib.fileInput?.addEventListener('change', (event) => uploadFiles(event.target.fi
   lib.dropzone?.addEventListener(type, (event) => {
     event.preventDefault();
     lib.dropzone.classList.remove('is-dropping');
-    if (type === 'drop' && currentFolder && canUploadPhotos) uploadFiles(event.dataTransfer.files);
+    if (type === 'drop' && currentSet && canUploadPhotos) uploadFiles(event.dataTransfer.files);
   });
-});
-
-/* ---- formularz folderu ---- */
-
-const folderModalEl = document.getElementById('folder-modal');
-const folderForm = document.getElementById('folder-form');
-const folderFormError = document.getElementById('folder-form-error');
-
-// Ścieżka układa się sama z sezonu, kolejki i meczu — dopóki nikt jej nie nadpisze.
-let prefixEditedByHand = false;
-
-async function refreshPrefixSuggestion() {
-  if (prefixEditedByHand || folderForm.elements.id.value) return;
-  const params = new URLSearchParams({ role: folderForm.elements.role.value });
-  if (folderForm.elements.match_id.value) params.set('match_id', folderForm.elements.match_id.value);
-  try {
-    const payload = await api(`/api/folders/suggest-prefix?${params}`);
-    folderForm.elements.prefix_path.value = payload.prefix;
-  } catch (error) {
-    setFormError(folderFormError, error.message);
-  }
-}
-
-folderModalEl?.addEventListener('show.bs.modal', async (event) => {
-  if (!folderForm) return;
-  const trigger = event.relatedTarget;
-  const editId = trigger?.dataset?.folderEdit ? Number(trigger.dataset.folderEdit) : null;
-  const folder = editId ? folders.find((item) => item.id === editId) : null;
-
-  folderForm.reset();
-  setFormError(folderFormError, '');
-  document.getElementById('folder-modal-title').textContent = folder ? 'Edytuj folder' : 'Nowy folder';
-  folderForm.elements.id.value = folder?.id || '';
-  folderForm.elements.name.value = folder?.name || '';
-  folderForm.elements.prefix_path.value = folder?.prefix_path || '';
-  folderForm.elements.role.value = folder?.role || 'custom';
-  document.getElementById('folder-upload-enabled').checked = folder ? Number(folder.is_upload_enabled) === 1 : true;
-
-  prefixEditedByHand = Boolean(folder);
-
-  // Lista meczów jest krótka i zmienia się rzadko — pobieramy ją przy otwarciu.
-  try {
-    const payload = await api('/api/matches');
-    const select = folderForm.elements.match_id;
-    select.innerHTML = '<option value="">Bez meczu</option>'
-      + payload.matches.map((match) => {
-        const date = formatDate(match.match_date);
-        return `<option value="${match.id}">${escapeHTML(`${match.home_team} – ${match.away_team}`)}`
-          + `${date ? ` (${date.date})` : ''}</option>`;
-      }).join('');
-    // Nowy folder prawie zawsze dotyczy meczu: bierzemy ten otwarty w widoku
-    // meczu, a poza nim najbliższy nadchodzący (albo ostatni rozegrany).
-    const upcoming = [...payload.matches]
-      .sort((a, b) => String(a.match_date).localeCompare(String(b.match_date)))
-      .find((match) => String(match.match_date) >= new Date().toISOString().slice(0, 10));
-    const preselected = folder?.match_id
-      || currentMatch?.id
-      || upcoming?.id
-      || payload.matches[0]?.id
-      || '';
-    select.value = String(preselected);
-
-    if (!folder) {
-      const chosen = payload.matches.find((match) => String(match.id) === select.value);
-      if (chosen && !folderForm.elements.name.value) {
-        folderForm.elements.name.value = `${chosen.home_team} – ${chosen.away_team}`;
-      }
-      await refreshPrefixSuggestion();
-    }
-  } catch (error) {
-    setFormError(folderFormError, error.message);
-  }
-});
-
-folderForm?.elements.match_id?.addEventListener('change', refreshPrefixSuggestion);
-folderForm?.elements.role?.addEventListener('change', refreshPrefixSuggestion);
-document.getElementById('folder-prefix')?.addEventListener('input', () => { prefixEditedByHand = true; });
-
-folderForm?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  setFormError(folderFormError, '');
-
-  const id = folderForm.elements.id.value;
-  const body = {
-    name: folderForm.elements.name.value,
-    prefix_path: folderForm.elements.prefix_path.value,
-    role: folderForm.elements.role.value,
-    match_id: folderForm.elements.match_id.value || null,
-    is_upload_enabled: document.getElementById('folder-upload-enabled').checked
-  };
-
-  try {
-    const payload = await api(id ? `/api/folders/${id}` : '/api/folders', {
-      method: id ? 'PATCH' : 'POST',
-      body: JSON.stringify(body)
-    });
-    hideModal(folderModalEl);
-    await loadFolders();
-    await selectFolder(payload.folder.id);
-  } catch (error) {
-    setFormError(folderFormError, error.message);
-  }
 });
 
 /* ---- ustawienia: test połączenia i reguła CORS ---- */
@@ -1943,7 +1836,7 @@ const ed = {
 let design = null;          // aktualnie edytowana grafika z serwera
 let designValues = {};      // wartości pól w trakcie edycji
 let activePhotoField = null;
-let pickerFolders = [];
+let pickerSets = [];
 let pickerPhotos = [];
 let dirty = false;
 
@@ -2044,7 +1937,7 @@ async function openDesign(designId) {
     closePicker();
     showView('editor');
     await drawDesign();
-    await loadPickerFolders();
+    await loadPickerSets();
   } catch (error) {
     setEditorError(error.message);
   }
@@ -2109,37 +2002,45 @@ async function openPicker(fieldKey) {
     ed.cropX.value = current.crop?.x ?? 0;
     ed.cropY.value = current.crop?.y ?? 0;
   }
-  if (!pickerFolders.length) await loadPickerFolders();
+  if (!pickerSets.length) await loadPickerSets();
   await loadPickerPhotos();
 }
 
-async function loadPickerFolders() {
+/**
+ * Zdjęcia do grafiki bierze się domyślnie z meczu, którego ona dotyczy, ale
+ * nic nie stoi na przeszkodzie, żeby sięgnąć do innego spotkania — kadr sprzed
+ * tygodnia bywa lepszy niż ten z ostatniego meczu.
+ */
+async function loadPickerSets() {
   if (!ed.pickerFolder) return;
   try {
-    const payload = await api('/api/folders');
-    // Foldery tego meczu na górze — to z nich najczęściej wybiera się kadr.
-    pickerFolders = payload.folders.sort((a, b) => {
-      const mine = (folder) => (design?.match_id && folder.match_id === design.match_id ? 0 : 1);
-      return mine(a) - mine(b);
-    });
-    ed.pickerFolder.innerHTML = pickerFolders.map((folder) =>
-      `<option value="${folder.id}">${escapeHTML(folder.name)} (${folder.photo_count})</option>`).join('')
-      || '<option value="">Brak folderów</option>';
+    const payload = await api('/api/photo-sets');
+    pickerSets = payload.sets;
+
+    ed.pickerFolder.innerHTML = pickerSets.map((set) => {
+      const own = design?.match_id && set.match_id === design.match_id;
+      return `<option value="${escapeHTML(set.key)}">`
+        + `${own ? '★ ' : ''}${escapeHTML(set.label)} (${set.photo_count})</option>`;
+    }).join('') || '<option value="">Brak meczów</option>';
+
+    // Mecz tej grafiki jest wybrany od razu — reszta zostaje w zasięgu jednego kliknięcia.
+    const own = pickerSets.find((set) => design?.match_id && set.match_id === design.match_id);
+    ed.pickerFolder.value = (own || pickerSets.find((set) => set.photo_count) || pickerSets[0])?.key || '';
   } catch (error) {
     setEditorError(error.message);
   }
 }
 
 async function loadPickerPhotos() {
-  const folderId = ed.pickerFolder.value;
-  if (!folderId) {
+  const key = ed.pickerFolder.value;
+  if (!key) {
     pickerPhotos = [];
     ed.pickerGrid.innerHTML = '';
     ed.pickerEmpty.classList.remove('d-none');
     return;
   }
   try {
-    const payload = await api(`/api/folders/${folderId}/photos`);
+    const payload = await api(`/api/photo-sets/${encodeURIComponent(key)}/photos`);
     pickerPhotos = payload.photos;
     renderPicker();
   } catch (error) {

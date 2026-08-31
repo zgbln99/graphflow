@@ -116,16 +116,22 @@ Ustawienia w `.env` (na VPS: `/opt/club-graphics/.env`, nigdy w repozytorium):
 Po zmianie `.env` konieczny jest restart procesu: `pm2 restart zastal-marketing-center`.
 Poprawność konfiguracji sprawdza przycisk **Testuj połączenie** w Ustawieniach.
 
-Jak to działa w panelu (widok „Biblioteka zdjęć”):
+Jak to działa w panelu (zakładka „Zdjęcia”):
 
-- **folder** wskazuje katalog (prefix) w buckecie i można go powiązać z meczem;
-  usunięcie folderu kasuje tylko wpis w bazie — pliki w magazynie zostają,
-- **Synchronizuj** wczytuje zawartość prefixu do indeksu; bucket jest źródłem prawdy,
+- **zdjęcia należą do meczu** — bez podziału na fotografa, wybrane czy archiwum.
+  Lista po lewej to mecze sezonu plus zbiór „Poza meczem” na grafiki spoza kalendarza,
+- **katalog w magazynie zakłada się sam** przy pierwszym zdjęciu, a jego ścieżka
+  powstaje z sezonu, kolejki i meczu: `2026-27/kolejka-1/2026-10-04-dziki-zastal/`.
+  Data z przodu układa mecze chronologicznie także w kliencie S3 na pulpicie,
+- **Synchronizuj** wczytuje zawartość katalogu do indeksu; bucket jest źródłem prawdy,
   więc zdjęcia wgrane klientem S3 z pulpitu pojawiają się tak samo jak te z przeglądarki,
-- **Prześlij zdjęcia** (admin, grafik, fotograf) wysyła pliki partiami przez serwer do bucketa;
+- **Prześlij zdjęcia** (admin, grafik, fotograf) wysyła pliki partiami przez serwer;
   pliki większe niż 60 MB są odrzucane,
-- **oznaczanie zdjęć** (admin, grafik, social media) wybiera kadry do grafik — zgodnie z zasadą,
-  że social media decyduje o treści.
+- **oznaczanie zdjęć** (admin, grafik, social media) wybiera kadry do grafik — zgodnie
+  z zasadą, że social media decyduje o treści.
+
+Do grafiki nie trzeba brać zdjęcia z jej własnego meczu: wybór w edytorze pokazuje
+wszystkie mecze sezonu, z meczem tej grafiki na wierzchu.
 
 ## Funkcje
 

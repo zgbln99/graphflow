@@ -586,92 +586,10 @@ const uploadPhotos = multer({
   }
 });
 
-router.get('/api/storage/status', requireAuth, async (req, res, next) => {
-  try {
-    res.json({ success: true, storage: storage.getStorageStatus() });
-  } catch (err) { next(err); }
-});
-
-router.post('/api/storage/test', requireAuth, requireRole('admin'), async (req, res, next) => {
-  try {
-    res.json({ success: true, result: await storage.testConnection() });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
-router.get('/api/folders', requireAuth, async (req, res, next) => {
-  try {
-    res.json({ success: true, folders: await repo.listFolders({ matchId: req.query.match_id || null }) });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
-// Ścieżkę układa serwer, żeby wszystkie foldery trzymały jedną konwencję.
-router.get('/api/folders/suggest-prefix', requireAuth, async (req, res, next) => {
-  try {
-    const prefix = await repo.suggestFolderPrefix({
-      matchId: req.query.match_id || null,
-      seasonId: req.query.season_id || null,
-      role: req.query.role || 'custom'
-    });
-    res.json({ success: true, prefix });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
-router.post('/api/folders', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
-  try {
-    res.status(201).json({ success: true, folder: await repo.createFolder(req.body || {}) });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
-router.patch('/api/folders/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
-  try {
-    res.json({ success: true, folder: await repo.updateFolder(req.params.id, req.body || {}) });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
-router.delete('/api/folders/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
-  try {
-    await repo.deleteFolder(req.params.id);
-    res.json({ success: true });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
-/**
- * Synchronizacja: bucket jest źródłem prawdy. Zdjęcia wrzucone z pulpitu
- * (klientem S3) pojawiają się w panelu dopiero po tej operacji.
- */
-router.post('/api/folders/:id/sync', requireAuth, async (req, res, next) => {
-  try {
-    const folder = await repo.getFolder(req.params.id);
-    if (!folder) return res.status(404).json({ success: false, error: 'Nie znaleziono folderu.' });
-
-    const listing = await storage.listObjects(folder.prefix_path, { imagesOnly: true });
-    const { indexed } = await repo.upsertPhotos(folder.id, listing.objects);
-    const removed = await repo.pruneMissingPhotos(folder.id, listing.objects.map((object) => object.key));
-
-    res.json({
-      success: true,
-      indexed,
-      removed,
-      truncated: listing.truncated,
-      photos: await withPreviewUrls(await repo.listPhotos(folder.id))
-    });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
-router.get('/api/folders/:id/photos', requireAuth, async (req, res, next) => {
-  try {
-    const folder = await repo.getFolder(req.params.id);
-    if (!folder) return res.status(404).json({ success: false, error: 'Nie znaleziono folderu.' });
-
-    const photos = await repo.listPhotos(folder.id, { selectedOnly: req.query.selected === '1' });
-    res.json({ success: true, folder, photos: await withPreviewUrls(photos) });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
 /**
  * Multer zgłasza własne błędy (za duży plik, za dużo plików, zły format).
  * Bez tego opakowania trafiłyby do globalnej obsługi błędów jako 500,
- * a formularz pokazałby "Operacja nie powiodła się" zamiast konkretu.
+ * a formularz pokazałby „Operacja nie powiodła się" zamiast konkretu.
  */
 function receivePhotos(req, res, next) {
   uploadPhotos.array('files', MAX_UPLOAD_BATCH)(req, res, (error) => {
@@ -689,42 +607,92 @@ function receivePhotos(req, res, next) {
   });
 }
 
+router.get('/api/storage/status', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, storage: storage.getStorageStatus() });
+  } catch (err) { next(err); }
+});
+
+router.post('/api/storage/test', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.json({ success: true, result: await storage.testConnection() });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
 /**
- * Wysyłka zdjęć do magazynu.
+ * Zbiory zdjęć = mecze. Katalog w magazynie powstaje sam przy pierwszym
+ * zdjęciu, więc lista pokazuje też mecze, do których nikt jeszcze nic nie wgrał.
+ */
+router.get('/api/photo-sets', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, sets: await repo.listPhotoSets({ seasonId: req.query.season_id || null }) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.get('/api/photo-sets/:key/photos', requireAuth, async (req, res, next) => {
+  try {
+    const { folder, match, key } = await repo.resolvePhotoSet(req.params.key);
+    if (!folder) return res.json({ success: true, key, match, folder: null, photos: [] });
+
+    const photos = await repo.listPhotos(folder.id, { selectedOnly: req.query.selected === '1' });
+    res.json({ success: true, key, match, folder, photos: await withPreviewUrls(photos) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+/**
+ * Synchronizacja z magazynem: bucket jest źródłem prawdy, więc zdjęcia wrzucone
+ * klientem S3 z pulpitu pojawiają się tak samo jak te z przeglądarki.
+ */
+router.post('/api/photo-sets/:key/sync', requireAuth, async (req, res, next) => {
+  try {
+    const { folder, key } = await repo.resolvePhotoSet(req.params.key, { create: true });
+    const listing = await storage.listObjects(folder.prefix_path, { imagesOnly: true });
+    const { indexed } = await repo.upsertPhotos(folder.id, listing.objects);
+    const removed = await repo.pruneMissingPhotos(folder.id, listing.objects.map((object) => object.key));
+
+    res.json({
+      success: true,
+      key,
+      indexed,
+      removed,
+      truncated: listing.truncated,
+      photos: await withPreviewUrls(await repo.listPhotos(folder.id))
+    });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+/**
+ * Wysyłka zdjęć do zbioru.
  *
  * MEGA S4 nie pozwala skonfigurować CORS, więc przeglądarka nie może wysłać
  * pliku wprost do bucketa — plik idzie przez nasz serwer. Multer zapisuje go
  * do katalogu tymczasowego, stamtąd strumień trafia do magazynu i plik
  * tymczasowy znika. Klucze dostępu zostają po stronie serwera (§13).
  */
-router.post('/api/folders/:id/upload', requireAuth,
+router.post('/api/photo-sets/:key/upload', requireAuth,
   requireRole('admin', 'designer', 'photographer'),
   receivePhotos, async (req, res, next) => {
     const files = req.files || [];
     const cleanup = () => files.forEach((file) => fs.unlink(file.path, () => {}));
 
     try {
-      const folder = await repo.getFolder(req.params.id);
-      if (!folder) return res.status(404).json({ success: false, error: 'Nie znaleziono folderu.' });
-      if (!folder.is_upload_enabled) {
-        return res.status(409).json({ success: false, error: 'Wysyłka do tego folderu jest wyłączona.' });
-      }
       if (!files.length) return res.status(400).json({ success: false, error: 'Nie wybrano plików.' });
+      const { folder, key } = await repo.resolvePhotoSet(req.params.key, { create: true });
 
       const objects = [];
       for (const file of files) {
         const name = storage.safeFileName(file.originalname);
         // Znacznik czasu chroni przed nadpisaniem pliku o tej samej nazwie z innego aparatu.
-        const key = `${folder.prefix_path}${Date.now().toString(36)}-${name}`;
+        const objectKey = `${folder.prefix_path}${Date.now().toString(36)}-${name}`;
 
-        await storage.putObject(key, fs.createReadStream(file.path), {
+        await storage.putObject(objectKey, fs.createReadStream(file.path), {
           contentType: storage.contentTypeFor(name, file.mimetype),
           contentLength: file.size
         });
 
         objects.push({
-          key,
-          fileName: key.split('/').pop(),
+          key: objectKey,
+          fileName: objectKey.split('/').pop(),
           size: file.size,
           lastModified: new Date(),
           metadata: { originalName: file.originalname, uploadedBy: req.session.user.id }
@@ -734,6 +702,7 @@ router.post('/api/folders/:id/upload', requireAuth,
       await repo.upsertPhotos(folder.id, objects);
       res.status(201).json({
         success: true,
+        key,
         uploaded: objects.length,
         photos: await withPreviewUrls(await repo.listPhotos(folder.id))
       });
