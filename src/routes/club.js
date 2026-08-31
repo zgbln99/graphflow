@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const os = require('os');
+const { pipeline } = require('stream/promises');
 const fs = require('fs');
 const Database = require('../config/database');
 const {
@@ -571,30 +572,51 @@ async function createTemplateWithFreeName(payload, userId) {
  */
 router.get('/api/psd/files', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
   try {
-    res.json({ success: true, prefix: storage.PREFIXES.psd, files: await storage.listPsdFiles() });
+    res.json({
+      success: true,
+      prefix: storage.PREFIXES.psd,
+      // Próg podajemy razem z listą, żeby za duży plik dało się rozpoznać
+      // przed kliknięciem, a nie dopiero po nieudanej próbie.
+      maxFileSize: psdImport.maxFileSize(),
+      files: await storage.listPsdFiles()
+    });
   } catch (err) { handleRepoError(res, next, err); }
 });
 
 router.post('/api/psd/import-from-storage', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  let tmpPath = null;
   try {
     const key = storage.normalizeKey(req.body?.key || '');
     if (!key.startsWith(storage.PREFIXES.psd) || !/\.psd$/i.test(key)) {
       return res.status(400).json({ success: false, error: 'Wskaż plik PSD z katalogu magazynu.' });
     }
 
+    // Rozmiar sprawdzamy przed pobraniem, żeby nie ściągać na próżno pliku,
+    // którego i tak nie przetworzymy.
+    const head = await storage.headObject(key);
+    psdImport.checkFileSize(head.size);
+
+    // Plik zapisujemy najpierw na dysk, a dopiero potem wczytujemy w całości.
+    // Zbieranie kawałków w tablicy i sklejanie ich zajmowałoby w szczycie
+    // dwukrotność rozmiaru pliku — przy PSD rzędu kilkuset megabajtów to
+    // wystarczało, żeby zabrakło pamięci.
+    tmpPath = path.join(tmpDir, `psd-${Date.now().toString(36)}`);
     const object = await storage.getObjectStream(key);
-    const chunks = [];
-    for await (const chunk of object.body) chunks.push(chunk);
+    await pipeline(object.body, fs.createWriteStream(tmpPath));
 
     const result = await buildTemplateFromPsd({
-      buffer: Buffer.concat(chunks),
+      buffer: fs.readFileSync(tmpPath),
       fileName: key.split('/').pop(),
       category: req.body?.category,
       userId: req.session.user.id,
       sourceKey: key
     });
     res.status(201).json({ success: true, ...result });
-  } catch (err) { psdErrorResponse(res, next, err); }
+  } catch (err) {
+    psdErrorResponse(res, next, err);
+  } finally {
+    if (tmpPath) fs.unlink(tmpPath, () => {});
+  }
 });
 
 /* ---- wysyłka PSD z przeglądarki, kawałek po kawałku ----

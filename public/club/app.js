@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-psd-czesci';
+const APP_BUILD = '2026-08-31-psd-duze';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -159,7 +159,13 @@ async function api(url, options = {}) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.success === false) {
-    const error = new Error(payload.error || 'Operacja nie powiodła się.');
+    // Bez treści od aplikacji zostaje sam status — najczęściej znaczy, że
+    // żądanie zginęło u pośrednika albo proces przerwał pracę w trakcie.
+    const fallback = response.status === 502 || response.status === 504
+      ? `Serwer przerwał pracę w trakcie przetwarzania (HTTP ${response.status}). `
+        + 'Zajrzyj w logi: pm2 logs zastal-marketing-center'
+      : `Operacja nie powiodła się (HTTP ${response.status}).`;
+    const error = new Error(payload.error || fallback);
     error.field = payload.field;
     // Podpowiedź, co poprawić — przy imporcie PSD to często najważniejsza część.
     error.hint = payload.hint;
@@ -1800,6 +1806,7 @@ document.getElementById('psd-from-browser')?.addEventListener('click', () => psd
 /* ---- lista plików PSD leżących w magazynie ---- */
 
 let psdFiles = [];
+let psdMaxSize = Infinity;
 let psdBusy = false;
 
 function setPsdModalBusy(busy, label = '') {
@@ -1812,19 +1819,25 @@ function renderPsdFiles() {
   if (!psdFilesList) return;
   psdFilesEmpty?.classList.toggle('d-none', psdFiles.length > 0);
 
-  psdFilesList.innerHTML = psdFiles.map((file) => `
+  psdFilesList.innerHTML = psdFiles.map((file) => {
+    const tooBig = file.size > psdMaxSize;
+    return `
     <div class="list-group-item d-flex align-items-center">
       <span class="me-2 text-secondary">${icon('template')}</span>
       <div class="flex-fill min-w-0">
         <div class="text-truncate">${escapeHTML(file.fileName)}</div>
-        <div class="text-secondary small">${fileSize(file.size)}${file.lastModified
-          ? ' · ' + new Date(file.lastModified).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })
-          : ''}</div>
+        <div class="${tooBig ? 'text-warning' : 'text-secondary'} small">
+          ${fileSize(file.size)}${file.lastModified
+            ? ' · ' + new Date(file.lastModified).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })
+            : ''}${tooBig ? ` · za duży, próg to ${fileSize(psdMaxSize)}` : ''}
+        </div>
       </div>
-      <button class="btn btn-primary btn-sm ms-2" type="button" data-psd-key="${escapeHTML(file.key)}">
+      <button class="btn btn-primary btn-sm ms-2" type="button"
+              data-psd-key="${escapeHTML(file.key)}" ${tooBig ? 'disabled' : ''}>
         Zbuduj szablon
       </button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function loadPsdFiles() {
@@ -1833,6 +1846,7 @@ async function loadPsdFiles() {
   try {
     const payload = await api('/api/psd/files');
     psdFiles = payload.files;
+    psdMaxSize = payload.maxFileSize || Infinity;
     document.getElementById('psd-prefix').textContent = payload.prefix;
     renderPsdFiles();
   } catch (error) {

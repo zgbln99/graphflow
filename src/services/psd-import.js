@@ -12,8 +12,9 @@
  * wtopiłaby się w tło na stałe.
  */
 
-const { readPsd, initializeCanvas } = require('ag-psd');
+const { readPsd, initializeCanvas, getLayerImageData } = require('ag-psd');
 const { PNG } = require('pngjs');
+const os = require('os');
 
 // ag-psd sięga po canvas wyłącznie po to, żeby utworzyć bufor pikseli.
 // Podstawiamy własny, czysto javascriptowy — VPS nie musi kompilować cairo.
@@ -36,6 +37,34 @@ class PsdImportError extends Error {
 }
 
 /** Nazwa warstwy → klucz pola: bez „#", bez polskich znaków, bez spacji. */
+/**
+ * Ile waży najcięższy plik, który da się tu przetworzyć.
+ *
+ * Odczyt PSD wymaga całego pliku w pamięci, a do tego dochodzą dane warstw —
+ * w praktyce około dwuipółkrotność rozmiaru pliku. Lepiej odmówić z czytelnym
+ * komunikatem, niż pozwolić procesowi zginąć: śmierć procesu to błąd 502 dla
+ * wszystkich, którzy akurat korzystają z panelu.
+ */
+const MEMORY_FACTOR = 2.5;
+
+function maxFileSize() {
+  // Połowę pamięci maszyny zostawiamy reszcie aplikacji i systemowi.
+  return Math.round((os.totalmem() * 0.5) / MEMORY_FACTOR);
+}
+
+function checkFileSize(bytes) {
+  const limit = maxFileSize();
+  if (bytes <= limit) return;
+
+  const mb = (value) => Math.round(value / 1024 / 1024) + ' MB';
+  throw new PsdImportError(
+    `Plik waży ${mb(bytes)}, a ten serwer przetworzy najwyżej ${mb(limit)}.`,
+    'Scal w Photoshopie warstwy dekoracyjne w jedną (osobno zostaw tylko te z „#") '
+    + 'i zapisz PSD ponownie — przy grafice na social media zbija to rozmiar kilkukrotnie. '
+    + 'Pomaga też zmniejszenie dokumentu do docelowych wymiarów, np. 1080 × 1350 px.'
+  );
+}
+
 function fieldKey(name) {
   const text = String(name || '').replace(EDITABLE_MARK, '').trim().toLowerCase()
     .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e').replace(/ł/g, 'l')
@@ -131,11 +160,13 @@ function compositeStaticLayers(psd, staticLayers) {
   const out = new Uint8ClampedArray(width * height * 4);
 
   staticLayers.forEach((layer) => {
-    if (!layer.imageData) return;
     const alpha = layer.opacity ?? 1;
     if (alpha <= 0) return;
 
-    const src = layer.imageData;
+    // Piksele rozpakowujemy dopiero tutaj i zwalniamy zaraz po narysowaniu,
+    // więc w pamięci nigdy nie leży więcej niż jedna warstwa naraz.
+    const src = layer.imageData || getLayerImageData(layer);
+    if (!src) return;
     const offsetX = Math.round(layer.left ?? 0);
     const offsetY = Math.round(layer.top ?? 0);
 
@@ -162,6 +193,9 @@ function compositeStaticLayers(psd, staticLayers) {
         out[to + 3] = outAlpha * 255;
       }
     }
+
+    layer.imageData = undefined;
+    layer.canvas = undefined;
   });
 
   const png = new PNG({ width, height });
@@ -211,6 +245,8 @@ function photoAreaIsTransparent(psd, pixels, box) {
  * @returns {{ name, width, height, definition, composite, warnings }}
  */
 function importTemplate(buffer, { name = 'Szablon z PSD' } = {}) {
+  checkFileSize(buffer.length);
+
   let psd;
   try {
     psd = readPsd(buffer, {
@@ -218,9 +254,26 @@ function importTemplate(buffer, { name = 'Szablon z PSD' } = {}) {
       skipThumbnail: true,
       // Spłaszczony podgląd z pliku i tak odpada (Photoshop trzyma go bez kanału
       // alfa), a przy dużym dokumencie to kilkadziesiąt megabajtów w pamięci.
-      skipCompositeImageData: true
+      skipCompositeImageData: true,
+      // Pliki dołączone do smart obiektów potrafią ważyć tyle co cały dokument,
+      // a do układu szablonu nie są potrzebne.
+      skipLinkedFilesData: true,
+      // Najważniejsze przy dużych plikach: nie rozpakowujemy pikseli wszystkich
+      // warstw naraz. Warstwy do edycji nie potrzebują ich wcale (liczy się
+      // położenie), a grafikę składamy warstwa po warstwie, zwalniając pamięć
+      // po każdej. Bez tego proces ginął na plikach rzędu kilkuset megabajtów.
+      useRawData: true,
+      // Zamiast pozwolić procesowi paść na braku pamięci, wolimy czytelny błąd.
+      totalMemoryLimit: Math.max(256 * 1024 * 1024, Math.round(os.totalmem() * 0.35))
     });
   } catch (error) {
+    if (/memory|allocat/i.test(error.message)) {
+      throw new PsdImportError(
+        'Plik jest za duży, żeby go przetworzyć na tym serwerze.',
+        'Scal warstwy dekoracyjne w jedną (zostaw osobno tylko te z „#") i zapisz PSD ponownie — '
+        + 'zwykle zbija to rozmiar kilkukrotnie.'
+      );
+    }
     throw new PsdImportError(`Nie udało się odczytać pliku PSD: ${error.message}`);
   }
 
@@ -344,4 +397,4 @@ function importTemplate(buffer, { name = 'Szablon z PSD' } = {}) {
   };
 }
 
-module.exports = { importTemplate, PsdImportError, fieldKey };
+module.exports = { importTemplate, PsdImportError, fieldKey, maxFileSize, checkFileSize };

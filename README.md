@@ -58,6 +58,14 @@ w magazynie:
 Plik źródłowy zostaje w `psd/` — aplikacja go nie kopiuje, tylko zapamiętuje jako zasób
 szablonu.
 
+**Rozmiar pliku a pamięć serwera.** Odczyt PSD wymaga całego pliku w pamięci, więc próg
+zależy od maszyny: aplikacja liczy go jako połowę pamięci serwera podzieloną przez 2,5
+(przy 2 GB wychodzi ok. 400 MB) i pokazuje przy każdym pliku na liście. Plik powyżej progu
+jest odrzucany z komunikatem — zamiast doprowadzić do śmierci procesu, czyli błędu 502 dla
+wszystkich korzystających z panelu. Gdy plik nie mieści się w progu, scal w Photoshopie
+warstwy dekoracyjne w jedną (osobno zostaw tylko te z `#`); przy grafice na social media
+zbija to rozmiar kilkukrotnie.
+
 **Co powstaje z czego**
 
 | Warstwa w PSD | Pole w formularzu | Zachowanie |
