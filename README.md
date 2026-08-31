@@ -43,16 +43,20 @@ obraz nakładki.
 5. Efekty warstw (cień, obrys, poświata) i tryby mieszania inne niż „zwykły"
    zrasteryzuj albo scal — składanie ich odtwarza tylko krycie i tryb zwykły.
    Import wypisuje, których warstw to dotyczy.
-6. Zapisz jako `.psd` i wrzuć do katalogu **`psd/`** w buckecie — klientem S3 z pulpitu
-   (Cyberduck, WinSCP, S3 Browser). Potem w Szablonach kliknij **Z PSD** i wybierz plik
-   z listy.
+6. Zapisz jako `.psd` i wczytaj w Szablonach przyciskiem **Z PSD**.
 
-Pliki PSD ważą zwykle więcej, niż przechodzi przez przeglądarkę (pośrednik przed aplikacją
-tnie duże żądania), dlatego drogą podstawową jest katalog `psd/` w magazynie. Przycisk
-**Wyślij z dysku…** w tym samym oknie zostaje dla małych plików.
+Plik można podać na dwa sposoby, oba kończą się w tym samym miejscu — katalogu `psd/`
+w magazynie:
 
-Plik źródłowy zostaje tam, gdzie go położyłeś — aplikacja go nie kopiuje, tylko zapamiętuje
-jako zasób szablonu.
+- **Wyślij z dysku…** — przeglądarka dzieli plik na części po 8 MB i składa go
+  bezpośrednio w buckecie. Rozmiar całości nie ma znaczenia: pojedyncze żądanie nigdy
+  nie zbliża się do limitu pośrednika (Cloudflare przepuszcza 100 MB), a serwer nie
+  odkłada całego pliku na dysk. Przerwana wysyłka sprząta po sobie niedokończone części.
+- **Klientem S3 z pulpitu** (Cyberduck, WinSCP, S3 Browser) prosto do katalogu `psd/` —
+  wtedy w oknie wystarczy wybrać plik z listy.
+
+Plik źródłowy zostaje w `psd/` — aplikacja go nie kopiuje, tylko zapamiętuje jako zasób
+szablonu.
 
 **Co powstaje z czego**
 

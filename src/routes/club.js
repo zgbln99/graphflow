@@ -597,27 +597,107 @@ router.post('/api/psd/import-from-storage', requireAuth, requireRole('admin', 'd
   } catch (err) { psdErrorResponse(res, next, err); }
 });
 
-/** Wysyłka z przeglądarki — wygodna dla małych plików, ale ograniczona przez pośrednika. */
-router.post('/api/psd/upload', requireAuth, requireRole('admin', 'designer'),
-  receivePsd, async (req, res, next) => {
-    const file = req.file;
-    try {
-      if (!file) return res.status(400).json({ success: false, error: 'Nie wybrano pliku PSD.' });
+/* ---- wysyłka PSD z przeglądarki, kawałek po kawałku ----
+   Plik dzielimy po stronie przeglądarki i składamy w buckecie, więc rozmiar
+   przestaje mieć znaczenie: żadne pojedyncze żądanie nie zbliża się do limitu
+   pośrednika, a serwer nie odkłada całego pliku na dysk.
+*/
 
-      const result = await buildTemplateFromPsd({
-        buffer: fs.readFileSync(file.path),
-        fileName: file.originalname,
-        category: req.body.category,
-        userId: req.session.user.id,
-        sourceStream: () => ({ stream: fs.createReadStream(file.path), size: file.size })
-      });
-      res.status(201).json({ success: true, ...result });
+// Trwające wysyłki, żeby nikt nie dopisał części do cudzego pliku.
+const psdUploads = new Map();
+const UPLOAD_TTL_MS = 60 * 60 * 1000;
+
+function forgetStaleUploads() {
+  const now = Date.now();
+  psdUploads.forEach((upload, id) => {
+    if (now - upload.startedAt <= UPLOAD_TTL_MS) return;
+    storage.abortMultipart(upload.key, upload.uploadId);
+    psdUploads.delete(id);
+  });
+}
+
+router.post('/api/psd/upload/start', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    forgetStaleUploads();
+
+    const fileName = String(req.body?.fileName || '');
+    if (!/\.psd$/i.test(fileName)) {
+      return res.status(400).json({ success: false, error: 'Wybierz plik z rozszerzeniem .psd.' });
+    }
+
+    const key = `${storage.PREFIXES.psd}${storage.safeFileName(fileName)}`;
+    const started = await storage.startMultipart(key, { contentType: 'image/vnd.adobe.photoshop' });
+
+    const id = `${req.session.user.id}-${Date.now().toString(36)}`;
+    psdUploads.set(id, {
+      userId: req.session.user.id,
+      key: started.key,
+      uploadId: started.uploadId,
+      parts: [],
+      startedAt: Date.now()
+    });
+
+    res.json({ success: true, id, partSize: started.partSize });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.post('/api/psd/upload/part', requireAuth, requireRole('admin', 'designer'),
+  receivePsdPart, async (req, res, next) => {
+    const upload = psdUploads.get(String(req.body?.id));
+    try {
+      if (!upload || upload.userId !== req.session.user.id) {
+        return res.status(404).json({ success: false, error: 'Wysyłka wygasła — zacznij od nowa.' });
+      }
+      if (!req.file) return res.status(400).json({ success: false, error: 'Brak części pliku.' });
+
+      const partNumber = Number(req.body.partNumber);
+      if (!Number.isInteger(partNumber) || partNumber < 1) {
+        return res.status(400).json({ success: false, error: 'Nieprawidłowy numer części.' });
+      }
+
+      const part = await storage.uploadPart(
+        upload.key, upload.uploadId, partNumber, fs.readFileSync(req.file.path)
+      );
+      upload.parts = upload.parts.filter((item) => item.PartNumber !== partNumber).concat(part);
+      res.json({ success: true, partNumber });
     } catch (err) {
-      psdErrorResponse(res, next, err);
+      handleRepoError(res, next, err);
     } finally {
-      if (file) fs.unlink(file.path, () => {});
+      if (req.file) fs.unlink(req.file.path, () => {});
     }
   });
+
+router.post('/api/psd/upload/finish', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  const upload = psdUploads.get(String(req.body?.id));
+  try {
+    if (!upload || upload.userId !== req.session.user.id) {
+      return res.status(404).json({ success: false, error: 'Wysyłka wygasła — zacznij od nowa.' });
+    }
+    if (!upload.parts.length) {
+      return res.status(400).json({ success: false, error: 'Nie wysłano żadnej części pliku.' });
+    }
+
+    const key = await storage.completeMultipart(upload.key, upload.uploadId, upload.parts);
+    psdUploads.delete(String(req.body.id));
+    res.json({ success: true, key, fileName: key.split('/').pop() });
+  } catch (err) {
+    if (upload) {
+      await storage.abortMultipart(upload.key, upload.uploadId);
+      psdUploads.delete(String(req.body.id));
+    }
+    handleRepoError(res, next, err);
+  }
+});
+
+router.post('/api/psd/upload/abort', requireAuth, requireRole('admin', 'designer'), async (req, res) => {
+  const id = String(req.body?.id);
+  const upload = psdUploads.get(id);
+  if (upload && upload.userId === req.session.user.id) {
+    await storage.abortMultipart(upload.key, upload.uploadId);
+    psdUploads.delete(id);
+  }
+  res.json({ success: true });
+});
 
 router.post('/api/templates/:id/assets', requireAuth, requireRole('admin', 'designer'),
   uploadTemplateAsset.single('file'), async (req, res, next) => {
@@ -690,30 +770,16 @@ router.delete('/api/assets/:id', requireAuth, requireRole('admin', 'designer'), 
 const MAX_UPLOAD_BATCH = 20;
 const MAX_PHOTO_SIZE = 60 * 1024 * 1024;
 
-// Pliki PSD bywają duże — czytamy je z dysku, nigdy do pamięci procesu naraz.
-const MAX_PSD_SIZE = 300 * 1024 * 1024;
-
-const uploadPsd = multer({
+const uploadPsdPart = multer({
   storage: multer.diskStorage({ destination: tmpDir }),
-  limits: { fileSize: MAX_PSD_SIZE, files: 1 },
-  fileFilter: (req, file, cb) => {
-    if (!/\.psd$/i.test(file.originalname)) {
-      return cb(new repo.ValidationError('Wybierz plik z rozszerzeniem .psd.', 'file'));
-    }
-    cb(null, true);
-  }
+  // Część jest z definicji mała; zapas na wypadek innego rozmiaru po stronie przeglądarki.
+  limits: { fileSize: 32 * 1024 * 1024, files: 1 }
 });
 
-function receivePsd(req, res, next) {
-  uploadPsd.single('file')(req, res, (error) => {
+function receivePsdPart(req, res, next) {
+  uploadPsdPart.single('chunk')(req, res, (error) => {
     if (!error) return next();
     if (req.file) fs.unlink(req.file.path, () => {});
-    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({
-        success: false,
-        error: `Plik PSD jest większy niż ${Math.round(MAX_PSD_SIZE / 1024 / 1024)} MB.`
-      });
-    }
     return handleRepoError(res, next, error);
   });
 }

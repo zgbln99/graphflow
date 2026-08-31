@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-psd-magazyn';
+const APP_BUILD = '2026-08-31-psd-czesci';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -1804,8 +1804,7 @@ let psdBusy = false;
 
 function setPsdModalBusy(busy, label = '') {
   psdBusy = busy;
-  psdModalProgress?.classList.toggle('d-none', !busy);
-  if (busy && label) psdModalLabel.textContent = label;
+  setPsdProgress(busy ? { percent: null, label } : { hide: true });
   psdFilesList?.querySelectorAll('button').forEach((button) => { button.disabled = busy; });
 }
 
@@ -1885,15 +1884,89 @@ const psdProgress = {
   bar: document.getElementById('psd-bar')
 };
 
-/** Pliki PSD ważą setki megabajtów — bez paska nie wiadomo, czy cokolwiek się dzieje. */
+const psdModalProgressUi = {
+  panel: document.getElementById('psd-modal-progress'),
+  label: document.getElementById('psd-modal-label'),
+  percent: document.getElementById('psd-modal-percent'),
+  bar: document.getElementById('psd-modal-bar')
+};
+
+/**
+ * Postęp pokazujemy tam, gdzie użytkownik patrzy: w oknie wyboru, gdy jest
+ * otwarte, a poza nim na karcie szablonów. Nigdy w obu naraz.
+ */
 function setPsdProgress({ percent = 0, label = '', hide = false } = {}) {
-  if (!psdProgress.panel) return;
-  psdProgress.panel.classList.toggle('d-none', hide);
-  if (hide) return;
-  psdProgress.label.textContent = label;
-  psdProgress.percent.textContent = percent === null ? '' : `${Math.round(percent)}%`;
-  psdProgress.bar.style.width = `${percent === null ? 100 : percent}%`;
-  psdProgress.bar.classList.toggle('progress-bar-indeterminate', percent === null);
+  const inModal = psdModalEl?.classList.contains('show');
+  const ui = inModal ? psdModalProgressUi : psdProgress;
+  psdProgress.panel?.classList.add('d-none');
+  psdModalProgressUi.panel?.classList.add('d-none');
+  if (hide || !ui.panel) return;
+
+  ui.panel.classList.remove('d-none');
+  ui.label.textContent = label;
+  ui.percent.textContent = percent === null ? '' : `${Math.round(percent)}%`;
+  ui.bar.style.width = `${percent === null ? 100 : percent}%`;
+  ui.bar.classList.toggle('progress-bar-indeterminate', percent === null);
+}
+
+/**
+ * Wysyłka PSD z dysku, kawałek po kawałku.
+ *
+ * Pliki PSD ważą setki megabajtów, a pośrednik przed aplikacją tnie żądania
+ * powyżej stu. Dzielimy więc plik na części i składamy go w magazynie —
+ * pojedyncze żądanie nigdy nie zbliża się do limitu, więc rozmiar całości
+ * przestaje mieć znaczenie.
+ */
+async function sendPsdInChunks(file) {
+  const started = await api('/api/psd/upload/start', {
+    method: 'POST',
+    body: JSON.stringify({ fileName: file.name })
+  });
+
+  const partSize = started.partSize;
+  const parts = Math.ceil(file.size / partSize);
+
+  try {
+    for (let index = 0; index < parts; index += 1) {
+      const chunk = file.slice(index * partSize, Math.min((index + 1) * partSize, file.size));
+      const form = new FormData();
+      form.append('id', started.id);
+      form.append('partNumber', String(index + 1));
+      form.append('chunk', chunk, 'part');
+
+      await new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open('POST', '/api/psd/upload/part');
+        request.upload.addEventListener('progress', (progress) => {
+          if (!progress.lengthComputable) return;
+          const done = index * partSize + progress.loaded;
+          setPsdProgress({
+            percent: Math.min(100, done / file.size * 100),
+            label: `Wysyłam do magazynu — część ${index + 1} z ${parts}`
+          });
+        });
+        request.addEventListener('load', () => {
+          let body = {};
+          try { body = JSON.parse(request.responseText); } catch { /* pusta odpowiedź */ }
+          if (request.status >= 200 && request.status < 300 && body.success !== false) return resolve(body);
+          if (request.status === 413) {
+            return reject(new Error('Pośrednik odrzucił nawet pojedynczą część pliku. '
+              + 'Wrzuć PSD do katalogu psd/ w magazynie klientem S3.'));
+          }
+          reject(new Error(body.error || `Serwer odrzucił część ${index + 1} (HTTP ${request.status}).`));
+        });
+        request.addEventListener('error', () => reject(new Error('Połączenie przerwane w trakcie wysyłki.')));
+        request.send(form);
+      });
+    }
+
+    setPsdProgress({ percent: null, label: 'Składam plik w magazynie' });
+    return await api('/api/psd/upload/finish', { method: 'POST', body: JSON.stringify({ id: started.id }) });
+  } catch (error) {
+    // Przerwana wysyłka zostawiłaby w buckecie niedokończone części.
+    await api('/api/psd/upload/abort', { method: 'POST', body: JSON.stringify({ id: started.id }) }).catch(() => {});
+    throw error;
+  }
 }
 
 psdInput?.addEventListener('change', async (event) => {
@@ -1901,51 +1974,25 @@ psdInput?.addEventListener('change', async (event) => {
   if (!file) return;
 
   showPsdStatus('info', `<strong>${escapeHTML(file.name)}</strong> · ${fileSize(file.size)}`);
-  setPsdProgress({ percent: 0, label: 'Wysyłam plik na serwer' });
+  setPsdProgress({ percent: 0, label: 'Zaczynam wysyłkę' });
 
   try {
-    const form = new FormData();
-    form.append('file', file, file.name);
+    const uploaded = await sendPsdInChunks(file);
 
-    const payload = await new Promise((resolve, reject) => {
-      const request = new XMLHttpRequest();
-      request.open('POST', '/api/psd/upload');
-      request.upload.addEventListener('progress', (progress) => {
-        if (!progress.lengthComputable) return;
-        const percent = progress.loaded / progress.total * 100;
-        setPsdProgress({
-          percent,
-          label: percent < 100 ? 'Wysyłam plik na serwer' : 'Analizuję warstwy'
-        });
-        // Po zakończeniu wysyłki serwer czyta plik — długość tego etapu zależy
-        // od liczby warstw, więc pokazujemy pasek bez konkretnej wartości.
-        if (percent >= 100) setPsdProgress({ percent: null, label: 'Analizuję warstwy i składam grafikę' });
-      });
-      request.addEventListener('load', () => {
-        let body = {};
-        try { body = JSON.parse(request.responseText); } catch { /* pusta odpowiedź */ }
-        if (request.status >= 200 && request.status < 300 && body.success !== false) return resolve(body);
-        // 413 zwraca zwykle pośrednik przed aplikacją, a nie ona sama.
-        if (request.status === 413) {
-          return reject(Object.assign(
-            new Error('Plik jest za duży, żeby przejść przez przeglądarkę.'),
-            { html: '<div class="mt-1 small">Wrzuć go do katalogu <code>psd/</code> w magazynie '
-              + 'klientem S3 z pulpitu i użyj przycisku „Z PSD”.</div>' }
-          ));
-        }
-        const hint = body.hint ? `<div class="mt-1 small">${escapeHTML(body.hint)}</div>` : '';
-        reject(Object.assign(new Error(body.error || `Serwer odrzucił plik (HTTP ${request.status}).`), { html: hint }));
-      });
-      request.addEventListener('error', () => reject(new Error('Połączenie przerwane w trakcie wysyłki.')));
-      request.send(form);
+    setPsdProgress({ percent: null, label: 'Czytam warstwy i składam grafikę' });
+    const payload = await api('/api/psd/import-from-storage', {
+      method: 'POST',
+      body: JSON.stringify({ key: uploaded.key })
     });
+
     setPsdProgress({ hide: true });
+    hideModal(psdModalEl);
     showImportResult(payload);
     await loadTemplates();
     showTemplateEditor(payload.template);
   } catch (error) {
     setPsdProgress({ hide: true });
-    showPsdStatus('danger', escapeHTML(error.message) + (error.html || ''));
+    showPsdStatus('danger', escapeHTML(error.message) + (error.hint ? ` ${escapeHTML(error.hint)}` : ''));
   } finally {
     psdInput.value = '';
   }
