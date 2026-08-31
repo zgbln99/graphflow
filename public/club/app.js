@@ -1740,3 +1740,29 @@ document.getElementById('new-action')?.addEventListener('click', (event) => {
   event.preventDefault();
   showView('library');
 });
+
+/* ---- kontrola wersji ----
+   Przy każdym wdrożeniu wracało pytanie „czy przeglądarka na pewno ma nowy
+   skrypt?". Panel odpowiada na nie sam: porównuje wersję, którą wysłał serwer,
+   z wersją skryptu, który faktycznie się wykonuje. */
+
+const APP_BUILD = '2026-08-31-magazyn-3';
+
+(() => {
+  const buildEl = document.getElementById('app-build');
+  const scriptEl = document.getElementById('app-script');
+  const hintEl = document.getElementById('app-build-hint');
+  if (!buildEl) return;
+
+  const src = document.querySelector('script[src*="/club/app.js"]')?.getAttribute('src') || '';
+  const stamp = src.split('?v=')[1] || 'brak';
+
+  buildEl.textContent = APP_BUILD;
+  scriptEl.textContent = stamp;
+
+  if (stamp === 'brak' || /^\d+$/.test(stamp)) {
+    hintEl.className = 'd-block text-warning mt-1';
+    hintEl.textContent = 'Serwer podaje stary adres skryptu — na serwerze nie ma jeszcze najnowszej wersji. '
+      + 'Wykonaj git pull i pm2 restart zastal-marketing-center.';
+  }
+})();
