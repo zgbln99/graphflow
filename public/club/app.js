@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-nawigacja-1';
+const APP_BUILD = '2026-08-31-sciezki-1';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -1711,6 +1711,21 @@ const folderModalEl = document.getElementById('folder-modal');
 const folderForm = document.getElementById('folder-form');
 const folderFormError = document.getElementById('folder-form-error');
 
+// Ścieżka układa się sama z sezonu, kolejki i meczu — dopóki nikt jej nie nadpisze.
+let prefixEditedByHand = false;
+
+async function refreshPrefixSuggestion() {
+  if (prefixEditedByHand || folderForm.elements.id.value) return;
+  const params = new URLSearchParams({ role: folderForm.elements.role.value });
+  if (folderForm.elements.match_id.value) params.set('match_id', folderForm.elements.match_id.value);
+  try {
+    const payload = await api(`/api/folders/suggest-prefix?${params}`);
+    folderForm.elements.prefix_path.value = payload.prefix;
+  } catch (error) {
+    setFormError(folderFormError, error.message);
+  }
+}
+
 folderModalEl?.addEventListener('show.bs.modal', async (event) => {
   if (!folderForm) return;
   const trigger = event.relatedTarget;
@@ -1726,17 +1741,45 @@ folderModalEl?.addEventListener('show.bs.modal', async (event) => {
   folderForm.elements.role.value = folder?.role || 'custom';
   document.getElementById('folder-upload-enabled').checked = folder ? Number(folder.is_upload_enabled) === 1 : true;
 
+  prefixEditedByHand = Boolean(folder);
+
   // Lista meczów jest krótka i zmienia się rzadko — pobieramy ją przy otwarciu.
   try {
     const payload = await api('/api/matches');
     const select = folderForm.elements.match_id;
     select.innerHTML = '<option value="">Bez meczu</option>'
-      + payload.matches.map((match) => `<option value="${match.id}">${escapeHTML(`${match.home_team} – ${match.away_team}`)}</option>`).join('');
-    select.value = folder?.match_id || '';
+      + payload.matches.map((match) => {
+        const date = formatDate(match.match_date);
+        return `<option value="${match.id}">${escapeHTML(`${match.home_team} – ${match.away_team}`)}`
+          + `${date ? ` (${date.date})` : ''}</option>`;
+      }).join('');
+    // Nowy folder prawie zawsze dotyczy meczu: bierzemy ten otwarty w widoku
+    // meczu, a poza nim najbliższy nadchodzący (albo ostatni rozegrany).
+    const upcoming = [...payload.matches]
+      .sort((a, b) => String(a.match_date).localeCompare(String(b.match_date)))
+      .find((match) => String(match.match_date) >= new Date().toISOString().slice(0, 10));
+    const preselected = folder?.match_id
+      || currentMatch?.id
+      || upcoming?.id
+      || payload.matches[0]?.id
+      || '';
+    select.value = String(preselected);
+
+    if (!folder) {
+      const chosen = payload.matches.find((match) => String(match.id) === select.value);
+      if (chosen && !folderForm.elements.name.value) {
+        folderForm.elements.name.value = `${chosen.home_team} – ${chosen.away_team}`;
+      }
+      await refreshPrefixSuggestion();
+    }
   } catch (error) {
     setFormError(folderFormError, error.message);
   }
 });
+
+folderForm?.elements.match_id?.addEventListener('change', refreshPrefixSuggestion);
+folderForm?.elements.role?.addEventListener('change', refreshPrefixSuggestion);
+document.getElementById('folder-prefix')?.addEventListener('input', () => { prefixEditedByHand = true; });
 
 folderForm?.addEventListener('submit', async (event) => {
   event.preventDefault();

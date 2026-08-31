@@ -496,6 +496,18 @@ router.get('/api/folders', requireAuth, async (req, res, next) => {
   } catch (err) { handleRepoError(res, next, err); }
 });
 
+// Ścieżkę układa serwer, żeby wszystkie foldery trzymały jedną konwencję.
+router.get('/api/folders/suggest-prefix', requireAuth, async (req, res, next) => {
+  try {
+    const prefix = await repo.suggestFolderPrefix({
+      matchId: req.query.match_id || null,
+      seasonId: req.query.season_id || null,
+      role: req.query.role || 'custom'
+    });
+    res.json({ success: true, prefix });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
 router.post('/api/folders', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
   try {
     res.status(201).json({ success: true, folder: await repo.createFolder(req.body || {}) });

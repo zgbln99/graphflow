@@ -897,6 +897,64 @@ function normalizeFolder(payload, { requireAll = true } = {}) {
   return data;
 }
 
+/**
+ * Ścieżkę w buckecie układa aplikacja, a nie człowiek. Struktura idzie od
+ * ogółu do szczegółu: sezon → kolejka (jeśli podana) → mecz → przeznaczenie.
+ * Dzięki temu katalog magazynu czyta się tak samo jak kalendarz rozgrywek,
+ * a zdjęcia z jednego meczu nigdy nie rozjadą się po dwóch miejscach.
+ */
+const FOLDER_ROLE_SEGMENTS = {
+  photographer: 'fotograf',
+  selected: 'wybrane',
+  social: 'social',
+  archive: 'archiwum',
+  custom: 'inne'
+};
+
+/** Nazwa → bezpieczny segment ścieżki: bez polskich znaków, spacji i ukośników. */
+function slug(value, fallback = '') {
+  const text = String(value || '')
+    .toLowerCase()
+    .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e').replace(/ł/g, 'l')
+    .replace(/ń/g, 'n').replace(/ó/g, 'o').replace(/ś/g, 's').replace(/[żź]/g, 'z')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  return text || fallback;
+}
+
+async function suggestFolderPrefix({ matchId = null, seasonId = null, role = 'custom' } = {}) {
+  const segments = [];
+  let match = null;
+
+  if (matchId) {
+    match = await db.fetch(`
+      SELECT m.id, m.home_team, m.away_team, m.match_date, m.round_name, s.name AS season_name
+      FROM cg_matches m JOIN cg_seasons s ON s.id = m.season_id
+      WHERE m.id = ? LIMIT 1
+    `, [Number(matchId)]);
+    if (!match) throw new ValidationError('Nie znaleziono meczu.', 'match_id');
+  }
+
+  const season = match
+    ? match.season_name
+    : (seasonId ? (await getSeason(seasonId))?.name : (await getActiveSeason())?.name);
+  segments.push(slug(season, 'sezon'));
+
+  if (match) {
+    if (match.round_name) segments.push(slug(match.round_name));
+    // Data z przodu układa mecze chronologicznie także w kliencie S3 na pulpicie.
+    const date = String(match.match_date || '').slice(0, 10);
+    segments.push([date, slug(match.home_team, 'gospodarz'), slug(match.away_team, 'gosc')].filter(Boolean).join('-'));
+  } else {
+    segments.push('poza-meczem');
+  }
+
+  segments.push(FOLDER_ROLE_SEGMENTS[role] || FOLDER_ROLE_SEGMENTS.custom);
+  return `${segments.filter(Boolean).join('/')}/`;
+}
+
 async function listFolders({ matchId = null } = {}) {
   const conditions = [];
   const params = [];
@@ -1220,6 +1278,7 @@ module.exports = {
   deleteDesign,
   recordExport,
   FOLDER_ROLES,
+  suggestFolderPrefix,
   listFolders,
   getFolder,
   createFolder,
