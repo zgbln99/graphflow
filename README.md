@@ -57,8 +57,16 @@ wyjdzie w pliku. Pola liczbowe w zakładce Warstwy nadal działają, gdy trzeba 
 dokładną wartość.
 
 Kroje pisma do wyboru przy warstwie tekstowej: klubowy **ZT Talk**, **ZT Talk Expanded**
-oraz trzy kroje systemowe (bezszeryfowy, szeryfowy, o stałej szerokości). Podgląd i eksport
-rysuje ten sam silnik, więc krój w podglądzie jest tym, który wyjdzie w pliku.
+oraz trzy kroje systemowe (bezszeryfowy, szeryfowy, o stałej szerokości). Przełącznik
+**Kursywa** pochyla tekst; gdy krój nie ma własnej odmiany pochylonej, robi to przeglądarka.
+Prawdziwą kursywę można wgrać: w zakładce **Pliki** rodzaj „Czcionka” przyjmuje TTF, OTF
+i WOFF, a raz wgrany krój jest do wyboru we wszystkich szablonach. Podgląd i eksport rysuje
+ten sam silnik, więc krój w podglądzie jest tym, który wyjdzie w pliku.
+
+Warstwę wybiera się klikając na podglądzie — kolejne kliknięcia w to samo miejsce
+przechodzą przez warstwy leżące pod spodem i zapętlają się. Bez tego zdjęcie albo nakładka
+rozciągnięte na cały dokument zasłaniałyby wszystko inne. Przeciągnięcie przesuwa warstwę
+zaznaczoną, więc jedno nie przeszkadza drugiemu.
 
 ### Edytor grafiki (social media)
 
