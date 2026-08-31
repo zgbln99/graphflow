@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-magazyn-5';
+const APP_BUILD = '2026-08-31-psd-magazyn';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -161,6 +161,8 @@ async function api(url, options = {}) {
   if (!response.ok || payload.success === false) {
     const error = new Error(payload.error || 'Operacja nie powiodła się.');
     error.field = payload.field;
+    // Podpowiedź, co poprawić — przy imporcie PSD to często najważniejsza część.
+    error.hint = payload.hint;
     throw error;
   }
   return payload;
@@ -1777,9 +1779,14 @@ document.addEventListener('click', (event) => {
    Grafik pracuje w Photoshopie; przepisywanie układu ręcznie byłoby mozolne
    i zawodne. Plik idzie na serwer, a wraca gotowy szablon z polami. */
 
-const psdButton = document.getElementById('template-psd');
 const psdInput = document.getElementById('template-psd-file');
 const psdStatus = document.getElementById('template-psd-status');
+const psdModalEl = document.getElementById('psd-modal');
+const psdFilesList = document.getElementById('psd-files');
+const psdFilesEmpty = document.getElementById('psd-files-empty');
+const psdModalError = document.getElementById('psd-modal-error');
+const psdModalProgress = document.getElementById('psd-modal-progress');
+const psdModalLabel = document.getElementById('psd-modal-label');
 
 function showPsdStatus(kind, html) {
   if (!psdStatus) return;
@@ -1788,7 +1795,88 @@ function showPsdStatus(kind, html) {
   psdStatus.classList.remove('d-none');
 }
 
-psdButton?.addEventListener('click', () => psdInput?.click());
+document.getElementById('psd-from-browser')?.addEventListener('click', () => psdInput?.click());
+
+/* ---- lista plików PSD leżących w magazynie ---- */
+
+let psdFiles = [];
+let psdBusy = false;
+
+function setPsdModalBusy(busy, label = '') {
+  psdBusy = busy;
+  psdModalProgress?.classList.toggle('d-none', !busy);
+  if (busy && label) psdModalLabel.textContent = label;
+  psdFilesList?.querySelectorAll('button').forEach((button) => { button.disabled = busy; });
+}
+
+function renderPsdFiles() {
+  if (!psdFilesList) return;
+  psdFilesEmpty?.classList.toggle('d-none', psdFiles.length > 0);
+
+  psdFilesList.innerHTML = psdFiles.map((file) => `
+    <div class="list-group-item d-flex align-items-center">
+      <span class="me-2 text-secondary">${icon('template')}</span>
+      <div class="flex-fill min-w-0">
+        <div class="text-truncate">${escapeHTML(file.fileName)}</div>
+        <div class="text-secondary small">${fileSize(file.size)}${file.lastModified
+          ? ' · ' + new Date(file.lastModified).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })
+          : ''}</div>
+      </div>
+      <button class="btn btn-primary btn-sm ms-2" type="button" data-psd-key="${escapeHTML(file.key)}">
+        Zbuduj szablon
+      </button>
+    </div>`).join('');
+}
+
+async function loadPsdFiles() {
+  setFormError(psdModalError, '');
+  setPsdModalBusy(true, 'Czytam zawartość magazynu…');
+  try {
+    const payload = await api('/api/psd/files');
+    psdFiles = payload.files;
+    document.getElementById('psd-prefix').textContent = payload.prefix;
+    renderPsdFiles();
+  } catch (error) {
+    setFormError(psdModalError, error.message);
+  } finally {
+    setPsdModalBusy(false);
+  }
+}
+
+psdModalEl?.addEventListener('show.bs.modal', loadPsdFiles);
+document.getElementById('psd-refresh')?.addEventListener('click', loadPsdFiles);
+
+psdFilesList?.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-psd-key]');
+  if (!button || psdBusy) return;
+
+  setFormError(psdModalError, '');
+  setPsdModalBusy(true, 'Czytam warstwy i składam grafikę…');
+  try {
+    const payload = await api('/api/psd/import-from-storage', {
+      method: 'POST',
+      body: JSON.stringify({ key: button.dataset.psdKey })
+    });
+    hideModal(psdModalEl);
+    showImportResult(payload);
+    await loadTemplates();
+    showTemplateEditor(payload.template);
+  } catch (error) {
+    setFormError(psdModalError, error.message + (error.hint ? ` ${error.hint}` : ''));
+  } finally {
+    setPsdModalBusy(false);
+  }
+});
+
+/** Wynik importu wygląda tak samo niezależnie od tego, skąd przyszedł plik. */
+function showImportResult(payload) {
+  const warnings = (payload.warnings || []).map((text) => `<li>${escapeHTML(text)}</li>`).join('');
+  showPsdStatus(warnings ? 'warning' : 'success',
+    `Szablon <strong>${escapeHTML(payload.template.name)}</strong> gotowy — `
+    + `${payload.summary.size}, ${payload.summary.fields} `
+    + `${plural(payload.summary.fields, 'pole do wypełnienia', 'pola do wypełnienia', 'pól do wypełnienia')}.`
+    + (warnings ? `<ul class="mt-2 mb-0 ps-3">${warnings}</ul>` : ''));
+}
 
 const psdProgress = {
   panel: document.getElementById('template-psd-progress'),
@@ -1812,7 +1900,6 @@ psdInput?.addEventListener('change', async (event) => {
   const file = event.target.files[0];
   if (!file) return;
 
-  psdButton.disabled = true;
   showPsdStatus('info', `<strong>${escapeHTML(file.name)}</strong> · ${fileSize(file.size)}`);
   setPsdProgress({ percent: 0, label: 'Wysyłam plik na serwer' });
 
@@ -1822,7 +1909,7 @@ psdInput?.addEventListener('change', async (event) => {
 
     const payload = await new Promise((resolve, reject) => {
       const request = new XMLHttpRequest();
-      request.open('POST', '/api/templates/import-psd');
+      request.open('POST', '/api/psd/upload');
       request.upload.addEventListener('progress', (progress) => {
         if (!progress.lengthComputable) return;
         const percent = progress.loaded / progress.total * 100;
@@ -1838,6 +1925,14 @@ psdInput?.addEventListener('change', async (event) => {
         let body = {};
         try { body = JSON.parse(request.responseText); } catch { /* pusta odpowiedź */ }
         if (request.status >= 200 && request.status < 300 && body.success !== false) return resolve(body);
+        // 413 zwraca zwykle pośrednik przed aplikacją, a nie ona sama.
+        if (request.status === 413) {
+          return reject(Object.assign(
+            new Error('Plik jest za duży, żeby przejść przez przeglądarkę.'),
+            { html: '<div class="mt-1 small">Wrzuć go do katalogu <code>psd/</code> w magazynie '
+              + 'klientem S3 z pulpitu i użyj przycisku „Z PSD”.</div>' }
+          ));
+        }
         const hint = body.hint ? `<div class="mt-1 small">${escapeHTML(body.hint)}</div>` : '';
         reject(Object.assign(new Error(body.error || `Serwer odrzucił plik (HTTP ${request.status}).`), { html: hint }));
       });
@@ -1845,22 +1940,13 @@ psdInput?.addEventListener('change', async (event) => {
       request.send(form);
     });
     setPsdProgress({ hide: true });
-
-    const warnings = (payload.warnings || [])
-      .map((text) => `<li>${escapeHTML(text)}</li>`).join('');
-    showPsdStatus(warnings ? 'warning' : 'success',
-      `Szablon <strong>${escapeHTML(payload.template.name)}</strong> gotowy — `
-      + `${payload.summary.size}, ${payload.summary.fields} `
-      + `${plural(payload.summary.fields, 'pole do wypełnienia', 'pola do wypełnienia', 'pól do wypełnienia')}.`
-      + (warnings ? `<ul class="mt-2 mb-0 ps-3">${warnings}</ul>` : ''));
-
+    showImportResult(payload);
     await loadTemplates();
     showTemplateEditor(payload.template);
   } catch (error) {
     setPsdProgress({ hide: true });
     showPsdStatus('danger', escapeHTML(error.message) + (error.html || ''));
   } finally {
-    psdButton.disabled = false;
     psdInput.value = '';
   }
 });

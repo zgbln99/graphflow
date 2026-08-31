@@ -1,6 +1,10 @@
-<%# Logo klubu — gdy wgrane, pokazujemy wyłącznie je (bez tekstu, bez ramki) %>
+<%# Logo klubu — gdy wgrane, pokazujemy wyłącznie je (bez tekstu, bez ramki).
+    Gdy pliku nie da się wczytać, wracamy do napisu zamiast pokazywać
+    ikonę zepsutego obrazka. %>
 <% if (branding && branding.logoUrl) { %>
-  <img src="<%= branding.logoUrl %>" alt="Logo klubu">
+  <img src="<%= branding.logoUrl %>" alt="Logo klubu"
+       onerror="this.nextElementSibling?.classList.remove('d-none'); this.remove()">
+  <span class="wordmark d-none"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
 <% } else { %>
   <span class="wordmark"><b>ZASTAL</b><span>MARKETING CENTER</span></span>
 <% } %>

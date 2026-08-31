@@ -260,6 +260,14 @@ async function listObjects(prefix, { limit = 1000, imagesOnly = false } = {}) {
   }
 }
 
+/** Pliki PSD leżące w magazynie — do wyboru przy imporcie szablonu. */
+async function listPsdFiles({ limit = 200 } = {}) {
+  const listing = await listObjects(PREFIXES.psd, { limit });
+  return listing.objects
+    .filter((object) => /\.psd$/i.test(object.key))
+    .sort((a, b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
+}
+
 async function headObject(key) {
   try {
     const result = await getClient().send(new HeadObjectCommand({ Bucket: getBucket(), Key: normalizeKey(key) }));
@@ -345,7 +353,10 @@ const PREFIXES = {
   photos: '',            // zdjęcia meczowe mają własną ścieżkę z sezonu i meczu
   templates: 'szablony/',
   exports: 'eksporty/',
-  branding: 'branding/'
+  branding: 'branding/',
+  // Katalog, do którego grafik wrzuca pliki PSD klientem S3 z pulpitu.
+  // Duże pliki nie przechodzą przez przeglądarkę, więc to jedyna sensowna droga.
+  psd: 'psd/'
 };
 
 module.exports = {
@@ -358,6 +369,7 @@ module.exports = {
   listObjects,
   headObject,
   getObjectStream,
+  listPsdFiles,
   deleteObject,
   putObject,
   presignDownload,

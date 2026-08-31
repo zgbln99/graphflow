@@ -569,8 +569,10 @@
                   <h3 class="card-title">Szablony</h3>
                   <div class="card-actions">
                     <% if (can('admin','designer')) { %>
-                      <button class="btn btn-sm" id="template-psd" type="button" title="Zbuduj szablon z pliku Photoshopa">
-                        <svg class="icon"><use href="#i-upload"></use></svg>Z PSD
+                      <button class="btn btn-sm" id="template-psd-storage" type="button"
+                              title="Zbuduj szablon z pliku PSD leżącego w magazynie"
+                              data-bs-toggle="modal" data-bs-target="#psd-modal">
+                        <svg class="icon"><use href="#i-folder"></use></svg>Z PSD
                       </button>
                       <input type="file" id="template-psd-file" accept=".psd" hidden>
                       <button class="btn btn-primary btn-sm" id="template-new" type="button">
@@ -1103,6 +1105,48 @@
 
 
 <!-- ==================== MODALE ==================== -->
+<div class="modal modal-blur fade" id="psd-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title">Szablon z pliku PSD</h5>
+          <div class="text-secondary small">Pliki z katalogu <code id="psd-prefix">psd/</code> w magazynie</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger d-none" id="psd-modal-error" role="alert"></div>
+
+        <div class="list-group list-group-flush scroll-y" id="psd-files" style="max-height:min(46vh,420px)"></div>
+
+        <div class="text-secondary d-none" id="psd-files-empty">
+          <p class="mb-2">W katalogu <code>psd/</code> nie ma jeszcze żadnego pliku.</p>
+          <p class="mb-0">
+            Wrzuć tam PSD klientem S3 z pulpitu (Cyberduck, WinSCP, S3 Browser) — pliki PSD
+            ważą zwykle więcej, niż przechodzi przez przeglądarkę.
+          </p>
+        </div>
+
+        <div class="mt-3 d-none" id="psd-modal-progress">
+          <div class="d-flex align-items-center mb-2">
+            <span class="flex-fill text-truncate" id="psd-modal-label">Czytam plik z magazynu…</span>
+          </div>
+          <div class="progress"><div class="progress-bar progress-bar-indeterminate"></div></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Zamknij</button>
+        <button type="button" class="btn btn-sm" id="psd-refresh">
+          <svg class="icon"><use href="#i-refresh"></use></svg>Odśwież listę
+        </button>
+        <button type="button" class="btn btn-sm" id="psd-from-browser">Wyślij z dysku…</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <div class="modal modal-blur fade" id="match-modal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
     <div class="modal-content">

@@ -17,7 +17,8 @@
 
       <div class="text-center mb-4">
         <% if (branding && branding.logoUrl) { %>
-          <img class="login-logo" src="<%= branding.logoUrl %>" alt="Logo klubu">
+          <img class="login-logo" src="<%= branding.logoUrl %>" alt="Logo klubu"
+               onerror="this.remove()">
         <% } else { %>
           <div class="navbar-brand-club justify-content-center">
             <span class="wordmark text-center"><b>ZASTAL</b><span>MARKETING CENTER</span></span>

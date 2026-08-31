@@ -213,7 +213,13 @@ function photoAreaIsTransparent(psd, pixels, box) {
 function importTemplate(buffer, { name = 'Szablon z PSD' } = {}) {
   let psd;
   try {
-    psd = readPsd(buffer, { useImageData: true, skipThumbnail: true });
+    psd = readPsd(buffer, {
+      useImageData: true,
+      skipThumbnail: true,
+      // Spłaszczony podgląd z pliku i tak odpada (Photoshop trzyma go bez kanału
+      // alfa), a przy dużym dokumencie to kilkadziesiąt megabajtów w pamięci.
+      skipCompositeImageData: true
+    });
   } catch (error) {
     throw new PsdImportError(`Nie udało się odczytać pliku PSD: ${error.message}`);
   }

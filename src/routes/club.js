@@ -456,6 +456,95 @@ router.delete('/api/materials/:id', requireAuth, requireRole('admin', 'designer'
   } catch (err) { handleRepoError(res, next, err); }
 });
 
+/**
+ * Buduje szablon z zawartości pliku PSD.
+ *
+ * @param buffer      zawartość pliku
+ * @param fileName    nazwa źródłowa (do nazwy szablonu i etykiet)
+ * @param sourceKey   klucz pliku PSD w magazynie, jeśli już tam leży
+ * @param sourceStream funkcja zwracająca strumień do zapisania pliku w magazynie
+ */
+async function buildTemplateFromPsd({ buffer, fileName, category, userId, sourceKey = null, sourceStream = null }) {
+  const parsed = psdImport.importTemplate(buffer, {
+    name: path.basename(fileName, path.extname(fileName))
+  });
+
+  const uploadedKeys = [];
+  try {
+    // Nazwę bierzemy z pliku, więc kolizja nie jest winą użytkownika —
+    // dokładamy numer zamiast odsyłać go z błędem.
+    const template = await createTemplateWithFreeName({
+      name: parsed.name,
+      category: category === 'other' ? 'other' : 'match',
+      width: parsed.width,
+      height: parsed.height,
+      definition: parsed.definition
+    }, userId);
+
+    const stamp = Date.now().toString(36);
+    const overlayKey = `${storage.PREFIXES.templates}${template.id}/${stamp}-grafika.png`;
+    await storage.putObject(overlayKey, parsed.composite, {
+      contentType: 'image/png',
+      contentLength: parsed.composite.length
+    });
+    uploadedKeys.push(overlayKey);
+
+    // Plik źródłowy zostaje w magazynie — bez niego powrót do oryginału
+    // znaczyłby szukanie po dyskach grafika. Gdy już tam leży, nie kopiujemy go.
+    let psdKey = sourceKey;
+    if (!psdKey && sourceStream) {
+      psdKey = `${storage.PREFIXES.templates}${template.id}/${stamp}-${storage.safeFileName(fileName)}`;
+      const { stream, size } = sourceStream();
+      await storage.putObject(psdKey, stream, {
+        contentType: 'image/vnd.adobe.photoshop',
+        contentLength: size
+      });
+      uploadedKeys.push(psdKey);
+    }
+    if (psdKey) {
+      await repo.addTemplateAsset(template.id, {
+        kind: 'source',
+        objectKey: psdKey,
+        metadata: { originalName: fileName }
+      });
+    }
+
+    const asset = await repo.addTemplateAsset(template.id, {
+      kind: 'overlay',
+      objectKey: overlayKey,
+      metadata: { source: 'psd', originalName: fileName }
+    });
+
+    // Warstwa nakładki wskazuje na dopiero co utworzony plik.
+    await repo.updateTemplate(template.id, {
+      definition: {
+        ...parsed.definition,
+        layers: parsed.definition.layers.map((layer) => (layer.id === 'psd_grafika'
+          ? { ...layer, asset_id: asset.id }
+          : layer))
+      }
+    });
+
+    return {
+      // Z zasobami, żeby podgląd zaraz po imporcie pokazał grafikę, a nie ramkę „brak pliku".
+      template: await repo.getTemplate(template.id, { withAssets: true }),
+      warnings: parsed.warnings,
+      summary: { fields: parsed.definition.fields.length, size: `${parsed.width}×${parsed.height}` }
+    };
+  } catch (error) {
+    // Nieudany import nie ma zostawiać śmieci w magazynie.
+    uploadedKeys.forEach((key) => storage.deleteObject(key).catch(() => {}));
+    throw error;
+  }
+}
+
+function psdErrorResponse(res, next, error) {
+  if (error instanceof psdImport.PsdImportError) {
+    return res.status(error.status).json({ success: false, error: error.message, hint: error.hint });
+  }
+  return handleRepoError(res, next, error);
+}
+
 async function createTemplateWithFreeName(payload, userId) {
   for (let attempt = 1; attempt <= 20; attempt += 1) {
     const name = attempt === 1 ? payload.name : `${payload.name} (${attempt})`;
@@ -473,82 +562,58 @@ async function createTemplateWithFreeName(payload, userId) {
  * a spłaszczoną grafikę zapisujemy jako jeden obraz nakładki. Warstwy oznaczone
  * „#" stają się polami formularza dla social mediów.
  */
-router.post('/api/templates/import-psd', requireAuth, requireRole('admin', 'designer'),
+/**
+ * Import z magazynu — droga podstawowa.
+ *
+ * Pliki PSD ważą setki megabajtów, a strona stoi za pośrednikiem, który tnie
+ * duże żądania. Grafik wrzuca więc plik do katalogu „psd/" klientem S3
+ * z pulpitu, a tutaj tylko wybiera, który zamienić w szablon.
+ */
+router.get('/api/psd/files', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    res.json({ success: true, prefix: storage.PREFIXES.psd, files: await storage.listPsdFiles() });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.post('/api/psd/import-from-storage', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    const key = storage.normalizeKey(req.body?.key || '');
+    if (!key.startsWith(storage.PREFIXES.psd) || !/\.psd$/i.test(key)) {
+      return res.status(400).json({ success: false, error: 'Wskaż plik PSD z katalogu magazynu.' });
+    }
+
+    const object = await storage.getObjectStream(key);
+    const chunks = [];
+    for await (const chunk of object.body) chunks.push(chunk);
+
+    const result = await buildTemplateFromPsd({
+      buffer: Buffer.concat(chunks),
+      fileName: key.split('/').pop(),
+      category: req.body?.category,
+      userId: req.session.user.id,
+      sourceKey: key
+    });
+    res.status(201).json({ success: true, ...result });
+  } catch (err) { psdErrorResponse(res, next, err); }
+});
+
+/** Wysyłka z przeglądarki — wygodna dla małych plików, ale ograniczona przez pośrednika. */
+router.post('/api/psd/upload', requireAuth, requireRole('admin', 'designer'),
   receivePsd, async (req, res, next) => {
     const file = req.file;
-    const uploadedKeys = [];
     try {
       if (!file) return res.status(400).json({ success: false, error: 'Nie wybrano pliku PSD.' });
 
-      const parsed = psdImport.importTemplate(fs.readFileSync(file.path), {
-        name: req.body.name || path.basename(file.originalname, path.extname(file.originalname))
+      const result = await buildTemplateFromPsd({
+        buffer: fs.readFileSync(file.path),
+        fileName: file.originalname,
+        category: req.body.category,
+        userId: req.session.user.id,
+        sourceStream: () => ({ stream: fs.createReadStream(file.path), size: file.size })
       });
-
-      // Nazwę bierzemy z pliku, więc kolizja nie jest winą użytkownika —
-      // dokładamy numer zamiast odsyłać go z błędem.
-      const template = await createTemplateWithFreeName({
-        name: parsed.name,
-        category: req.body.category === 'other' ? 'other' : 'match',
-        width: parsed.width,
-        height: parsed.height,
-        definition: parsed.definition
-      }, req.session.user.id);
-
-      const stamp = Date.now().toString(36);
-      const overlayKey = `${storage.PREFIXES.templates}${template.id}/${stamp}-grafika.png`;
-      await storage.putObject(overlayKey, parsed.composite, {
-        contentType: 'image/png',
-        contentLength: parsed.composite.length
-      });
-      uploadedKeys.push(overlayKey);
-
-      // Plik źródłowy zostaje w magazynie — bez niego powrót do oryginału
-      // znaczyłby szukanie po dyskach grafika.
-      const sourceKey = `${storage.PREFIXES.templates}${template.id}/${stamp}-${storage.safeFileName(file.originalname)}`;
-      await storage.putObject(sourceKey, fs.createReadStream(file.path), {
-        contentType: 'image/vnd.adobe.photoshop',
-        contentLength: file.size
-      });
-      uploadedKeys.push(sourceKey);
-
-      await repo.addTemplateAsset(template.id, {
-        kind: 'source',
-        objectKey: sourceKey,
-        metadata: { originalName: file.originalname, size: file.size }
-      });
-
-      const asset = await repo.addTemplateAsset(template.id, {
-        kind: 'overlay',
-        objectKey: overlayKey,
-        metadata: { source: 'psd', originalName: file.originalname }
-      });
-
-      // Warstwa nakładki wskazuje na dopiero co utworzony plik.
-      const definition = {
-        ...parsed.definition,
-        layers: parsed.definition.layers.map((layer) => (layer.id === 'psd_grafika'
-          ? { ...layer, asset_id: asset.id }
-          : layer))
-      };
-      await repo.updateTemplate(template.id, { definition });
-
-      res.status(201).json({
-        success: true,
-        // Z zasobami, żeby podgląd zaraz po imporcie pokazał grafikę, a nie ramkę „brak pliku".
-        template: await repo.getTemplate(template.id, { withAssets: true }),
-        warnings: parsed.warnings,
-        summary: {
-          fields: parsed.definition.fields.length,
-          size: `${parsed.width}×${parsed.height}`
-        }
-      });
+      res.status(201).json({ success: true, ...result });
     } catch (err) {
-      // Nieudany import nie ma zostawiać śmieci w magazynie.
-      uploadedKeys.forEach((key) => storage.deleteObject(key).catch(() => {}));
-      if (err instanceof psdImport.PsdImportError) {
-        return res.status(err.status).json({ success: false, error: err.message, hint: err.hint });
-      }
-      handleRepoError(res, next, err);
+      psdErrorResponse(res, next, err);
     } finally {
       if (file) fs.unlink(file.path, () => {});
     }

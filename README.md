@@ -43,7 +43,16 @@ obraz nakładki.
 5. Efekty warstw (cień, obrys, poświata) i tryby mieszania inne niż „zwykły"
    zrasteryzuj albo scal — składanie ich odtwarza tylko krycie i tryb zwykły.
    Import wypisuje, których warstw to dotyczy.
-6. Zapisz jako `.psd` i wczytaj w Szablonach przyciskiem **Z PSD**.
+6. Zapisz jako `.psd` i wrzuć do katalogu **`psd/`** w buckecie — klientem S3 z pulpitu
+   (Cyberduck, WinSCP, S3 Browser). Potem w Szablonach kliknij **Z PSD** i wybierz plik
+   z listy.
+
+Pliki PSD ważą zwykle więcej, niż przechodzi przez przeglądarkę (pośrednik przed aplikacją
+tnie duże żądania), dlatego drogą podstawową jest katalog `psd/` w magazynie. Przycisk
+**Wyślij z dysku…** w tym samym oknie zostaje dla małych plików.
+
+Plik źródłowy zostaje tam, gdzie go położyłeś — aplikacja go nie kopiuje, tylko zapamiętuje
+jako zasób szablonu.
 
 **Co powstaje z czego**
 
@@ -125,6 +134,7 @@ katalogiem przelotowym, z którego plik znika po wysłaniu do magazynu.
 | zdjęcia meczowe | `2026-27/kolejka-1/2026-10-04-dziki-zastal/` |
 | zdjęcia spoza kalendarza | `2026-27/poza-meczem/` |
 | nakładki i pliki źródłowe szablonów | `szablony/{id}/` |
+| pliki źródłowe PSD do importu | `psd/` |
 | eksporty grafik | `eksporty/{data}/` |
 | logo klubu | `branding/` |
 
