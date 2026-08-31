@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-czcionki';
+const APP_BUILD = '2026-08-31-uklad-myszka';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -887,7 +887,173 @@ async function drawPreview() {
     currentTemplate?.assets || [],
     { placeholders: true }
   );
+
+  renderLayerHandles();
 }
+
+/* ---- ustawianie warstw myszą ----
+   Uchwyty leżą nad płótnem, ale rysuje je silnik eksportu, więc to, co
+   przesuwasz, jest dokładnie tym, co wyjdzie w pliku. Wpisywanie współrzędnych
+   z Photoshopa ręcznie było najżmudniejszą częścią przygotowania szablonu. */
+
+const previewStage = document.getElementById('preview-stage');
+const previewHandles = document.getElementById('preview-handles');
+const SNAP = 8;               // przyciąganie w pikselach szablonu
+
+/** Ile pikseli szablonu przypada na piksel ekranu. */
+function previewScale() {
+  const width = Number(templateForm?.elements.width.value) || 1080;
+  return previewCanvas.clientWidth ? width / previewCanvas.clientWidth : 1;
+}
+
+function renderLayerHandles() {
+  if (!previewHandles) return;
+  const scale = previewScale();
+  const toScreen = (value) => `${value / scale}px`;
+
+  previewHandles.innerHTML = [...workingLayers]
+    .sort((a, b) => a.z - b.z)
+    .filter((layer) => layer.visible !== false)
+    .map((layer) => {
+      const active = layer.id === selectedLayerId;
+      return `<div class="layer-box ${active ? 'active' : ''} ${layer.locked ? 'locked' : ''}"
+                   data-box="${escapeHTML(layer.id)}"
+                   style="left:${toScreen(layer.x)};top:${toScreen(layer.y)};
+                          width:${toScreen(layer.w)};height:${toScreen(layer.h)}">
+        ${active ? `<span class="tag">${escapeHTML(layer.name)}</span>` : ''}
+        ${active && !layer.locked
+          ? ['nw', 'ne', 'sw', 'se'].map((grip) => `<span class="grip" data-grip="${grip}"></span>`).join('')
+          : ''}
+      </div>`;
+    }).join('');
+}
+
+/** Krawędzie i środek dokumentu oraz pozostałych warstw — do przyciągania. */
+function snapTargets(layer, width, height) {
+  const vertical = [0, width / 2, width];
+  const horizontal = [0, height / 2, height];
+  workingLayers.forEach((other) => {
+    if (other.id === layer.id || other.visible === false) return;
+    vertical.push(other.x, other.x + other.w / 2, other.x + other.w);
+    horizontal.push(other.y, other.y + other.h / 2, other.y + other.h);
+  });
+  return { vertical, horizontal };
+}
+
+function snap(value, targets) {
+  let best = value;
+  let distance = SNAP;
+  targets.forEach((target) => {
+    const delta = Math.abs(target - value);
+    if (delta < distance) { distance = delta; best = target; }
+  });
+  return best;
+}
+
+previewHandles?.addEventListener('pointerdown', (event) => {
+  const box = event.target.closest('[data-box]');
+  if (!box) return;
+
+  const layer = workingLayers.find((item) => item.id === box.dataset.box);
+  if (!layer) return;
+
+  if (layer.id !== selectedLayerId) {
+    selectedLayerId = layer.id;
+    renderLayerList();
+    renderLayerProps();
+    renderLayerHandles();
+  }
+  if (layer.locked) return;
+
+  const grip = event.target.dataset.grip || null;
+  const scale = previewScale();
+  const width = Number(templateForm.elements.width.value) || 1080;
+  const height = Number(templateForm.elements.height.value) || 1350;
+  const from = { pointerX: event.clientX, pointerY: event.clientY, x: layer.x, y: layer.y, w: layer.w, h: layer.h };
+
+  event.preventDefault();
+  previewHandles.setPointerCapture(event.pointerId);
+
+  /** Wybiera z kandydatów ten, który najmniej rusza warstwę — czyli najbliższy. */
+  const closest = (value, candidates) => candidates
+    .reduce((best, candidate) => (Math.abs(candidate - value) < Math.abs(best - value) ? candidate : best), value);
+
+  const onMove = (move) => {
+    const dx = (move.clientX - from.pointerX) * scale;
+    const dy = (move.clientY - from.pointerY) * scale;
+    const targets = snapTargets(layer, width, height);
+
+    if (!grip) {
+      // Przy przesuwaniu przyciągamy trzy punkty warstwy: obie krawędzie i środek.
+      const rawX = Math.round(from.x + dx);
+      const rawY = Math.round(from.y + dy);
+
+      layer.x = Math.round(closest(rawX, [
+        snap(rawX, targets.vertical),
+        snap(rawX + from.w, targets.vertical) - from.w,
+        snap(rawX + from.w / 2, targets.vertical) - from.w / 2
+      ]));
+      layer.y = Math.round(closest(rawY, [
+        snap(rawY, targets.horizontal),
+        snap(rawY + from.h, targets.horizontal) - from.h,
+        snap(rawY + from.h / 2, targets.horizontal) - from.h / 2
+      ]));
+    } else {
+      let { x, y, w, h } = from;
+      if (grip.includes('w')) {
+        x = Math.round(snap(from.x + dx, targets.vertical));
+        w = from.x + from.w - x;
+      }
+      if (grip.includes('e')) {
+        w = Math.round(snap(from.x + from.w + dx, targets.vertical)) - x;
+      }
+      if (grip.includes('n')) {
+        y = Math.round(snap(from.y + dy, targets.horizontal));
+        h = from.y + from.h - y;
+      }
+      if (grip.includes('s')) {
+        h = Math.round(snap(from.y + from.h + dy, targets.horizontal)) - y;
+      }
+      // Warstwa nie może się wywrócić na drugą stronę ani zniknąć.
+      layer.x = x;
+      layer.y = y;
+      layer.w = Math.max(8, w);
+      layer.h = Math.max(8, h);
+    }
+
+    renderLayerHandles();
+    refreshPreview();
+  };
+
+  const onUp = () => {
+    previewHandles.removeEventListener('pointermove', onMove);
+    previewHandles.removeEventListener('pointerup', onUp);
+    // Pola liczbowe muszą pokazać to, co ustawiła mysz.
+    renderLayerProps();
+  };
+
+  previewHandles.addEventListener('pointermove', onMove);
+  previewHandles.addEventListener('pointerup', onUp);
+});
+
+// Strzałki przesuwają zaznaczoną warstwę — do dopieszczenia pozycji o piksel.
+document.addEventListener('keydown', (event) => {
+  if (!selectedLayerId || !document.getElementById('view-templates')?.classList.contains('active-view')) return;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) return;
+  const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+  if (!step) return;
+
+  const layer = workingLayers.find((item) => item.id === selectedLayerId);
+  if (!layer || layer.locked) return;
+
+  event.preventDefault();
+  const distance = event.shiftKey ? 10 : 1;
+  layer.x += step[0] * distance;
+  layer.y += step[1] * distance;
+  renderLayerHandles();
+  renderLayerProps();
+  refreshPreview();
+});
 
 /* ---- lista i zapis szablonu ---- */
 

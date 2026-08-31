@@ -24,8 +24,10 @@ Serwer odświeża dane w tle zgodnie z `SOCIAL_MONITOR_INTERVAL_MS`. Ustawienie 
 
 ### Szablony: gotowa grafika plus pola
 
-Szablon składa się z gotowej grafiki przygotowanej przez grafika i z pól, które
-wypełnia social media. Grafik przygotowuje plik PNG z przezroczystością w docelowym
+Podział pracy jest tu sednem: **grafik pracuje w Photoshopie, social media nigdy go nie
+otwiera.** Szablon powstaje raz — z gotowej grafiki i z pól, które potem wypełnia się
+w panelu formularzem. Osoba prowadząca profile widzi wyłącznie te pola, podgląd i przycisk
+eksportu; nie ma dostępu do warstw ani do biblioteki szablonów. Grafik przygotowuje plik PNG z przezroczystością w docelowym
 rozmiarze (np. 1080 × 1350) — ramkę, pasek, elementy identyfikacji — zostawiając puste
 miejsce tam, gdzie ma wejść zdjęcie.
 
@@ -44,6 +46,13 @@ Praca w panelu (**Szablony → Nowy**):
    - `kształt` — jednolity prostokąt, przydatny jako podkład pod tekst.
 4. **Pliki** — gotowe grafiki, tła i maski. Trafiają do magazynu, szablon zapamiętuje
    tylko klucz.
+
+Warstwy ustawia się **myszą wprost na podglądzie**: przeciągnięcie przesuwa, ciągnięcie
+za róg zmienia rozmiar, strzałki przesuwają o piksel (z Shiftem o dziesięć). Warstwa
+przyciąga się do krawędzi i środka dokumentu oraz do pozostałych warstw. Uchwyty leżą
+nad płótnem, ale rysuje je silnik eksportu — to, co przesuwasz, jest dokładnie tym, co
+wyjdzie w pliku. Pola liczbowe w zakładce Warstwy nadal działają, gdy trzeba wpisać
+dokładną wartość.
 
 Kroje pisma do wyboru przy warstwie tekstowej: klubowy **ZT Talk**, **ZT Talk Expanded**
 oraz trzy kroje systemowe (bezszeryfowy, szeryfowy, o stałej szerokości). Podgląd i eksport

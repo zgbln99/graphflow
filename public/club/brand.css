@@ -134,3 +134,26 @@
 .upload-panel{margin-bottom:1rem;padding:.75rem;border:1px solid var(--tblr-border-color);
   border-radius:var(--tblr-border-radius);background:var(--tblr-bg-surface-secondary)}
 .upload-panel .progress{height:.5rem}
+
+/* Ustawianie warstw myszą wprost na podglądzie.
+   Uchwyty leżą nad płótnem, ale samo płótno rysuje silnik eksportu — dzięki
+   temu to, co się przesuwa, jest dokładnie tym, co wyjdzie w pliku. */
+.preview-stage{position:relative;display:inline-block;max-width:100%;line-height:0}
+.preview-stage canvas{max-width:100%;height:auto;display:block}
+.preview-handles{position:absolute;inset:0}
+.layer-box{position:absolute;border:1px dashed rgba(255,255,255,.35);cursor:move;
+  transition:border-color .1s}
+.layer-box:hover{border-color:rgba(255,255,255,.7)}
+.layer-box.locked{cursor:not-allowed;border-style:dotted;opacity:.5}
+.layer-box.active{border:1px solid var(--tblr-primary);
+  box-shadow:0 0 0 1px rgba(13,143,79,.35), inset 0 0 0 9999px rgba(13,143,79,.08)}
+.layer-box .grip{position:absolute;width:10px;height:10px;background:var(--tblr-primary);
+  border:1px solid #fff;border-radius:2px}
+.layer-box .grip[data-grip="nw"]{left:-5px;top:-5px;cursor:nwse-resize}
+.layer-box .grip[data-grip="ne"]{right:-5px;top:-5px;cursor:nesw-resize}
+.layer-box .grip[data-grip="sw"]{left:-5px;bottom:-5px;cursor:nesw-resize}
+.layer-box .grip[data-grip="se"]{right:-5px;bottom:-5px;cursor:nwse-resize}
+.layer-box .tag{position:absolute;left:0;top:-1.35rem;padding:0 .35rem;font-size:.7rem;
+  line-height:1.2rem;white-space:nowrap;border-radius:3px;
+  background:var(--tblr-primary);color:#fff}
+.preview-guide{position:absolute;background:#ffbf3f;pointer-events:none}

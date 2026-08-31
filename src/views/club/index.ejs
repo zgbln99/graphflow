@@ -709,9 +709,14 @@
                   <div class="card-actions text-secondary small" id="preview-size"></div>
                 </div>
                 <div class="card-body d-flex justify-content-center align-items-start">
-                  <canvas id="template-preview" class="border rounded" style="max-width:100%;height:auto"></canvas>
+                  <div class="preview-stage" id="preview-stage">
+                    <canvas id="template-preview" class="border rounded"></canvas>
+                    <div class="preview-handles" id="preview-handles"></div>
+                  </div>
                 </div>
                 <div class="card-footer text-secondary small">
+                  Przeciągnij warstwę, żeby ją przesunąć; ciągnij za róg, żeby zmienić rozmiar.
+                  Strzałki przesuwają o piksel, z Shiftem o dziesięć.
                   Podgląd rysuje te same warstwy co eksport — różni je tylko skala.
                 </div>
               </div>
