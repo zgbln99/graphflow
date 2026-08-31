@@ -30,15 +30,37 @@ fs.mkdirSync(tmpDir, { recursive: true });
 const templateDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'templates');
 fs.mkdirSync(templateDir, { recursive: true });
 
+const MAX_ASSET_SIZE = 25 * 1024 * 1024;
+
 const uploadTemplateAsset = multer({
   storage: multer.diskStorage({ destination: tmpDir }),
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: MAX_ASSET_SIZE, files: 1 },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
-    if (!allowed.includes(file.mimetype)) return cb(new Error('Dozwolone formaty: PNG, JPG, WEBP, SVG.'));
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new repo.ValidationError('Dozwolone formaty: PNG, JPG, WEBP, SVG.', 'file'));
+    }
     cb(null, true);
   }
 });
+
+/**
+ * Bez tego opakowania błąd multera (za duży plik, zły format) trafiał do
+ * globalnej obsługi jako 500 ze stroną HTML, a formularz nie miał czego pokazać.
+ */
+function receiveTemplateAsset(req, res, next) {
+  uploadTemplateAsset.single('file')(req, res, (error) => {
+    if (!error) return next();
+    if (req.file) fs.unlink(req.file.path, () => {});
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        error: `Plik jest większy niż ${Math.round(MAX_ASSET_SIZE / 1024 / 1024)} MB.`
+      });
+    }
+    return handleRepoError(res, next, error);
+  });
+}
 
 const upload = multer({
   storage: multer.diskStorage({ destination: tmpDir }),
@@ -468,7 +490,7 @@ router.delete('/api/materials/:id', requireAuth, requireRole('admin', 'designer'
  * Plik trafia do magazynu, a szablon zapamiętuje tylko klucz.
  */
 router.post('/api/templates/:id/assets', requireAuth, requireRole('admin', 'designer'),
-  uploadTemplateAsset.single('file'), async (req, res, next) => {
+  receiveTemplateAsset, async (req, res, next) => {
     const file = req.file;
     try {
       if (!file) return res.status(400).json({ success: false, error: 'Nie wybrano pliku.' });

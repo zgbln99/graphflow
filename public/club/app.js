@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-uklad-myszka';
+const APP_BUILD = '2026-08-31-pliki-szablonu';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -829,23 +829,56 @@ assetList?.addEventListener('click', async (event) => {
   } catch (error) { setFormError(templateFormError, error.message); }
 });
 
+const assetError = document.getElementById('asset-error');
+
+/** Wymiary pliku czytamy w przeglądarce — rozjazd z szablonem widać od razu. */
+function imageSize(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => { URL.revokeObjectURL(url); resolve({ w: image.naturalWidth, h: image.naturalHeight }); };
+    image.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    image.src = url;
+  });
+}
+
 document.getElementById('asset-file')?.addEventListener('change', async (event) => {
   const file = event.target.files?.[0];
-  if (!file || !currentTemplate?.id) return;
-  const form = new FormData();
-  form.append('file', file);
-  form.append('kind', document.getElementById('asset-kind').value);
-  setFormError(templateFormError, '');
+  if (!file) return;
+
+  setFormError(assetError, '');
   try {
+    // Plik trzeba do czegoś przypiąć. Zamiast blokować przycisk przy nowym
+    // szablonie — czego nie dało się odróżnić od zepsutego przycisku —
+    // zapisujemy szablon i wgrywamy dalej.
+    if (!currentTemplate?.id) await saveTemplate();
+    if (!currentTemplate?.id) throw new Error('Zapisz najpierw szablon (zakładka Podstawy).');
+
+    const form = new FormData();
+    form.append('file', file);
+    form.append('kind', document.getElementById('asset-kind').value);
+
     const response = await fetch('/api/templates/' + currentTemplate.id + '/assets', { method: 'POST', body: form });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) throw new Error(payload.error || 'Nie udało się wgrać pliku.');
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || `Nie udało się wgrać pliku (HTTP ${response.status}).`);
+    }
+
     currentTemplate.assets = [...(currentTemplate.assets || []), payload.asset];
     renderAssets();
     renderLayerProps();
     refreshPreview();
+
+    const size = await imageSize(file);
+    const width = Number(templateForm.elements.width.value);
+    const height = Number(templateForm.elements.height.value);
+    if (size && (size.w !== width || size.h !== height)) {
+      setFormError(assetError,
+        `Plik ma ${size.w} × ${size.h} px, a szablon ${width} × ${height} px. `
+        + 'Grafika zostanie przeskalowana — dopasuj rozmiar szablonu do pliku albo odwrotnie.');
+    }
   } catch (error) {
-    setFormError(templateFormError, error.message);
+    setFormError(assetError, error.message);
   } finally {
     event.target.value = '';
   }
@@ -1185,8 +1218,7 @@ templateForm?.querySelectorAll('[name=width],[name=height]').forEach((input) => 
   input.addEventListener('input', refreshPreview);
 });
 
-templateForm?.addEventListener('submit', async (event) => {
-  event.preventDefault();
+async function saveTemplate() {
   const id = templateForm.elements.id.value;
   const body = {
     name: templateForm.elements.name.value,
@@ -1195,15 +1227,21 @@ templateForm?.addEventListener('submit', async (event) => {
     height: templateForm.elements.height.value,
     definition: { fields: collectFields(), layers: workingLayers }
   };
+  const { template } = await api(id ? '/api/templates/' + id : '/api/templates', {
+    method: id ? 'PATCH' : 'POST',
+    body: JSON.stringify(body)
+  });
+  await loadTemplates();
+  const full = await api('/api/templates/' + template.id);
+  showTemplateEditor(full.template);
+  return full.template;
+}
+
+templateForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
   setFormError(templateFormError, '');
   try {
-    const { template } = await api(id ? '/api/templates/' + id : '/api/templates', {
-      method: id ? 'PATCH' : 'POST',
-      body: JSON.stringify(body)
-    });
-    await loadTemplates();
-    const full = await api('/api/templates/' + template.id);
-    showTemplateEditor(full.template);
+    await saveTemplate();
   } catch (error) {
     setFormError(templateFormError, error.message);
   }

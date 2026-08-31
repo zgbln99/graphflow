@@ -673,7 +673,7 @@
                         <div class="tab-pane" id="tab-assets">
                           <p class="text-secondary small">
                             Pliki graficzne szablonu: overlay z przezroczystością, tło, maska.
-                            PNG, JPG, WEBP lub SVG, maks. 15 MB.
+                            PNG, JPG, WEBP lub SVG, maks. 25 MB.
                           </p>
                           <div class="btn-list mb-3">
                             <select class="form-select form-select-sm w-auto" id="asset-kind">
@@ -688,6 +688,7 @@
                               <svg class="icon"><use href="#i-upload"></use></svg>Wgraj plik
                             </label>
                           </div>
+                          <div class="alert alert-danger d-none" id="asset-error" role="alert"></div>
                           <div class="row g-2" id="asset-list"></div>
                         </div>
 

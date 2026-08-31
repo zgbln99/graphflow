@@ -45,7 +45,9 @@ Praca w panelu (**Szablony → Nowy**):
      bo herb rywala zmienia się co mecz,
    - `kształt` — jednolity prostokąt, przydatny jako podkład pod tekst.
 4. **Pliki** — gotowe grafiki, tła i maski. Trafiają do magazynu, szablon zapamiętuje
-   tylko klucz.
+   tylko klucz. Wgranie pliku do nowego szablonu zapisuje go po drodze, więc nie trzeba
+   pamiętać o kolejności. Gdy wymiary pliku nie zgadzają się z rozmiarem szablonu,
+   panel to zgłasza — grafika i tak zostanie wgrana, ale przy rysowaniu byłaby skalowana.
 
 Warstwy ustawia się **myszą wprost na podglądzie**: przeciągnięcie przesuwa, ciągnięcie
 za róg zmienia rozmiar, strzałki przesuwają o piksel (z Shiftem o dziesięć). Warstwa
