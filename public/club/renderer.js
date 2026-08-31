@@ -118,6 +118,11 @@
   };
 
   function fontStack(key) {
+    // Czcionka wgrana przez grafika ma rodzinę nazwaną numerem zasobu —
+    // rejestruje ją panel, zanim cokolwiek narysujemy.
+    if (typeof key === 'string' && key.startsWith('asset:')) {
+      return `"zmc-font-${key.slice(6)}", "ZT Talk", sans-serif`;
+    }
     return FONT_STACKS[key] || FONT_STACKS.talk;
   }
 
@@ -127,7 +132,9 @@
     const content = layer.uppercase ? text.toUpperCase() : text;
 
     ctx.fillStyle = layer.color || '#ffffff';
-    ctx.font = `${layer.fontWeight || 700} ${layer.fontSize || 64}px ${fontStack(layer.fontFamily)}`;
+    // Gdy krój nie ma odmiany pochylonej, przeglądarka pochyla go sama.
+    ctx.font = `${layer.italic ? 'italic ' : ''}${layer.fontWeight || 700} `
+      + `${layer.fontSize || 64}px ${fontStack(layer.fontFamily)}`;
     ctx.textBaseline = 'top';
     ctx.textAlign = layer.align === 'center' ? 'center' : (layer.align === 'right' ? 'right' : 'left');
     if ('letterSpacing' in ctx) ctx.letterSpacing = `${layer.letterSpacing || 0}px`;

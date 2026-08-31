@@ -542,7 +542,10 @@
                       <input type="range" class="form-range" id="crop-y" min="-1" max="1" step="0.02" value="0">
                     </div>
                   </div>
-                  <div class="text-secondary small mt-2">Kadr zostaje w obszarze wyznaczonym przez grafika.</div>
+                  <div class="text-secondary small mt-2">
+                    Zdjęcie możesz też przeciągnąć myszą po podglądzie, a kółkiem myszy
+                    je przybliżyć. Kadr zostaje w obszarze wyznaczonym przez grafika.
+                  </div>
                 </div>
               </div>
             </div>
@@ -672,8 +675,10 @@
 
                         <div class="tab-pane" id="tab-assets">
                           <p class="text-secondary small">
-                            Pliki graficzne szablonu: overlay z przezroczystością, tło, maska.
+                            Pliki szablonu: overlay z przezroczystością, tło, maska.
                             PNG, JPG, WEBP lub SVG, maks. 25 MB.
+                            Rodzaj „Czcionka" przyjmuje TTF, OTF i WOFF — raz wgrany krój
+                            jest do wyboru we wszystkich szablonach.
                           </p>
                           <div class="btn-list mb-3">
                             <select class="form-select form-select-sm w-auto" id="asset-kind">
@@ -681,10 +686,11 @@
                               <option value="background">Tło</option>
                               <option value="mask">Maska</option>
                               <option value="image">Obraz</option>
+                              <option value="font">Czcionka</option>
                             </select>
                             <label class="btn btn-sm mb-0">
                               <input type="file" id="asset-file" hidden
-                                     accept="image/png,image/jpeg,image/webp,image/svg+xml">
+                                     accept="image/png,image/jpeg,image/webp,image/svg+xml,.ttf,.otf,.woff,.woff2">
                               <svg class="icon"><use href="#i-upload"></use></svg>Wgraj plik
                             </label>
                           </div>

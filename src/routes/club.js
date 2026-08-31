@@ -36,9 +36,12 @@ const uploadTemplateAsset = multer({
   storage: multer.diskStorage({ destination: tmpDir }),
   limits: { fileSize: MAX_ASSET_SIZE, files: 1 },
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
-    if (!allowed.includes(file.mimetype)) {
-      return cb(new repo.ValidationError('Dozwolone formaty: PNG, JPG, WEBP, SVG.', 'file'));
+    // Czcionki bywają podawane przez przeglądarkę jako typ ogólny, więc
+    // rozpoznajemy je też po rozszerzeniu.
+    const images = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    const isFont = /\.(ttf|otf|woff2?)$/i.test(file.originalname);
+    if (!images.includes(file.mimetype) && !isFont) {
+      return cb(new repo.ValidationError('Dozwolone formaty: PNG, JPG, WEBP, SVG oraz czcionki TTF, OTF, WOFF.', 'file'));
     }
     cb(null, true);
   }
@@ -484,6 +487,16 @@ router.delete('/api/materials/:id', requireAuth, requireRole('admin', 'designer'
 });
 
 /* ------------------------------------------------- pliki szablonów */
+
+/**
+ * Czcionki wgrane przez grafika. Trzymamy je jako pliki szablonów, ale
+ * udostępniamy wszystkim — krój raz wgrany ma być do wyboru wszędzie.
+ */
+router.get('/api/fonts', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, fonts: await repo.listFonts() });
+  } catch (err) { handleRepoError(res, next, err); }
+});
 
 /**
  * Gotowa grafika od grafika: nakładka z przezroczystością, tło albo maska.

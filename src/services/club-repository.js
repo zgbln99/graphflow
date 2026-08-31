@@ -329,7 +329,10 @@ function normalizeLayers(rawLayers, { width, height, fieldKeys }) {
     if (type === 'text') {
       base.color = /^#[0-9a-f]{3,8}$/i.test(layer.color || '') ? layer.color : '#ffffff';
       base.fontSize = Math.round(number(layer.fontSize, 64, 6, 800));
-      base.fontFamily = FONT_KEYS.includes(layer.fontFamily) ? layer.fontFamily : 'talk';
+      base.fontFamily = FONT_KEYS.includes(layer.fontFamily) || String(layer.fontFamily || '').startsWith('asset:')
+        ? layer.fontFamily
+        : 'talk';
+      base.italic = Boolean(layer.italic);
       base.fontWeight = [400, 500, 600, 700].includes(Number(layer.fontWeight)) ? Number(layer.fontWeight) : 700;
       base.align = ALIGNMENTS.includes(layer.align) ? layer.align : 'left';
       base.lineHeight = number(layer.lineHeight, 1.1, 0.6, 3);
@@ -529,6 +532,15 @@ function decorateAsset(asset) {
     metadata: parseJson(asset.metadata, null),
     url: `/api/assets/${asset.id}/file`
   };
+}
+
+/** Czcionki wgrane przy dowolnym szablonie — do wyboru w każdym. */
+async function listFonts() {
+  const rows = await db.query(`
+    SELECT id, template_id, kind, object_key, metadata, created_at
+    FROM cg_template_assets WHERE kind = 'font' ORDER BY id
+  `);
+  return rows.map(decorateAsset);
 }
 
 async function listTemplateAssets(templateId) {
@@ -1285,6 +1297,7 @@ module.exports = {
   FONT_FAMILIES,
   ASSET_KINDS,
   listTemplateAssets,
+  listFonts,
   addTemplateAsset,
   getTemplateAsset,
   deleteTemplateAsset,

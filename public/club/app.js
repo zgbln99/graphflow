@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-pliki-szablonu';
+const APP_BUILD = '2026-08-31-warstwy-kursywa';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -132,7 +132,7 @@ function showView(name) {
   document.querySelector('.page-body')?.scrollTo({ top: 0 });
   if (name === 'social') loadSocialView();
   if (name === 'matches' && !matchesLoaded) loadMatches();
-  if (name === 'templates' && !templates.length) loadTemplates().catch(() => {});
+  if (name === 'templates') { loadFonts(); if (!templates.length) loadTemplates().catch(() => {}); }
   if (name === 'other') loadOtherTemplates().catch(() => {});
   if (name === 'history') loadHistory().catch(() => {});
   if (name === 'library' && !setsLoaded) loadPhotoSets();
@@ -469,6 +469,40 @@ const FIELD_TYPE_LABELS = {
   text: 'Tekst', textarea: 'Tekst wielolinijkowy', number: 'Liczba',
   select: 'Lista wyboru', date: 'Data', photo: 'Zdjęcie'
 };
+/**
+ * Czcionki wgrane przez grafika rejestrujemy w przeglądarce, zanim cokolwiek
+ * narysujemy — inaczej płótno użyłoby zastępczego kroju i podgląd rozjechałby
+ * się z eksportem.
+ */
+let uploadedFonts = [];
+
+async function loadFonts() {
+  try {
+    const payload = await api('/api/fonts');
+    uploadedFonts = payload.fonts;
+
+    await Promise.all(uploadedFonts.map(async (font) => {
+      const family = `zmc-font-${font.id}`;
+      if ([...document.fonts].some((face) => face.family === family)) return;
+      const face = new FontFace(family, `url(${font.url})`);
+      await face.load();
+      document.fonts.add(face);
+    }));
+  } catch (error) {
+    console.error('Nie udało się wczytać czcionek:', error);
+  }
+}
+
+function fontOptions() {
+  return [
+    ...FONT_FAMILIES,
+    ...uploadedFonts.map((font) => ({
+      key: `asset:${font.id}`,
+      label: font.metadata?.originalName?.replace(/\.(ttf|otf|woff2?)$/i, '') || `Czcionka ${font.id}`
+    }))
+  ];
+}
+
 // Kroje pisma do wyboru — te same, które rozpoznaje silnik rysujący.
 const FONT_FAMILIES = [
   { key: 'talk', label: 'ZT Talk (klubowy)' },
@@ -684,7 +718,7 @@ function renderLayerProps() {
         <div class="col-12">
           <label class="form-label small mb-1">Krój pisma</label>
           <select class="form-select form-select-sm" data-l="fontFamily">
-            ${FONT_FAMILIES.map((font) => `<option value="${font.key}"
+            ${fontOptions().map((font) => `<option value="${font.key}"
               ${(layer.fontFamily || 'talk') === font.key ? 'selected' : ''}>${escapeHTML(font.label)}</option>`).join('')}
           </select>
         </div>
@@ -711,6 +745,12 @@ function renderLayerProps() {
           <label class="form-check form-switch mt-4">
             <input class="form-check-input" type="checkbox" data-l="uppercase" ${layer.uppercase ? 'checked' : ''}>
             <span class="form-check-label small">WERSALIKI</span>
+          </label>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-check form-switch mt-4">
+            <input class="form-check-input" type="checkbox" data-l="italic" ${layer.italic ? 'checked' : ''}>
+            <span class="form-check-label small"><em>Kursywa</em></span>
           </label>
         </div>
         <div class="col-12">
@@ -783,7 +823,7 @@ document.getElementById('layer-add')?.addEventListener('click', () => {
     x: 0, y: 0, w: width, h: height, rotation: 0, field: null, asset_id: null
   };
   if (type === 'photo') Object.assign(layer, { fit: 'cover', mask: 'rect', radius: 0 });
-  if (type === 'text') Object.assign(layer, { color: '#ffffff', fontFamily: 'talk', fontSize: 96, fontWeight: 700, align: 'left', lineHeight: 1.1, letterSpacing: 0, uppercase: false, text: '' });
+  if (type === 'text') Object.assign(layer, { color: '#ffffff', fontFamily: 'talk', italic: false, fontSize: 96, fontWeight: 700, align: 'left', lineHeight: 1.1, letterSpacing: 0, uppercase: false, text: '' });
   if (type === 'background' || type === 'shape') Object.assign(layer, { color: type === 'background' ? '#0b0d0d' : '#0d8f4f', radius: 0 });
 
   workingLayers.push(layer);
@@ -865,10 +905,13 @@ document.getElementById('asset-file')?.addEventListener('change', async (event) 
     }
 
     currentTemplate.assets = [...(currentTemplate.assets || []), payload.asset];
+    if (payload.asset.kind === 'font') await loadFonts();
     renderAssets();
     renderLayerProps();
     refreshPreview();
 
+    // Czcionka nie ma wymiarów w pikselach — sprawdzamy je tylko dla grafik.
+    if (payload.asset.kind === 'font') return;
     const size = await imageSize(file);
     const width = Number(templateForm.elements.width.value);
     const height = Number(templateForm.elements.height.value);
@@ -983,37 +1026,72 @@ function snap(value, targets) {
   return best;
 }
 
+/** Warstwy leżące pod kursorem, od wierzchu do spodu. */
+function layersUnder(clientX, clientY) {
+  const rect = previewHandles.getBoundingClientRect();
+  const scale = previewScale();
+  const x = (clientX - rect.left) * scale;
+  const y = (clientY - rect.top) * scale;
+
+  return [...workingLayers]
+    .filter((layer) => layer.visible !== false
+      && x >= layer.x && x <= layer.x + layer.w
+      && y >= layer.y && y <= layer.y + layer.h)
+    .sort((a, b) => b.z - a.z);
+}
+
+function selectLayer(id) {
+  if (selectedLayerId === id) return;
+  selectedLayerId = id;
+  renderLayerList();
+  renderLayerProps();
+  renderLayerHandles();
+}
+
+/**
+ * Jedno zdarzenie obsługuje i wybór warstwy, i przesuwanie.
+ *
+ * Zdjęcie albo nakładka rozciągnięte na cały dokument zasłaniają wszystko pod
+ * spodem, więc samo kliknięcie w ramkę nie wystarcza do wyboru. Rozróżniamy
+ * więc gest: kliknięcie bez ruchu przechodzi do następnej warstwy pod
+ * kursorem (i zapętla się), a przeciągnięcie przesuwa tę już zaznaczoną.
+ */
 previewHandles?.addEventListener('pointerdown', (event) => {
-  const box = event.target.closest('[data-box]');
-  if (!box) return;
+  if (!previewHandles.isConnected) return;
 
-  const layer = workingLayers.find((item) => item.id === box.dataset.box);
-  if (!layer) return;
+  const under = layersUnder(event.clientX, event.clientY);
+  if (!under.length) return;
 
-  if (layer.id !== selectedLayerId) {
-    selectedLayerId = layer.id;
-    renderLayerList();
-    renderLayerProps();
-    renderLayerHandles();
+  const onActive = event.target.closest('[data-box]')?.dataset.box === selectedLayerId;
+  const layer = workingLayers.find((item) => item.id === selectedLayerId);
+
+  // Kliknięcie poza zaznaczoną warstwą wybiera od razu tę na wierzchu.
+  if (!onActive) {
+    selectLayer(under[0].id);
+    return;
   }
-  if (layer.locked) return;
+  if (!layer || layer.locked) return;
 
   const grip = event.target.dataset.grip || null;
   const scale = previewScale();
   const width = Number(templateForm.elements.width.value) || 1080;
   const height = Number(templateForm.elements.height.value) || 1350;
   const from = { pointerX: event.clientX, pointerY: event.clientY, x: layer.x, y: layer.y, w: layer.w, h: layer.h };
+  let moved = false;
 
   event.preventDefault();
   previewHandles.setPointerCapture(event.pointerId);
 
-  /** Wybiera z kandydatów ten, który najmniej rusza warstwę — czyli najbliższy. */
+  /** Wybiera z kandydatów tego, który najmniej rusza warstwę — czyli najbliższego. */
   const closest = (value, candidates) => candidates
     .reduce((best, candidate) => (Math.abs(candidate - value) < Math.abs(best - value) ? candidate : best), value);
 
   const onMove = (move) => {
     const dx = (move.clientX - from.pointerX) * scale;
     const dy = (move.clientY - from.pointerY) * scale;
+    if (Math.abs(move.clientX - from.pointerX) > 2 || Math.abs(move.clientY - from.pointerY) > 2) moved = true;
+    if (!moved) return;
+
     const targets = snapTargets(layer, width, height);
 
     if (!grip) {
@@ -1061,8 +1139,15 @@ previewHandles?.addEventListener('pointerdown', (event) => {
   const onUp = () => {
     previewHandles.removeEventListener('pointermove', onMove);
     previewHandles.removeEventListener('pointerup', onUp);
-    // Pola liczbowe muszą pokazać to, co ustawiła mysz.
-    renderLayerProps();
+
+    if (moved) {
+      // Pola liczbowe muszą pokazać to, co ustawiła mysz.
+      renderLayerProps();
+      return;
+    }
+    // Kliknięcie bez ruchu: przechodzimy do następnej warstwy pod kursorem.
+    const index = under.findIndex((item) => item.id === selectedLayerId);
+    selectLayer(under[(index + 1) % under.length].id);
   };
 
   previewHandles.addEventListener('pointermove', onMove);
@@ -2337,6 +2422,81 @@ ed.pickerGrid?.addEventListener('click', (event) => {
   });
 });
 
+/* ---- kadrowanie zdjęcia myszą ----
+   Suwaki działały, ale nikt nie myśli o kadrze w kategoriach „przesunięcie
+   w poziomie 0,4". Przeciąganie po podglądzie i kółko myszy robią to samo,
+   tylko widać od razu efekt. Suwaki zostają — bywają wygodniejsze do
+   dopieszczenia drobnego przesunięcia. */
+
+function activeCropLayer() {
+  if (!design || !activePhotoField) return null;
+  return (design.template.definition.layers || [])
+    .find((layer) => layer.field === activePhotoField && (layer.type === 'photo' || layer.type === 'logo'));
+}
+
+function applyCrop(changes) {
+  const current = designValues[activePhotoField];
+  if (!current) return;
+
+  const crop = { ...(current.crop || { x: 0, y: 0, zoom: 1 }), ...changes };
+  // Granice pilnuje też renderer, ale bez tego suwaki pokazywałyby wartości
+  // spoza swojego zakresu.
+  crop.zoom = Math.min(Math.max(crop.zoom, 1), 4);
+  crop.x = Math.min(Math.max(crop.x, -1), 1);
+  crop.y = Math.min(Math.max(crop.y, -1), 1);
+  current.crop = crop;
+
+  ed.cropZoom.value = crop.zoom;
+  ed.cropX.value = crop.x;
+  ed.cropY.value = crop.y;
+  dirty = true;
+  scheduleRedraw();
+}
+
+ed.canvas?.addEventListener('pointerdown', (event) => {
+  const layer = activeCropLayer();
+  const value = designValues[activePhotoField];
+  if (!layer || !value) return;
+
+  const rect = ed.canvas.getBoundingClientRect();
+  // Kadr zapisujemy w zakresie -1..1, więc przeciągnięcie przez połowę
+  // szerokości warstwy odpowiada pełnemu wychyleniu.
+  const spanX = (layer.w / design.template.width) * rect.width / 2;
+  const spanY = (layer.h / design.template.height) * rect.height / 2;
+  const from = {
+    pointerX: event.clientX,
+    pointerY: event.clientY,
+    x: value.crop?.x ?? 0,
+    y: value.crop?.y ?? 0
+  };
+
+  event.preventDefault();
+  ed.canvas.setPointerCapture(event.pointerId);
+  ed.canvas.style.cursor = 'grabbing';
+
+  // Obraz ma iść za kursorem, a rosnące przesunięcie odsuwa go w lewo — stąd minus.
+  const onMove = (move) => applyCrop({
+    x: from.x - (move.clientX - from.pointerX) / spanX,
+    y: from.y - (move.clientY - from.pointerY) / spanY
+  });
+
+  const onUp = () => {
+    ed.canvas.removeEventListener('pointermove', onMove);
+    ed.canvas.removeEventListener('pointerup', onUp);
+    ed.canvas.style.cursor = '';
+  };
+
+  ed.canvas.addEventListener('pointermove', onMove);
+  ed.canvas.addEventListener('pointerup', onUp);
+});
+
+ed.canvas?.addEventListener('wheel', (event) => {
+  if (!activeCropLayer() || !designValues[activePhotoField]) return;
+  event.preventDefault();
+  const zoom = designValues[activePhotoField].crop?.zoom || 1;
+  applyCrop({ zoom: zoom * (event.deltaY < 0 ? 1.08 : 1 / 1.08) });
+}, { passive: false });
+
 /* ---- zapis i eksport ---- */
 
 function valuesForServer() {
@@ -2371,6 +2531,32 @@ ed.save?.addEventListener('click', async () => {
   }
 });
 
+/**
+ * Sprawdza, czy zdjęcia użyte w grafice nadal są w magazynie.
+ *
+ * Zdjęcie skasowane po wybraniu nie przerywa rysowania — renderer po prostu
+ * zostawia puste miejsce. Bez tej kontroli dałoby się wyeksportować grafikę
+ * z dziurą i opublikować ją, nie zauważywszy.
+ */
+async function missingPhotos() {
+  const entries = Object.entries(designValues)
+    .filter(([, value]) => value && typeof value === 'object' && value.url);
+
+  const checks = await Promise.all(entries.map(async ([key, value]) => {
+    const ok = await new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve(true);
+      image.onerror = () => resolve(false);
+      image.src = value.url;
+    });
+    if (ok) return null;
+    const field = (design.template.definition.fields || []).find((item) => item.key === key);
+    return field?.label || key;
+  }));
+
+  return checks.filter(Boolean);
+}
+
 /** Rysuje grafikę w natywnej rozdzielczości szablonu i oddaje ją jako PNG. */
 async function renderExportBlob() {
   const canvas = document.createElement('canvas');
@@ -2381,6 +2567,11 @@ async function renderExportBlob() {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Nie udało się przygotować pliku PNG.'))), 'image/png');
   });
+}
+
+function missingPhotosMessage(labels) {
+  return `Nie ma już w magazynie zdjęć dla: ${labels.join(', ')}. `
+    + 'Wybierz je ponownie — inaczej w gotowej grafice zostałoby puste miejsce.';
 }
 
 function exportFileName() {
@@ -2394,6 +2585,8 @@ ed.download?.addEventListener('click', async () => {
   ed.download.disabled = true;
   setEditorError('');
   try {
+    const missing = await missingPhotos();
+    if (missing.length) throw new Error(missingPhotosMessage(missing));
     const blob = await renderExportBlob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -2413,6 +2606,8 @@ ed.export?.addEventListener('click', async () => {
   ed.export.disabled = true;
   setEditorError('');
   try {
+    const missing = await missingPhotos();
+    if (missing.length) throw new Error(missingPhotosMessage(missing));
     if (dirty) {
       await api(`/api/designs/${design.id}`, {
         method: 'PATCH',

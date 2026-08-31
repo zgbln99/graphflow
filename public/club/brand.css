@@ -141,9 +141,12 @@
 .preview-stage{position:relative;display:inline-block;max-width:100%;line-height:0}
 .preview-stage canvas{max-width:100%;height:auto;display:block}
 .preview-handles{position:absolute;inset:0}
-.layer-box{position:absolute;border:1px dashed rgba(255,255,255,.35);cursor:move;
+/* Warstwa na cały dokument (zdjęcie, nakładka) zasłaniałaby wszystkie inne
+   ramki i nie dałoby się kliknąć niczego pod spodem. Chwytać można więc tylko
+   warstwę zaznaczoną; kliknięcie obok przechodzi do następnej pod kursorem. */
+.layer-box{position:absolute;border:1px dashed rgba(255,255,255,.28);pointer-events:none;
   transition:border-color .1s}
-.layer-box:hover{border-color:rgba(255,255,255,.7)}
+.layer-box.active{pointer-events:auto;cursor:move}
 .layer-box.locked{cursor:not-allowed;border-style:dotted;opacity:.5}
 .layer-box.active{border:1px solid var(--tblr-primary);
   box-shadow:0 0 0 1px rgba(13,143,79,.35), inset 0 0 0 9999px rgba(13,143,79,.08)}
@@ -157,3 +160,6 @@
   line-height:1.2rem;white-space:nowrap;border-radius:3px;
   background:var(--tblr-primary);color:#fff}
 .preview-guide{position:absolute;background:#ffbf3f;pointer-events:none}
+
+/* Zdjęcie w edytorze przeciąga się myszą, więc kursor ma to zapowiadać */
+#design-canvas{cursor:grab}
