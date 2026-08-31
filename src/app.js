@@ -45,6 +45,7 @@ app.use(session({
 
 // Pomocnik formatujący dostępny we wszystkich widokach.
 app.locals.fmt = require('./utils/club-format');
+app.locals.asset = require('./utils/asset-version');
 
 app.use((req, res, next) => {
   res.locals.appName = process.env.APP_NAME || 'ZASTAL MARKETING CENTER';
