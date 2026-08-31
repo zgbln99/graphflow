@@ -74,8 +74,11 @@ Jak to działa:
 - **formularz** powstaje z pól szablonu: teksty, liczby, listy wyboru, daty i zdjęcia.
   Aplikacja nie ma żadnych pól wpisanych na stałe.
 - **zdjęcia i logo** wybiera się z magazynu; warstwa typu „logo” może być związana z polem,
-  bo herb rywala zmienia się co mecz. Kadr (przesunięcie i powiększenie) zostaje w obszarze
-  wyznaczonym przez grafika.
+  bo herb rywala zmienia się co mecz. Kadr ustawia się przeciągając zdjęcie po podglądzie
+  i przybliżając kółkiem myszy (suwaki zostają do drobnych poprawek). Kadr zostaje
+  w obszarze wyznaczonym przez grafika.
+- **eksport sprawdza zdjęcia**: jeśli któreś zniknęło z magazynu po wybraniu, panel odmawia
+  zamiast wypuścić grafikę z pustym miejscem.
 - **podgląd** rysuje ten sam silnik, który robi eksport — różni je wyłącznie skala.
 - **eksport** to PNG w natywnej rozdzielczości szablonu (§15): „Pobierz PNG” zapisuje plik
   na dysk, „Eksportuj do magazynu” odkłada go w buckecie i w historii eksportów.
