@@ -495,7 +495,10 @@
                   <div class="card-actions text-secondary small" id="canvas-size">—</div>
                 </div>
                 <div class="card-body d-flex align-items-center justify-content-center bg-dark-lt" id="canvas-stage">
-                  <canvas id="design-canvas" width="540" height="675" class="rounded shadow-sm"></canvas>
+                  <div class="preview-stage design-stage" id="design-stage">
+                    <canvas id="design-canvas" width="540" height="675" class="rounded shadow-sm"></canvas>
+                    <div class="preview-handles" id="design-handles"></div>
+                  </div>
                 </div>
                 <div class="card-footer d-flex align-items-center">
                   <span class="text-secondary small" id="editor-scale">Eksport zawsze w rozdzielczości szablonu</span>
@@ -531,7 +534,7 @@
                 </div>
                 <div class="card-footer d-none" id="picker-crop">
                   <label class="form-label small mb-1">Powiększenie</label>
-                  <input type="range" class="form-range mb-2" id="crop-zoom" min="1" max="3" step="0.05" value="1">
+                  <input type="range" class="form-range mb-2" id="crop-zoom" min="0.1" max="4" step="0.05" value="1">
                   <div class="row g-2">
                     <div class="col">
                       <label class="form-label small mb-1">W poziomie</label>
@@ -543,8 +546,9 @@
                     </div>
                   </div>
                   <div class="text-secondary small mt-2">
-                    Zdjęcie możesz też przeciągnąć myszą po podglądzie, a kółkiem myszy
-                    je przybliżyć. Kadr zostaje w obszarze wyznaczonym przez grafika.
+                    Na podglądzie zdjęcie ma ramkę: środek przeciąga, narożniki skalują
+                    (także na mniejsze niż kadr), a kółko myszy przybliża w miejscu kursora.
+                    Widoczna zostaje tylko część w obszarze wyznaczonym przez grafika.
                   </div>
                 </div>
               </div>

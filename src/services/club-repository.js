@@ -725,7 +725,7 @@ function normalizeDesignValues(template, raw) {
         crop: {
           x: clampCrop(crop.x),
           y: clampCrop(crop.y),
-          zoom: Math.min(Math.max(Number(crop.zoom) || 1, 1), 4)
+          zoom: clampZoom(crop.zoom)
         }
       };
       return;
@@ -765,6 +765,16 @@ function missingRequiredFields(template, values) {
 function clampCrop(value) {
   const number = Number(value) || 0;
   return Math.min(Math.max(number, -1), 1);
+}
+
+/**
+ * Powiększenie zdjęcia w kadrze. Zakres musi być ten sam co w rendererze
+ * (public/club/renderer.js), inaczej serwer przyciąłby kadr ustawiony myszą.
+ * Wartości poniżej 1 są w porządku — zdjęcie wolno zmniejszyć wewnątrz maski.
+ */
+function clampZoom(value) {
+  const number = Number(value);
+  return Math.min(Math.max(Number.isFinite(number) ? number : 1, 0.1), 4);
 }
 
 /**

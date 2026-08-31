@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-kolejnosc-warstw';
+const APP_BUILD = '2026-08-31-kadr-myszka';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -2200,6 +2200,8 @@ const ed = {
   save: document.getElementById('editor-save'),
   savedAt: document.getElementById('editor-saved-at'),
   canvas: document.getElementById('design-canvas'),
+  stage: document.getElementById('design-stage'),
+  handles: document.getElementById('design-handles'),
   size: document.getElementById('canvas-size'),
   scale: document.getElementById('editor-scale'),
   download: document.getElementById('editor-download'),
@@ -2251,6 +2253,8 @@ function scheduleRedraw() {
 async function drawDesign(canvas = ed.canvas, options = {}) {
   if (!design) return;
   await ZmcRenderer.render(canvas, design.template, designValues, design.template.assets || [], options);
+  // Ramki idą po rysowaniu, bo liczą się z tego samego kadru co obrazek na płótnie.
+  if (canvas === ed.canvas) await renderCropHandles();
 }
 
 function fieldControl(field) {
@@ -2306,6 +2310,8 @@ async function openDesign(designId) {
     design = payload.design;
     designValues = { ...design.values };
     dirty = false;
+    activePhotoField = null;
+    photoImages.clear();
 
     ed.name.textContent = design.template.name;
     ed.context.textContent = design.match_id
@@ -2365,8 +2371,11 @@ ed.fields?.addEventListener('click', (event) => {
 
 /* ---- wybór zdjęcia i kadrowanie ---- */
 
+/**
+ * Zamyka listę zdjęć, ale nie odznacza warstwy — ramka na podglądzie ma
+ * zostać, żeby dało się dalej ustawiać kadr myszą przy szerszym płótnie.
+ */
 function closePicker() {
-  activePhotoField = null;
   ed.photos?.classList.add('d-none');
 }
 
@@ -2381,10 +2390,12 @@ async function openPicker(fieldKey) {
   const current = designValues[fieldKey];
   ed.crop.classList.toggle('d-none', !current);
   if (current) {
-    ed.cropZoom.value = current.crop?.zoom ?? 1;
-    ed.cropX.value = current.crop?.x ?? 0;
-    ed.cropY.value = current.crop?.y ?? 0;
+    const crop = ZmcRenderer.clampCrop(current.crop || {});
+    ed.cropZoom.value = crop.zoom;
+    ed.cropX.value = crop.x;
+    ed.cropY.value = crop.y;
   }
+  renderCropHandles();
   if (!pickerSets.length) await loadPickerSets();
   await loadPickerPhotos();
 }
@@ -2484,10 +2495,16 @@ ed.pickerGrid?.addEventListener('click', (event) => {
 });
 
 /* ---- kadrowanie zdjęcia myszą ----
-   Suwaki działały, ale nikt nie myśli o kadrze w kategoriach „przesunięcie
-   w poziomie 0,4". Przeciąganie po podglądzie i kółko myszy robią to samo,
-   tylko widać od razu efekt. Suwaki zostają — bywają wygodniejsze do
-   dopieszczenia drobnego przesunięcia. */
+   Suwaki zostają — bywają wygodniejsze do dopieszczenia drobnego przesunięcia
+   — ale ustawianie zdjęcia to praca oka, nie liczb. Nad podglądem leży więc
+   ramka transformacji jak w Photoshopie: środek przesuwa zdjęcie, narożniki
+   je skalują (także poniżej wielkości kadru), a kliknięcie wybiera kolejne
+   zdjęcie leżące pod kursorem. Rysuje ją silnik eksportu, więc to, co widać
+   w ramce, wychodzi potem w pliku. */
+
+// Rozmiary obrazków są potrzebne w trakcie przeciągania, a wtedy nie ma czasu
+// na czekanie na wczytanie — trzymamy je z ostatniego rysowania ramek.
+const photoImages = new Map();
 
 function activeCropLayer() {
   if (!design || !activePhotoField) return null;
@@ -2495,16 +2512,121 @@ function activeCropLayer() {
     .find((layer) => layer.field === activePhotoField && (layer.type === 'photo' || layer.type === 'logo'));
 }
 
+/** Warstwy zdjęć i logo, które mają już wybrany plik — od spodu do wierzchu. */
+function photoLayers() {
+  if (!design) return [];
+  return (design.template.definition.layers || [])
+    .filter((layer) => (layer.type === 'photo' || layer.type === 'logo')
+      && layer.field && layer.visible !== false && designValues[layer.field]?.url)
+    .sort((a, b) => a.z - b.z);
+}
+
+/** Logo domyślnie mieści się w całości, zdjęcie domyślnie wypełnia kadr. */
+function fitLayer(layer) {
+  return layer.type === 'logo' ? { ...layer, fit: layer.fit || 'contain' } : layer;
+}
+
+/** Ile pikseli szablonu przypada na piksel ekranu. */
+function designScale() {
+  const shown = ed.canvas?.clientWidth || 0;
+  return shown && design ? design.template.width / shown : 1;
+}
+
+/** Prostokąt narysowanego zdjęcia we współrzędnych szablonu. */
+function photoBox(layer) {
+  const image = photoImages.get(layer.field);
+  if (!image) return null;
+  return ZmcRenderer.fitImage(image, fitLayer(layer), designValues[layer.field]?.crop || {});
+}
+
+async function renderCropHandles() {
+  if (!ed.handles) return;
+  if (!design) { ed.handles.innerHTML = ''; return; }
+
+  const layers = photoLayers();
+  await Promise.all(layers.map(async (layer) => {
+    const image = await ZmcRenderer.loadImage(designValues[layer.field].url);
+    if (image) photoImages.set(layer.field, image);
+  }));
+
+  // Bez zaznaczenia pierwsze kliknięcie tylko wybierałoby warstwę — po wejściu
+  // w grafikę bierzemy więc zdjęcie z wierzchu, żeby od razu dało się je ruszać.
+  if (!activePhotoField && layers.length) {
+    activePhotoField = layers[layers.length - 1].field;
+    const crop = ZmcRenderer.clampCrop(designValues[activePhotoField].crop || {});
+    ed.cropZoom.value = crop.zoom;
+    ed.cropX.value = crop.x;
+    ed.cropY.value = crop.y;
+  }
+
+  const scale = designScale();
+  const px = (value) => `${value / scale}px`;
+  const frame = (layer, klass) => `<div class="${klass}" style="left:${px(layer.x)};top:${px(layer.y)};`
+    + `width:${px(layer.w)};height:${px(layer.h)}"></div>`;
+
+  ed.handles.innerHTML = layers.map((layer) => {
+    const box = photoBox(layer);
+    if (!box) return '';
+    const active = layer.field === activePhotoField;
+    return (active ? frame(layer, 'photo-frame') : '')
+      + `<div class="photo-box ${active ? 'active' : ''}" data-field="${escapeHTML(layer.field)}"
+              style="left:${px(box.x)};top:${px(box.y)};width:${px(box.w)};height:${px(box.h)}"></div>`
+      + (active ? gripsFor(layer, box) : '');
+  }).join('');
+}
+
+/**
+ * Uchwyty narożników i podpis warstwy.
+ *
+ * Zdjęcie wypełniające kadr jest zwykle większe od dokumentu, więc jego rogi
+ * wychodzą poza podgląd i nie dałoby się ich złapać. Uchwyt trzymamy więc przy
+ * krawędzi podglądu, choć skalowanie liczy się od prawdziwego rogu — inaczej
+ * właśnie w najczęstszym przypadku nie byłoby czym zmniejszyć zdjęcia.
+ */
+function gripsFor(layer, box) {
+  const scale = designScale();
+  const inset = 9 * scale;                    // uchwyt ma się zmieścić w całości
+  const width = design.template.width;
+  const height = design.template.height;
+  const hold = (value, max) => Math.min(Math.max(value, inset), max - inset);
+  const corner = (grip) => ({
+    x: hold(grip.includes('e') ? box.x + box.w : box.x, width) / scale,
+    y: hold(grip.includes('s') ? box.y + box.h : box.y, height) / scale
+  });
+
+  const nw = corner('nw');
+  return ['nw', 'ne', 'sw', 'se'].map((grip) => {
+    const point = corner(grip);
+    return `<span class="crop-grip" data-grip="${grip}" style="left:${point.x}px;top:${point.y}px"></span>`;
+  }).join('')
+    + `<span class="crop-tag" style="left:${nw.x + 12}px;top:${nw.y - 7}px">`
+    + `${escapeHTML(layer.name || 'Zdjęcie')}</span>`;
+}
+
+/** Zaznacza warstwę zdjęcia bez otwierania listy plików. */
+function selectPhotoField(field) {
+  if (activePhotoField === field) return;
+  activePhotoField = field;
+  const crop = ZmcRenderer.clampCrop(designValues[field]?.crop || {});
+  ed.cropZoom.value = crop.zoom;
+  ed.cropX.value = crop.x;
+  ed.cropY.value = crop.y;
+  if (!ed.photos.classList.contains('d-none')) {
+    const definition = design.template.definition.fields || [];
+    ed.pickerField.textContent = definition.find((item) => item.key === field)?.label || field;
+    ed.crop.classList.remove('d-none');
+    renderPicker();
+  }
+  renderCropHandles();
+}
+
 function applyCrop(changes) {
   const current = designValues[activePhotoField];
   if (!current) return;
 
-  const crop = { ...(current.crop || { x: 0, y: 0, zoom: 1 }), ...changes };
-  // Granice pilnuje też renderer, ale bez tego suwaki pokazywałyby wartości
+  // Granic pilnuje też renderer, ale bez tego suwaki pokazywałyby wartości
   // spoza swojego zakresu.
-  crop.zoom = Math.min(Math.max(crop.zoom, 1), 4);
-  crop.x = Math.min(Math.max(crop.x, -1), 1);
-  crop.y = Math.min(Math.max(crop.y, -1), 1);
+  const crop = ZmcRenderer.clampCrop({ ...(current.crop || {}), ...changes });
   current.crop = crop;
 
   ed.cropZoom.value = crop.zoom;
@@ -2514,49 +2636,125 @@ function applyCrop(changes) {
   scheduleRedraw();
 }
 
-ed.canvas?.addEventListener('pointerdown', (event) => {
+/**
+ * Zmienia powiększenie tak, żeby wskazany punkt zdjęcia został na miejscu.
+ * Tego samego rachunku używa skalowanie narożnikiem (punktem stałym jest wtedy
+ * przeciwległy róg) i kółko myszy (punktem stałym jest kursor).
+ */
+function zoomAround(layer, box, anchorX, anchorY, fromZoom, zoom) {
+  const factor = zoom / fromZoom;
+  const w = box.w * factor;
+  const h = box.h * factor;
+  const x = anchorX - ((anchorX - box.x) / box.w) * w;
+  const y = anchorY - ((anchorY - box.y) / box.h) * h;
+  return {
+    zoom,
+    x: ((x - layer.x - (layer.w - w) / 2) * 2) / layer.w,
+    y: ((y - layer.y - (layer.h - h) / 2) * 2) / layer.h
+  };
+}
+
+/** Punkt kursora we współrzędnych szablonu. */
+function pointerPoint(event) {
+  const rect = ed.handles.getBoundingClientRect();
+  const scale = designScale();
+  return { x: (event.clientX - rect.left) * scale, y: (event.clientY - rect.top) * scale };
+}
+
+/** Warstwy zdjęć pod kursorem, od wierzchu do spodu. */
+function photoLayersUnder(event) {
+  const point = pointerPoint(event);
+  return photoLayers()
+    .filter((layer) => point.x >= layer.x && point.x <= layer.x + layer.w
+      && point.y >= layer.y && point.y <= layer.y + layer.h)
+    .reverse();
+}
+
+ed.handles?.addEventListener('pointerdown', (event) => {
+  if (!design) return;
+  const grip = event.target.dataset.grip || null;
+  const under = photoLayersUnder(event);
+
+  // Kliknięcie poza zaznaczonym zdjęciem wybiera od razu to na wierzchu.
+  let wybrano = false;
+  if (!grip && under.length && !under.some((layer) => layer.field === activePhotoField)) {
+    selectPhotoField(under[0].field);
+    wybrano = true;
+  }
+
   const layer = activeCropLayer();
   const value = designValues[activePhotoField];
-  if (!layer || !value) return;
+  const box = layer ? photoBox(layer) : null;
+  if (!layer || !value || !box) return;
 
-  const rect = ed.canvas.getBoundingClientRect();
-  // Kadr zapisujemy w zakresie -1..1, więc przeciągnięcie przez połowę
-  // szerokości warstwy odpowiada pełnemu wychyleniu.
-  const spanX = (layer.w / design.template.width) * rect.width / 2;
-  const spanY = (layer.h / design.template.height) * rect.height / 2;
+  const scale = designScale();
   const from = {
     pointerX: event.clientX,
     pointerY: event.clientY,
-    x: value.crop?.x ?? 0,
-    y: value.crop?.y ?? 0
+    crop: ZmcRenderer.clampCrop(value.crop || {})
   };
+  let moved = false;
 
   event.preventDefault();
-  ed.canvas.setPointerCapture(event.pointerId);
-  ed.canvas.style.cursor = 'grabbing';
+  ed.handles.setPointerCapture(event.pointerId);
 
-  // Obraz ma iść za kursorem, a rosnące przesunięcie odsuwa go w lewo — stąd minus.
-  const onMove = (move) => applyCrop({
-    x: from.x - (move.clientX - from.pointerX) / spanX,
-    y: from.y - (move.clientY - from.pointerY) / spanY
-  });
+  const onMove = (move) => {
+    const dx = (move.clientX - from.pointerX) * scale;
+    const dy = (move.clientY - from.pointerY) * scale;
+    if (Math.abs(move.clientX - from.pointerX) > 2 || Math.abs(move.clientY - from.pointerY) > 2) moved = true;
+    if (!moved) return;
+
+    if (!grip) {
+      // Przesunięcie zapisujemy w połówkach ramki, więc przeciągnięcie przez
+      // pół szerokości warstwy to pełne wychylenie suwaka.
+      applyCrop({
+        x: from.crop.x + (2 * dx) / layer.w,
+        y: from.crop.y + (2 * dy) / layer.h
+      });
+      return;
+    }
+
+    // Narożnik ciągnie zdjęcie po przekątnej; punktem stałym jest róg naprzeciw.
+    const sx = grip.includes('e') ? 1 : -1;
+    const sy = grip.includes('s') ? 1 : -1;
+    const factor = Math.max(0.02, ((box.w + sx * dx) / box.w + (box.h + sy * dy) / box.h) / 2);
+    const zoom = Math.min(Math.max(from.crop.zoom * factor, ZmcRenderer.CROP.minZoom), ZmcRenderer.CROP.maxZoom);
+    applyCrop(zoomAround(layer, box, sx > 0 ? box.x : box.x + box.w,
+      sy > 0 ? box.y : box.y + box.h, from.crop.zoom, zoom));
+  };
 
   const onUp = () => {
-    ed.canvas.removeEventListener('pointermove', onMove);
-    ed.canvas.removeEventListener('pointerup', onUp);
-    ed.canvas.style.cursor = '';
+    ed.handles.removeEventListener('pointermove', onMove);
+    ed.handles.removeEventListener('pointerup', onUp);
+    ed.handles.style.cursor = '';
+    // Kliknięcie bez ruchu przechodzi do następnego zdjęcia pod kursorem — ale
+    // nie wtedy, gdy to samo kliknięcie dopiero co coś wybrało.
+    if (!moved && !grip && !wybrano && under.length > 1) {
+      const index = under.findIndex((item) => item.field === activePhotoField);
+      selectPhotoField(under[(index + 1) % under.length].field);
+    }
   };
 
-  ed.canvas.addEventListener('pointermove', onMove);
-  ed.canvas.addEventListener('pointerup', onUp);
+  if (!grip) ed.handles.style.cursor = 'grabbing';
+  ed.handles.addEventListener('pointermove', onMove);
+  ed.handles.addEventListener('pointerup', onUp);
 });
 
-ed.canvas?.addEventListener('wheel', (event) => {
-  if (!activeCropLayer() || !designValues[activePhotoField]) return;
+ed.stage?.addEventListener('wheel', (event) => {
+  const layer = activeCropLayer();
+  const box = layer ? photoBox(layer) : null;
+  if (!layer || !box || !designValues[activePhotoField]) return;
+
   event.preventDefault();
-  const zoom = designValues[activePhotoField].crop?.zoom || 1;
-  applyCrop({ zoom: zoom * (event.deltaY < 0 ? 1.08 : 1 / 1.08) });
+  const from = ZmcRenderer.clampCrop(designValues[activePhotoField].crop || {});
+  const zoom = Math.min(Math.max(from.zoom * (event.deltaY < 0 ? 1.08 : 1 / 1.08),
+    ZmcRenderer.CROP.minZoom), ZmcRenderer.CROP.maxZoom);
+  const point = pointerPoint(event);
+  applyCrop(zoomAround(layer, box, point.x, point.y, from.zoom, zoom));
 }, { passive: false });
+
+// Podgląd skaluje się z szerokością okna, więc ramki muszą się przeliczyć.
+window.addEventListener('resize', () => { renderCropHandles(); });
 
 /* ---- zapis i eksport ---- */
 

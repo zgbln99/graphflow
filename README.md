@@ -88,9 +88,14 @@ Jak to działa:
 - **formularz** powstaje z pól szablonu: teksty, liczby, listy wyboru, daty i zdjęcia.
   Aplikacja nie ma żadnych pól wpisanych na stałe.
 - **zdjęcia i logo** wybiera się z magazynu; warstwa typu „logo” może być związana z polem,
-  bo herb rywala zmienia się co mecz. Kadr ustawia się przeciągając zdjęcie po podglądzie
-  i przybliżając kółkiem myszy (suwaki zostają do drobnych poprawek). Kadr zostaje
-  w obszarze wyznaczonym przez grafika.
+  bo herb rywala zmienia się co mecz.
+- **kadr ustawia się myszą** na podglądzie, ramką jak w Photoshopie: środek przesuwa
+  zdjęcie, narożniki skalują, kółko myszy przybliża w miejscu kursora, a kliknięcie
+  wybiera zdjęcie leżące pod kursorem (gdy grafika ma ich kilka). Suwaki zostają do
+  drobnych poprawek. Zdjęcie wolno zmniejszyć poniżej wielkości kadru — nie każde ma
+  wypełniać całą maskę. Uchwyt zdjęcia większego od dokumentu trzyma się krawędzi
+  podglądu, żeby dało się go złapać. Widoczna zostaje tylko część w obszarze
+  wyznaczonym przez grafika.
 - **eksport sprawdza zdjęcia**: jeśli któreś zniknęło z magazynu po wybraniu, panel odmawia
   zamiast wypuścić grafikę z pustym miejscem.
 - **podgląd** rysuje ten sam silnik, który robi eksport — różni je wyłącznie skala.

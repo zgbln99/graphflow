@@ -161,5 +161,24 @@
   background:var(--tblr-primary);color:#fff}
 .preview-guide{position:absolute;background:#ffbf3f;pointer-events:none}
 
-/* Zdjęcie w edytorze przeciąga się myszą, więc kursor ma to zapowiadać */
-#design-canvas{cursor:grab}
+/* Ramka transformacji zdjęcia w edytorze grafiki.
+   Pokazuje cały obrazek, także tę część, która wychodzi poza maskę — inaczej
+   nie dałoby się złapać narożnika zdjęcia większego od kadru. Stąd przycięcie
+   sceny: ramka nie ma prawa wyjść poza podgląd. */
+.design-stage{overflow:hidden;cursor:grab}
+.design-stage .preview-handles{cursor:grab}
+.photo-box{position:absolute;pointer-events:none;border:1px dashed rgba(255,255,255,.35)}
+.photo-box.active{border:1px solid var(--tblr-primary);
+  box-shadow:0 0 0 1px rgba(13,143,79,.35)}
+/* Podpis warstwy trzymamy przy uchwycie, a nie nad ramką: ramka zdjęcia
+   większego od kadru zaczyna się poza podglądem i podpis byłby niewidoczny. */
+.crop-tag{position:absolute;padding:0 .35rem;font-size:.7rem;line-height:1.2rem;
+  white-space:nowrap;border-radius:3px;pointer-events:none;
+  background:var(--tblr-primary);color:#fff}
+.crop-grip{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;pointer-events:auto;
+  background:var(--tblr-primary);border:2px solid #fff;border-radius:3px;
+  box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.crop-grip[data-grip="nw"],.crop-grip[data-grip="se"]{cursor:nwse-resize}
+.crop-grip[data-grip="ne"],.crop-grip[data-grip="sw"]{cursor:nesw-resize}
+/* Maska grafika — poza nią zdjęcia nie widać, więc warto ją zaznaczyć. */
+.photo-frame{position:absolute;pointer-events:none;border:1px dashed rgba(255,191,63,.75)}

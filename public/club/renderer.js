@@ -83,25 +83,43 @@
   }
 
   /**
-   * Wpasowuje obrazek w obszar warstwy. Zwraca prostokąt źródłowy i docelowy
-   * z uwzględnieniem kadrowania użytkownika (przesunięcie i powiększenie),
-   * które zawsze zostaje w obrębie maski wyznaczonej przez grafika (§11).
+   * Zakres kadru. Powiększenie liczymy względem wpasowania w ramkę, więc 1 to
+   * „dokładnie na maskę". Poniżej jedynki zdjęcie robi się mniejsze od maski —
+   * i tak ma być, bo nie każde zdjęcie ma wypełniać cały kadr.
+   */
+  const CROP = { minZoom: 0.1, maxZoom: 4 };
+
+  function clampCrop(crop = {}) {
+    const between = (value, min, max, fallback) => {
+      const number = Number(value);
+      return Math.min(Math.max(Number.isFinite(number) ? number : fallback, min), max);
+    };
+    return {
+      zoom: between(crop.zoom, CROP.minZoom, CROP.maxZoom, 1),
+      x: between(crop.x, -1, 1, 0),
+      y: between(crop.y, -1, 1, 0)
+    };
+  }
+
+  /**
+   * Wpasowuje obrazek w obszar warstwy. Zwraca prostokąt docelowy
+   * z uwzględnieniem kadrowania użytkownika (przesunięcie i powiększenie);
+   * widoczna zostaje i tak tylko część w masce wyznaczonej przez grafika (§11).
    */
   function fitImage(image, layer, crop) {
-    const zoom = Math.max(1, Number(crop.zoom) || 1);
+    const { zoom, x, y } = clampCrop(crop);
     const scale = (layer.fit === 'contain'
       ? Math.min(layer.w / image.width, layer.h / image.height)
       : Math.max(layer.w / image.width, layer.h / image.height)) * zoom;
 
     const drawWidth = image.width * scale;
     const drawHeight = image.height * scale;
-    // Przesunięcie w zakresie -1..1 mapujemy na nadmiar obrazu poza maską.
-    const offsetX = ((Number(crop.x) || 0) * (drawWidth - layer.w)) / 2;
-    const offsetY = ((Number(crop.y) || 0) * (drawHeight - layer.h)) / 2;
-
+    // Przesunięcie -1..1 liczymy w połówkach ramki, a nie w nadmiarze obrazu
+    // poza nią — inaczej przy zdjęciu mniejszym od maski kierunek by się
+    // odwracał, a przy zdjęciu równym masce przesuwanie nic by nie dawało.
     return {
-      x: layer.x + (layer.w - drawWidth) / 2 - offsetX,
-      y: layer.y + (layer.h - drawHeight) / 2 - offsetY,
+      x: layer.x + (layer.w - drawWidth) / 2 + (x * layer.w) / 2,
+      y: layer.y + (layer.h - drawHeight) / 2 + (y * layer.h) / 2,
       w: drawWidth,
       h: drawHeight
     };
@@ -272,5 +290,5 @@
     ctx.restore();
   }
 
-  global.ZmcRenderer = { render, loadImage };
+  global.ZmcRenderer = { render, loadImage, fitImage, clampCrop, CROP };
 })(window);
