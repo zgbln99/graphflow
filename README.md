@@ -116,6 +116,23 @@ Ustawienia w `.env` (na VPS: `/opt/club-graphics/.env`, nigdy w repozytorium):
 Po zmianie `.env` konieczny jest restart procesu: `pm2 restart zastal-marketing-center`.
 Poprawność konfiguracji sprawdza przycisk **Testuj połączenie** w Ustawieniach.
 
+**Wszystko leży w buckecie**: zdjęcia meczowe, nakładki szablonów, pliki źródłowe PSD,
+eksporty i logo klubu. Serwer aplikacji nie trzyma żadnych plików użytkownika — poza
+katalogiem przelotowym, z którego plik znika po wysłaniu do magazynu.
+
+| Co | Gdzie w buckecie |
+| --- | --- |
+| zdjęcia meczowe | `2026-27/kolejka-1/2026-10-04-dziki-zastal/` |
+| zdjęcia spoza kalendarza | `2026-27/poza-meczem/` |
+| nakładki i pliki źródłowe szablonów | `szablony/{id}/` |
+| eksporty grafik | `eksporty/{data}/` |
+| logo klubu | `branding/` |
+
+Pliki, których używa płótno (nakładki szablonów, zdjęcia w edytorze), podaje sama
+aplikacja spod własnego adresu — obraz z obcej domeny „zatruwa" płótno i uniemożliwia
+zapisanie gotowej grafiki do pliku. Podglądy w siatce zdjęć idą prosto z magazynu
+podpisanym adresem, bo tam eksportu nie ma.
+
 Jak to działa w panelu (zakładka „Zdjęcia”):
 
 - **zdjęcia należą do meczu** — bez podziału na fotografa, wybrane czy archiwum.

@@ -22,19 +22,17 @@ const db = Database.getInstance();
 const brandingDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'branding');
 fs.mkdirSync(brandingDir, { recursive: true });
 
-// Pliki szablonów (overlay, tła, maski) — docelowo trafią do magazynu S3,
-// na razie leżą lokalnie i są serwowane statycznie jak logo klubu.
+// Katalog przelotowy: pliki leżą tu tylko na czas strumieniowania do bucketa.
+const tmpDir = path.join(os.tmpdir(), 'zmc-uploads');
+fs.mkdirSync(tmpDir, { recursive: true });
+
+// Pliki szablonów sprzed przeniesienia do magazynu leżą jeszcze tutaj —
+// katalog zostaje, żeby stare szablony dalej się rysowały.
 const templateDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'templates');
 fs.mkdirSync(templateDir, { recursive: true });
 
 const uploadTemplateAsset = multer({
-  storage: multer.diskStorage({
-    destination: templateDir,
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase().slice(0, 10);
-      cb(null, `tpl-${req.params.id}-${Date.now()}${ext}`);
-    }
-  }),
+  storage: multer.diskStorage({ destination: tmpDir }),
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
@@ -44,13 +42,7 @@ const uploadTemplateAsset = multer({
 });
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: brandingDir,
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `logo-${Date.now()}${ext}`);
-    }
-  }),
+  storage: multer.diskStorage({ destination: tmpDir }),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
@@ -108,7 +100,7 @@ async function getSetting(key, fallback = null) {
 
 async function getBranding() {
   return {
-    logoUrl: await getSetting('brand_logo_url'),
+    logoUrl: brandingLogoUrl(await getSetting('brand_logo_url')),
     // Nazwa klubu służy do wyróżnienia naszej drużyny w parze meczowej.
     clubName: await getSetting('club_name', 'Zastal')
   };
@@ -185,21 +177,75 @@ router.post('/logout', requireAuth, (req, res, next) => {
   });
 });
 
+/**
+ * Logo klubu leży w magazynie razem z resztą plików. W bazie zapisujemy klucz
+ * z przedrostkiem „s3:", a przeglądarce podajemy adres naszej trasy — dzięki
+ * temu bucket zostaje prywatny, a ekran logowania i tak pokazuje logo.
+ */
+function brandingLogoUrl(settingValue) {
+  if (!settingValue) return null;
+  return settingValue.startsWith('s3:') ? '/branding/logo' : settingValue;
+}
+
+async function removeOldLogo(settingValue) {
+  if (!settingValue) return;
+  if (settingValue.startsWith('s3:')) {
+    await storage.deleteObject(settingValue.slice(3)).catch(() => {});
+    return;
+  }
+  if (settingValue.startsWith('/uploads/branding/')) {
+    const oldPath = path.join(brandingDir, path.basename(settingValue));
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+}
+
+/**
+ * Logo pokazuje się także na ekranie logowania, więc trasa jest dostępna bez
+ * sesji. Trzymamy plik w pamięci procesu — to jeden mały obrazek, a bez tego
+ * każde wejście na stronę logowania pukałoby do magazynu.
+ */
+let logoCache = null;
+
+router.get('/branding/logo', async (req, res, next) => {
+  try {
+    const value = await getSetting('brand_logo_url');
+    if (!value?.startsWith('s3:')) return res.status(404).end();
+
+    const key = value.slice(3);
+    if (!logoCache || logoCache.key !== key) {
+      const object = await storage.getObjectStream(key);
+      const chunks = [];
+      for await (const chunk of object.body) chunks.push(chunk);
+      logoCache = {
+        key,
+        body: Buffer.concat(chunks),
+        contentType: object.contentType || storage.contentTypeFor(key)
+      };
+    }
+
+    res.set({ 'Content-Type': logoCache.contentType, 'Cache-Control': 'public, max-age=300' });
+    res.end(logoCache.body);
+  } catch (err) { next(err); }
+});
+
 router.post('/admin/branding/logo', requireAuth, requireAdmin, upload.single('logo'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'Nie wybrano pliku.' });
 
-    const logoUrl = `/uploads/branding/${req.file.filename}`;
+    const key = `${storage.PREFIXES.branding}${Date.now().toString(36)}-${storage.safeFileName(req.file.originalname)}`;
+    await storage.putObject(key, fs.createReadStream(req.file.path), {
+      contentType: req.file.mimetype,
+      contentLength: req.file.size
+    });
+
+    // W bazie trzymamy klucz w magazynie; adres do wyświetlenia składa getBranding().
+    const logoUrl = `s3:${key}`;
     const current = await db.fetch(
       'SELECT setting_value FROM cg_settings WHERE setting_key = ? LIMIT 1',
       ['brand_logo_url']
     );
 
-    if (current?.setting_value?.startsWith('/uploads/branding/')) {
-      const oldFile = path.basename(current.setting_value);
-      const oldPath = path.join(brandingDir, oldFile);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
+    await removeOldLogo(current?.setting_value);
 
     await db.query(
       `INSERT INTO cg_settings (setting_key, setting_value)
@@ -208,9 +254,12 @@ router.post('/admin/branding/logo', requireAuth, requireAdmin, upload.single('lo
       ['brand_logo_url', logoUrl]
     );
 
-    res.json({ success: true, logoUrl });
+    logoCache = null;
+    res.json({ success: true, logoUrl: brandingLogoUrl(logoUrl) });
   } catch (err) {
-    next(err);
+    handleRepoError(res, next, err);
+  } finally {
+    if (req.file) fs.unlink(req.file.path, () => {});
   }
 });
 
@@ -221,10 +270,8 @@ router.delete('/admin/branding/logo', requireAuth, requireAdmin, async (req, res
       ['brand_logo_url']
     );
 
-    if (current?.setting_value?.startsWith('/uploads/branding/')) {
-      const oldPath = path.join(brandingDir, path.basename(current.setting_value));
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
+    await removeOldLogo(current?.setting_value);
+    logoCache = null;
 
     await db.query(
       'UPDATE cg_settings SET setting_value = NULL WHERE setting_key = ?',
@@ -429,19 +476,13 @@ async function createTemplateWithFreeName(payload, userId) {
 router.post('/api/templates/import-psd', requireAuth, requireRole('admin', 'designer'),
   receivePsd, async (req, res, next) => {
     const file = req.file;
-    let assetPath = null;
+    const uploadedKeys = [];
     try {
       if (!file) return res.status(400).json({ success: false, error: 'Nie wybrano pliku PSD.' });
 
       const parsed = psdImport.importTemplate(fs.readFileSync(file.path), {
         name: req.body.name || path.basename(file.originalname, path.extname(file.originalname))
       });
-
-      // Nakładka leży lokalnie obok pozostałych plików szablonów: płótno musi
-      // pobrać ją z naszej domeny, żeby dało się wyeksportować gotową grafikę.
-      const assetFile = `psd-${Date.now().toString(36)}.png`;
-      assetPath = path.join(templateDir, assetFile);
-      fs.writeFileSync(assetPath, parsed.composite);
 
       // Nazwę bierzemy z pliku, więc kolizja nie jest winą użytkownika —
       // dokładamy numer zamiast odsyłać go z błędem.
@@ -453,9 +494,32 @@ router.post('/api/templates/import-psd', requireAuth, requireRole('admin', 'desi
         definition: parsed.definition
       }, req.session.user.id);
 
+      const stamp = Date.now().toString(36);
+      const overlayKey = `${storage.PREFIXES.templates}${template.id}/${stamp}-grafika.png`;
+      await storage.putObject(overlayKey, parsed.composite, {
+        contentType: 'image/png',
+        contentLength: parsed.composite.length
+      });
+      uploadedKeys.push(overlayKey);
+
+      // Plik źródłowy zostaje w magazynie — bez niego powrót do oryginału
+      // znaczyłby szukanie po dyskach grafika.
+      const sourceKey = `${storage.PREFIXES.templates}${template.id}/${stamp}-${storage.safeFileName(file.originalname)}`;
+      await storage.putObject(sourceKey, fs.createReadStream(file.path), {
+        contentType: 'image/vnd.adobe.photoshop',
+        contentLength: file.size
+      });
+      uploadedKeys.push(sourceKey);
+
+      await repo.addTemplateAsset(template.id, {
+        kind: 'source',
+        objectKey: sourceKey,
+        metadata: { originalName: file.originalname, size: file.size }
+      });
+
       const asset = await repo.addTemplateAsset(template.id, {
         kind: 'overlay',
-        objectKey: `/uploads/templates/${assetFile}`,
+        objectKey: overlayKey,
         metadata: { source: 'psd', originalName: file.originalname }
       });
 
@@ -466,11 +530,12 @@ router.post('/api/templates/import-psd', requireAuth, requireRole('admin', 'desi
           ? { ...layer, asset_id: asset.id }
           : layer))
       };
-      const saved = await repo.updateTemplate(template.id, { definition });
+      await repo.updateTemplate(template.id, { definition });
 
       res.status(201).json({
         success: true,
-        template: saved,
+        // Z zasobami, żeby podgląd zaraz po imporcie pokazał grafikę, a nie ramkę „brak pliku".
+        template: await repo.getTemplate(template.id, { withAssets: true }),
         warnings: parsed.warnings,
         summary: {
           fields: parsed.definition.fields.length,
@@ -478,7 +543,8 @@ router.post('/api/templates/import-psd', requireAuth, requireRole('admin', 'desi
         }
       });
     } catch (err) {
-      if (assetPath) fs.unlink(assetPath, () => {});
+      // Nieudany import nie ma zostawiać śmieci w magazynie.
+      uploadedKeys.forEach((key) => storage.deleteObject(key).catch(() => {}));
       if (err instanceof psdImport.PsdImportError) {
         return res.status(err.status).json({ success: false, error: err.message, hint: err.hint });
       }
@@ -490,25 +556,62 @@ router.post('/api/templates/import-psd', requireAuth, requireRole('admin', 'desi
 
 router.post('/api/templates/:id/assets', requireAuth, requireRole('admin', 'designer'),
   uploadTemplateAsset.single('file'), async (req, res, next) => {
+    const file = req.file;
     try {
-      if (!req.file) return res.status(400).json({ success: false, error: 'Nie wybrano pliku.' });
+      if (!file) return res.status(400).json({ success: false, error: 'Nie wybrano pliku.' });
+
+      const key = `${storage.PREFIXES.templates}${Number(req.params.id)}`
+        + `/${Date.now().toString(36)}-${storage.safeFileName(file.originalname)}`;
+      await storage.putObject(key, fs.createReadStream(file.path), {
+        contentType: file.mimetype,
+        contentLength: file.size
+      });
+
       const asset = await repo.addTemplateAsset(req.params.id, {
         kind: req.body.kind || 'overlay',
-        objectKey: `/uploads/templates/${req.file.filename}`,
-        metadata: { originalName: req.file.originalname, size: req.file.size }
+        objectKey: key,
+        metadata: { originalName: file.originalname, size: file.size }
       });
       res.status(201).json({ success: true, asset });
     } catch (err) {
-      if (req.file) fs.unlink(path.join(templateDir, req.file.filename), () => {});
       handleRepoError(res, next, err);
+    } finally {
+      if (file) fs.unlink(file.path, () => {});
     }
   });
+
+/**
+ * Plik szablonu podany z naszej domeny. Tak samo jak przy zdjęciach: płótno
+ * musi dostać obraz z tego samego adresu, inaczej nie da się go wyeksportować.
+ * Starsze pliki leżą jeszcze lokalnie — obsługujemy oba źródła.
+ */
+router.get('/api/assets/:id/file', requireAuth, async (req, res, next) => {
+  try {
+    const asset = await repo.getTemplateAsset(req.params.id);
+    if (!asset) return res.status(404).send('Nie znaleziono pliku.');
+
+    if (asset.object_key.startsWith('/uploads/')) {
+      return res.sendFile(path.join(__dirname, '..', '..', 'public', asset.object_key.replace(/^\//, '')));
+    }
+
+    const object = await storage.getObjectStream(asset.object_key);
+    res.set({
+      'Content-Type': object.contentType || storage.contentTypeFor(asset.object_key),
+      'Cache-Control': 'private, max-age=3600',
+      ...(object.contentLength ? { 'Content-Length': object.contentLength } : {})
+    });
+    object.body.on('error', next);
+    object.body.pipe(res);
+  } catch (err) { handleRepoError(res, next, err); }
+});
 
 router.delete('/api/assets/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
   try {
     const asset = await repo.deleteTemplateAsset(req.params.id);
     if (asset.object_key.startsWith('/uploads/templates/')) {
       fs.unlink(path.join(templateDir, path.basename(asset.object_key)), () => {});
+    } else {
+      await storage.deleteObject(asset.object_key).catch(() => {});
     }
     res.json({ success: true });
   } catch (err) { handleRepoError(res, next, err); }
@@ -522,15 +625,11 @@ router.delete('/api/assets/:id', requireAuth, requireRole('admin', 'designer'), 
 const MAX_UPLOAD_BATCH = 20;
 const MAX_PHOTO_SIZE = 60 * 1024 * 1024;
 
-// Katalog przelotowy: plik leży tu tylko na czas strumieniowania do bucketa.
-const photoTmpDir = path.join(os.tmpdir(), 'zmc-uploads');
-fs.mkdirSync(photoTmpDir, { recursive: true });
-
 // Pliki PSD bywają duże — czytamy je z dysku, nigdy do pamięci procesu naraz.
 const MAX_PSD_SIZE = 300 * 1024 * 1024;
 
 const uploadPsd = multer({
-  storage: multer.diskStorage({ destination: photoTmpDir }),
+  storage: multer.diskStorage({ destination: tmpDir }),
   limits: { fileSize: MAX_PSD_SIZE, files: 1 },
   fileFilter: (req, file, cb) => {
     if (!/\.psd$/i.test(file.originalname)) {
@@ -559,7 +658,7 @@ const EXPORT_PREFIX = 'eksporty/';
 const MAX_EXPORT_SIZE = 40 * 1024 * 1024;
 
 const uploadExport = multer({
-  storage: multer.diskStorage({ destination: photoTmpDir }),
+  storage: multer.diskStorage({ destination: tmpDir }),
   limits: { fileSize: MAX_EXPORT_SIZE, files: 1 }
 });
 
@@ -575,7 +674,7 @@ function receiveExport(req, res, next) {
 }
 
 const uploadPhotos = multer({
-  storage: multer.diskStorage({ destination: photoTmpDir }),
+  storage: multer.diskStorage({ destination: tmpDir }),
   limits: { fileSize: MAX_PHOTO_SIZE, files: MAX_UPLOAD_BATCH },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp'];

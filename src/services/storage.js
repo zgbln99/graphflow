@@ -340,7 +340,16 @@ async function presignDownload(key, { expiresIn = DOWNLOAD_URL_TTL, download = f
   }
 }
 
+/** Katalogi w buckecie — jedno miejsce, żeby nie rozjechały się między trasami. */
+const PREFIXES = {
+  photos: '',            // zdjęcia meczowe mają własną ścieżkę z sezonu i meczu
+  templates: 'szablony/',
+  exports: 'eksporty/',
+  branding: 'branding/'
+};
+
 module.exports = {
+  PREFIXES,
   StorageError,
   isConfigured,
   getStorageStatus,

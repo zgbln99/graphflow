@@ -485,13 +485,29 @@ async function deleteTemplate(id) {
 
 /* ------------------------------------------------- zasoby szablonów */
 
-const ASSET_KINDS = ['overlay', 'background', 'mask', 'font', 'image'];
+// „source" to plik źródłowy szablonu (PSD) — trzymamy go razem z resztą,
+// żeby dało się wrócić do oryginału bez szukania po dyskach grafika.
+const ASSET_KINDS = ['overlay', 'background', 'mask', 'font', 'image', 'source'];
+
+/**
+ * Pliki szablonu podajemy pod adresem naszej aplikacji, a nie magazynu:
+ * obraz z obcej domeny „zatruwa" płótno i uniemożliwia eksport do pliku.
+ */
+function decorateAsset(asset) {
+  if (!asset) return null;
+  return {
+    ...asset,
+    metadata: parseJson(asset.metadata, null),
+    url: `/api/assets/${asset.id}/file`
+  };
+}
 
 async function listTemplateAssets(templateId) {
-  return db.query(`
+  const rows = await db.query(`
     SELECT id, template_id, kind, object_key, metadata, created_at
     FROM cg_template_assets WHERE template_id = ? ORDER BY id
   `, [Number(templateId)]);
+  return rows.map(decorateAsset);
 }
 
 async function addTemplateAsset(templateId, { kind, objectKey, metadata = null }) {
@@ -505,7 +521,9 @@ async function addTemplateAsset(templateId, { kind, objectKey, metadata = null }
     object_key: objectKey,
     metadata: metadata ? JSON.stringify(metadata) : null
   });
-  return db.fetch('SELECT id, template_id, kind, object_key, metadata FROM cg_template_assets WHERE id = ?', [id]);
+  return decorateAsset(await db.fetch(
+    'SELECT id, template_id, kind, object_key, metadata FROM cg_template_assets WHERE id = ?', [id]
+  ));
 }
 
 async function getTemplateAsset(id) {

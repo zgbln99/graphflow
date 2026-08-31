@@ -48,7 +48,10 @@
   function collectSources(template, values, assetsById) {
     const sources = [];
     (template.definition.layers || []).forEach((layer) => {
-      if (layer.asset_id && assetsById[layer.asset_id]) sources.push(assetsById[layer.asset_id].object_key);
+      if (layer.asset_id && assetsById[layer.asset_id]) {
+        const asset = assetsById[layer.asset_id];
+        sources.push(asset.url || asset.object_key);
+      }
       if ((layer.type === 'photo' || layer.type === 'logo') && layer.field) {
         const { url } = photoValue(values[layer.field]);
         if (url) sources.push(url);
@@ -191,7 +194,7 @@
       }
 
       const asset = layer.asset_id ? assetsById[layer.asset_id] : null;
-      const assetImage = asset ? await loadImage(asset.object_key) : null;
+      const assetImage = asset ? await loadImage(asset.url || asset.object_key) : null;
 
       if (layer.type === 'background') {
         if (assetImage) {

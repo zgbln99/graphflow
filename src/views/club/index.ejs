@@ -580,6 +580,13 @@
                   </div>
                 </div>
                 <div class="card-body py-2 d-none" id="template-psd-status"></div>
+                <div class="card-body py-2 d-none" id="template-psd-progress">
+                  <div class="d-flex align-items-center mb-2">
+                    <span class="flex-fill text-truncate" id="psd-label">Wysyłam plik…</span>
+                    <span class="text-secondary ms-2" id="psd-percent"></span>
+                  </div>
+                  <div class="progress"><div class="progress-bar" id="psd-bar" style="width:0%"></div></div>
+                </div>
                 <div class="list-group list-group-flush" id="template-list"></div>
                 <div class="card-body text-secondary d-none" id="template-list-empty">
                   Nie ma jeszcze żadnego szablonu.
@@ -799,8 +806,15 @@
                 </div>
 
                 <div class="card-body" id="library-dropzone">
-                  <div class="progress mb-3 d-none" id="library-progress">
-                    <div class="progress-bar progress-bar-indeterminate"></div>
+                  <div class="upload-panel d-none" id="library-progress">
+                    <div class="d-flex align-items-center mb-2">
+                      <span class="flex-fill text-truncate" id="upload-label">Przygotowuję wysyłkę…</span>
+                      <span class="text-secondary ms-2" id="upload-count"></span>
+                    </div>
+                    <div class="progress">
+                      <div class="progress-bar" id="upload-bar" style="width:0%"></div>
+                    </div>
+                    <div class="text-secondary small mt-2" id="upload-file"></div>
                   </div>
                   <div class="alert alert-danger d-none" id="library-error" role="alert"></div>
                   <div class="text-secondary" id="library-empty">Wybierz mecz, żeby zobaczyć zdjęcia.</div>

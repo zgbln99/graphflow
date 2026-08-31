@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-zdjecia-2';
+const APP_BUILD = '2026-08-31-magazyn-5';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -602,7 +602,7 @@ function renderLayerProps() {
     .join('');
 
   const assetOptions = (currentTemplate?.assets || [])
-    .map((asset) => `<option value="${asset.id}" ${Number(layer.asset_id) === asset.id ? 'selected' : ''}>${escapeHTML(asset.kind)} · ${escapeHTML(asset.object_key.split('/').pop())}</option>`)
+    .map((asset) => `<option value="${asset.id}" ${Number(layer.asset_id) === asset.id ? 'selected' : ''}>${escapeHTML(asset.kind)} · ${escapeHTML(asset.metadata?.originalName || asset.object_key.split('/').pop())}</option>`)
     .join('');
 
   layerProps.innerHTML = `
@@ -775,10 +775,10 @@ function renderAssets() {
   assetList.innerHTML = assets.length ? assets.map((asset) => `
     <div class="col-6 col-md-4">
       <div class="card card-sm">
-        <div class="thumb-1610" style="background-image:url('${escapeHTML(asset.object_key)}');background-size:contain;background-position:center;background-repeat:no-repeat"></div>
+        <div class="thumb-1610" style="background-image:url('${escapeHTML(asset.url || asset.object_key)}');background-size:contain;background-position:center;background-repeat:no-repeat"></div>
         <div class="card-body p-2 d-flex align-items-center">
           <div class="flex-fill text-truncate">
-            <div class="text-truncate small">${escapeHTML(asset.object_key.split('/').pop())}</div>
+            <div class="text-truncate small">${escapeHTML(asset.metadata?.originalName || asset.object_key.split('/').pop())}</div>
             <div class="text-secondary small">${escapeHTML(asset.kind)}</div>
           </div>
           <button class="btn btn-icon btn-sm" type="button" data-asset-delete="${asset.id}" aria-label="Usuń plik">${icon('trash')}</button>
@@ -844,12 +844,14 @@ async function drawPreview() {
   previewCanvas.height = Math.round(height * scale);
   document.getElementById('preview-size').textContent = `${width} × ${height} px`;
 
-  // Wartości podglądowe: etykiety pól tekstowych, żeby grafik widział rozmieszczenie.
-  // Pola zdjęć zostają puste — wtedy renderer rysuje obrys maski wyznaczonej przez grafika.
+  // Wartości podglądowe pokazują rozmieszczenie, więc muszą być krótkie —
+  // pełne etykiety zawijały się i nachodziły na sąsiednie warstwy.
+  // Pola zdjęć zostają puste: renderer rysuje wtedy obrys maski od grafika.
   const values = {};
   collectFields().forEach((field) => {
     if (field.type === 'photo') return;
-    values[field.key] = field.default || field.label;
+    if (field.default) { values[field.key] = field.default; return; }
+    values[field.key] = field.type === 'number' ? '00' : field.label.split(' ')[0];
   });
 
   await window.ZmcRenderer.render(
@@ -1603,20 +1605,31 @@ function plural(count, one, few, many) {
 
 const UPLOAD_BATCH = 5;
 
-function setUploadProgress(done, total) {
+/** Rozmiar pliku po ludzku: 640 kB zamiast „0.6 MB", 12,4 MB zamiast 13002342. */
+function fileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
+  return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+}
+
+const uploadUi = {
+  label: document.getElementById('upload-label'),
+  count: document.getElementById('upload-count'),
+  bar: document.getElementById('upload-bar'),
+  file: document.getElementById('upload-file')
+};
+
+/** Pokazuje, na czym stoi wysyłka: ile plików poszło, który idzie teraz i ile procent. */
+function setUploadProgress({ done = 0, total = 0, label = '', file = '', hide = false } = {}) {
   if (!lib.progress) return;
-  const bar = lib.progress.querySelector('.progress-bar');
-  if (!bar) return;
-  if (total === null) {
-    bar.className = 'progress-bar progress-bar-indeterminate';
-    bar.style.width = '';
-    bar.textContent = '';
-    return;
-  }
-  const percent = Math.round(done / total * 100);
-  bar.className = 'progress-bar';
-  bar.style.width = `${percent}%`;
-  bar.textContent = `${Math.round(done)} / ${total}`;
+  lib.progress.classList.toggle('d-none', hide);
+  if (hide) return;
+
+  const percent = total ? Math.min(100, Math.round(done / total * 100)) : 0;
+  uploadUi.label.textContent = label;
+  uploadUi.count.textContent = total ? `${Math.floor(done)} z ${total} · ${percent}%` : '';
+  uploadUi.bar.style.width = `${percent}%`;
+  uploadUi.file.textContent = file;
 }
 
 /** XHR zamiast fetch — tylko on daje postęp wysyłki. */
@@ -1655,18 +1668,32 @@ async function uploadFiles(fileList) {
   if (!files.length) return;
 
   setLibraryBusy(true);
-  setUploadProgress(0, files.length);
+  const totalSize = fileSize(files.reduce((sum, file) => sum + file.size, 0));
+  setUploadProgress({
+    done: 0,
+    total: files.length,
+    label: `Wysyłam do magazynu (${totalSize})`,
+    file: files[0].name
+  });
 
   let sent = 0;
   try {
     for (let i = 0; i < files.length; i += UPLOAD_BATCH) {
       const batch = files.slice(i, i + UPLOAD_BATCH);
-      const payload = await sendBatch(currentSet.key, batch,
-        (ratio) => setUploadProgress(sent + ratio * batch.length, files.length));
+      const names = batch.map((file) => file.name).join(', ');
+
+      const payload = await sendBatch(currentSet.key, batch, (ratio) => setUploadProgress({
+        done: sent + ratio * batch.length,
+        total: files.length,
+        label: `Wysyłam do magazynu (${totalSize})`,
+        file: names
+      }));
+
       sent += batch.length;
-      setUploadProgress(sent, files.length);
+      setUploadProgress({ done: sent, total: files.length, label: 'Zapisuję w magazynie', file: names });
       photos = payload.photos;
     }
+    setUploadProgress({ done: files.length, total: files.length, label: 'Gotowe', file: '' });
     renderPhotos();
     await loadPhotoSets();
   } catch (error) {
@@ -1677,7 +1704,8 @@ async function uploadFiles(fileList) {
     if (sent) await selectSet(currentSet.key);
   } finally {
     setLibraryBusy(false);
-    setUploadProgress(null, null);
+    // Chwila zwłoki, żeby „Gotowe" zdążyło się pokazać, zamiast mrugnąć.
+    setTimeout(() => setUploadProgress({ hide: true }), 1200);
     if (lib.fileInput) lib.fileInput.value = '';
   }
 }
@@ -1762,22 +1790,61 @@ function showPsdStatus(kind, html) {
 
 psdButton?.addEventListener('click', () => psdInput?.click());
 
+const psdProgress = {
+  panel: document.getElementById('template-psd-progress'),
+  label: document.getElementById('psd-label'),
+  percent: document.getElementById('psd-percent'),
+  bar: document.getElementById('psd-bar')
+};
+
+/** Pliki PSD ważą setki megabajtów — bez paska nie wiadomo, czy cokolwiek się dzieje. */
+function setPsdProgress({ percent = 0, label = '', hide = false } = {}) {
+  if (!psdProgress.panel) return;
+  psdProgress.panel.classList.toggle('d-none', hide);
+  if (hide) return;
+  psdProgress.label.textContent = label;
+  psdProgress.percent.textContent = percent === null ? '' : `${Math.round(percent)}%`;
+  psdProgress.bar.style.width = `${percent === null ? 100 : percent}%`;
+  psdProgress.bar.classList.toggle('progress-bar-indeterminate', percent === null);
+}
+
 psdInput?.addEventListener('change', async (event) => {
   const file = event.target.files[0];
   if (!file) return;
 
   psdButton.disabled = true;
-  showPsdStatus('info', `Czytam <strong>${escapeHTML(file.name)}</strong>…`);
+  showPsdStatus('info', `<strong>${escapeHTML(file.name)}</strong> · ${fileSize(file.size)}`);
+  setPsdProgress({ percent: 0, label: 'Wysyłam plik na serwer' });
+
   try {
     const form = new FormData();
     form.append('file', file, file.name);
 
-    const response = await fetch('/api/templates/import-psd', { method: 'POST', body: form });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload.success === false) {
-      const hint = payload.hint ? `<div class="mt-1 small">${escapeHTML(payload.hint)}</div>` : '';
-      throw Object.assign(new Error(payload.error || 'Nie udało się wczytać pliku.'), { html: hint });
-    }
+    const payload = await new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open('POST', '/api/templates/import-psd');
+      request.upload.addEventListener('progress', (progress) => {
+        if (!progress.lengthComputable) return;
+        const percent = progress.loaded / progress.total * 100;
+        setPsdProgress({
+          percent,
+          label: percent < 100 ? 'Wysyłam plik na serwer' : 'Analizuję warstwy'
+        });
+        // Po zakończeniu wysyłki serwer czyta plik — długość tego etapu zależy
+        // od liczby warstw, więc pokazujemy pasek bez konkretnej wartości.
+        if (percent >= 100) setPsdProgress({ percent: null, label: 'Analizuję warstwy i składam grafikę' });
+      });
+      request.addEventListener('load', () => {
+        let body = {};
+        try { body = JSON.parse(request.responseText); } catch { /* pusta odpowiedź */ }
+        if (request.status >= 200 && request.status < 300 && body.success !== false) return resolve(body);
+        const hint = body.hint ? `<div class="mt-1 small">${escapeHTML(body.hint)}</div>` : '';
+        reject(Object.assign(new Error(body.error || `Serwer odrzucił plik (HTTP ${request.status}).`), { html: hint }));
+      });
+      request.addEventListener('error', () => reject(new Error('Połączenie przerwane w trakcie wysyłki.')));
+      request.send(form);
+    });
+    setPsdProgress({ hide: true });
 
     const warnings = (payload.warnings || [])
       .map((text) => `<li>${escapeHTML(text)}</li>`).join('');
@@ -1790,6 +1857,7 @@ psdInput?.addEventListener('change', async (event) => {
     await loadTemplates();
     showTemplateEditor(payload.template);
   } catch (error) {
+    setPsdProgress({ hide: true });
     showPsdStatus('danger', escapeHTML(error.message) + (error.html || ''));
   } finally {
     psdButton.disabled = false;

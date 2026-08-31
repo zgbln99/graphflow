@@ -129,3 +129,8 @@
 
 /* Zestaw ikon nie ma krzyżyka — obracamy plus, zamiast dokładać kolejny symbol */
 .icon-close .icon{transform:rotate(45deg)}
+
+/* Panel postępu wysyłki — wspólny dla zdjęć i plików PSD */
+.upload-panel{margin-bottom:1rem;padding:.75rem;border:1px solid var(--tblr-border-color);
+  border-radius:var(--tblr-border-radius);background:var(--tblr-bg-surface-secondary)}
+.upload-panel .progress{height:.5rem}
