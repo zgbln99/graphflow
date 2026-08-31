@@ -1,3 +1,45 @@
+/* ---- diagnostyka ----
+   Jeden nieobsłużony błąd w skrypcie potrafił po cichu zabić wszystko, co
+   rejestruje się poniżej niego — panel wyglądał normalnie, ale część przycisków
+   przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
+   wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
+
+const APP_BUILD = '2026-08-31-magazyn-4';
+
+function showFatal(message, where) {
+  let box = document.getElementById('app-fatal');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'app-fatal';
+    box.className = 'alert alert-danger m-3';
+    box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2000;margin:0;border-radius:0';
+    document.body.appendChild(box);
+  }
+  box.innerHTML = `<strong>Błąd panelu (wersja ${APP_BUILD}).</strong> `
+    + `Pokaż ten komunikat programiście:<br><code></code>`;
+  box.querySelector('code').textContent = `${message}${where ? ' — ' + where : ''}`;
+}
+
+window.addEventListener('error', (event) => {
+  showFatal(event.message, `${event.filename || ''}:${event.lineno || ''}`);
+});
+window.addEventListener('unhandledrejection', (event) => {
+  showFatal(event.reason?.message || String(event.reason), 'zapytanie do serwera');
+});
+
+/**
+ * Każdy moduł rejestruje się osobno: awaria jednego nie może wyłączyć
+ * pozostałych ani zatrzymać wykonywania reszty pliku.
+ */
+function moduleInit(name, fn) {
+  try {
+    fn();
+  } catch (error) {
+    console.error(`Moduł "${name}" nie wystartował:`, error);
+    showFatal(`moduł "${name}": ${error.message}`);
+  }
+}
+
 /* ZASTAL MARKETING CENTER — logika interfejsu.
    Markup generowany tu korzysta z komponentów Tabler (karty, listy, formularze),
    żeby widoki budowane w JS wyglądały tak samo jak te renderowane po stronie serwera.
@@ -1741,28 +1783,21 @@ document.getElementById('new-action')?.addEventListener('click', (event) => {
   showView('library');
 });
 
-/* ---- kontrola wersji ----
-   Przy każdym wdrożeniu wracało pytanie „czy przeglądarka na pewno ma nowy
-   skrypt?". Panel odpowiada na nie sam: porównuje wersję, którą wysłał serwer,
-   z wersją skryptu, który faktycznie się wykonuje. */
-
-const APP_BUILD = '2026-08-31-magazyn-3';
-
-(() => {
+moduleInit('wersja', () => {
   const buildEl = document.getElementById('app-build');
-  const scriptEl = document.getElementById('app-script');
-  const hintEl = document.getElementById('app-build-hint');
   if (!buildEl) return;
 
   const src = document.querySelector('script[src*="/club/app.js"]')?.getAttribute('src') || '';
   const stamp = src.split('?v=')[1] || 'brak';
 
   buildEl.textContent = APP_BUILD;
-  scriptEl.textContent = stamp;
+  document.getElementById('app-script').textContent = stamp;
 
+  // Ręcznie numerowany adres ("?v=8") znaczy, że serwer ma jeszcze starą wersję widoku.
   if (stamp === 'brak' || /^\d+$/.test(stamp)) {
-    hintEl.className = 'd-block text-warning mt-1';
-    hintEl.textContent = 'Serwer podaje stary adres skryptu — na serwerze nie ma jeszcze najnowszej wersji. '
+    const hint = document.getElementById('app-build-hint');
+    hint.className = 'd-block text-warning mt-1';
+    hint.textContent = 'Serwer podaje stary adres skryptu — nie ma na nim jeszcze najnowszej wersji. '
       + 'Wykonaj git pull i pm2 restart zastal-marketing-center.';
   }
-})();
+});
