@@ -7,7 +7,7 @@
   <title><%= title %></title>
   <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%230b0d0d%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229%22 fill=%22none%22 stroke=%22%230d8f4f%22 stroke-width=%222%22/%3E%3Cpath d=%22M7 16h18M16 7c-3 4-3 14 0 18M16 7c3 4 3 14 0 18%22 fill=%22none%22 stroke=%22%230d8f4f%22 stroke-width=%221.4%22/%3E%3C/svg%3E' %>">
   <link rel="stylesheet" href="/vendor/tabler/css/tabler.min.css">
-  <link rel="stylesheet" href="/club/brand.css?v=7">
+  <link rel="stylesheet" href="/club/brand.css?v=8">
 </head>
 <%
   const role = user.role || 'social';
@@ -23,6 +23,7 @@
     : 0;
   // Układ nawigacji: pasek górny (wariant wybrany przez właściciela projektu).
   const partials = { branding, user, role, can, initials, roleLabels, d, integrations };
+  const st = storage;
 %>
 <body class="app-body" data-role="<%= role %>" data-club="<%= clubName %>">
 <%- include('_icons') %>
@@ -40,7 +41,9 @@
 
       <div class="navbar-nav flex-row order-md-last ms-auto align-items-center">
         <div class="nav-item status-magazyn d-none d-md-flex me-3">
-          <span class="status status-warning status-lite" title="Magazyn zdjęć nieskonfigurowany">
+          <span class="status status-lite <%= st.configured ? 'status-green' : 'status-warning' %>"
+                id="storage-chip"
+                title="<%= st.configured ? ('Magazyn: ' + st.bucket + ' @ ' + st.endpoint) : 'Magazyn zdjęć nieskonfigurowany — uzupełnij S3_* w .env' %>">
             <span class="status-dot"></span>Magazyn
           </span>
         </div>
@@ -698,15 +701,75 @@
       <!-- ==================== BIBLIOTEKA ZDJĘĆ ==================== -->
       <div id="view-library" class="view">
         <div class="container-fluid">
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">Biblioteka zdjęć</h3>
-              <div class="card-actions">
-                <button class="btn btn-primary btn-sm" type="button"><svg class="icon"><use href="#i-upload"></use></svg>Prześlij zdjęcia</button>
+
+          <% if (!st.configured) { %>
+            <div class="alert alert-warning">
+              <h4 class="alert-title">Magazyn zdjęć nie jest podłączony</h4>
+              <p class="mb-0 text-secondary">
+                Uzupełnij <code>S3_ENDPOINT</code>, <code>S3_BUCKET</code>, <code>S3_ACCESS_KEY</code> i
+                <code>S3_SECRET_KEY</code> w pliku <code>/opt/club-graphics/.env</code> na serwerze,
+                a potem zrestartuj proces: <code>pm2 restart zastal-marketing-center</code>.
+                Kluczy nie trzymamy w repozytorium.
+              </p>
+            </div>
+          <% } %>
+
+          <div class="row row-cards">
+            <div class="col-lg-4 col-xl-3">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Foldery</h3>
+                  <% if (can('admin', 'designer')) { %>
+                    <div class="card-actions">
+                      <button class="btn btn-primary btn-sm" type="button" data-folder-new
+                              data-bs-toggle="modal" data-bs-target="#folder-modal" <%= st.configured ? '' : 'disabled' %>>
+                        <svg class="icon"><use href="#i-plus"></use></svg>Nowy
+                      </button>
+                    </div>
+                  <% } %>
+                </div>
+                <div class="list-group list-group-flush" id="folders-list"></div>
+                <div class="card-body text-secondary d-none" id="folders-empty">
+                  Brak folderów. Folder wskazuje katalog (prefix) w buckecie — np. <code>2026-27/kolejka-1/</code>.
+                </div>
               </div>
             </div>
-            <div class="card-body">
-              <div class="row g-2" id="library-grid"></div>
+
+            <div class="col-lg-8 col-xl-9">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h3 class="card-title" id="library-title">Biblioteka zdjęć</h3>
+                    <div class="text-secondary small" id="library-subtitle">Wybierz folder z listy po lewej.</div>
+                  </div>
+                  <div class="card-actions btn-list">
+                    <div class="form-check form-check-inline mb-0 d-none" id="library-filter">
+                      <input class="form-check-input" type="checkbox" id="library-selected-only">
+                      <label class="form-check-label" for="library-selected-only">Tylko wybrane</label>
+                    </div>
+                    <button class="btn btn-sm d-none" type="button" id="library-sync">
+                      <svg class="icon"><use href="#i-refresh"></use></svg>Synchronizuj
+                    </button>
+                    <% if (can('admin', 'designer', 'photographer')) { %>
+                      <button class="btn btn-primary btn-sm d-none" type="button" id="library-upload">
+                        <svg class="icon"><use href="#i-upload"></use></svg>Prześlij zdjęcia
+                      </button>
+                      <input type="file" id="library-file-input" accept="image/jpeg,image/png,image/webp" multiple hidden>
+                    <% } %>
+                  </div>
+                </div>
+
+                <div class="card-body" id="library-dropzone">
+                  <div class="progress mb-3 d-none" id="library-progress">
+                    <div class="progress-bar progress-bar-indeterminate"></div>
+                  </div>
+                  <div class="alert alert-danger d-none" id="library-error" role="alert"></div>
+                  <div class="text-secondary" id="library-empty">Wybierz folder, żeby zobaczyć zdjęcia.</div>
+                  <div class="row g-2" id="library-grid"></div>
+                </div>
+
+                <div class="card-footer text-secondary small d-none" id="library-footer"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -838,11 +901,50 @@
                   </div>
                 </div>
                 <div class="card-body">
-                  <div class="mb-3"><label class="form-label">Endpoint</label><input class="form-control" placeholder="https://s3.eu-central-1.mega.io"></div>
-                  <div class="mb-3"><label class="form-label">Bucket</label><input class="form-control" placeholder="zastal-media"></div>
-                  <div class="mb-3"><label class="form-label">Domyślny prefix</label><input class="form-control" placeholder="2026-27/"></div>
+                  <div class="datagrid">
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Endpoint</div>
+                      <div class="datagrid-content"><code><%= st.endpoint || '—' %></code></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Bucket</div>
+                      <div class="datagrid-content"><code><%= st.bucket || '—' %></code></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Region</div>
+                      <div class="datagrid-content"><code><%= st.region %></code></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Adresowanie</div>
+                      <div class="datagrid-content"><%= st.forcePathStyle ? 'path-style' : 'virtual-hosted' %></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Access key</div>
+                      <div class="datagrid-content"><code><%= st.accessKey || '—' %></code></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Ważność linków</div>
+                      <div class="datagrid-content">wysyłka <%= Math.round(st.uploadUrlTtl / 60) %> min · podgląd <%= Math.round(st.downloadUrlTtl / 60) %> min</div>
+                    </div>
+                  </div>
+                  <% if (st.missing.length) { %>
+                    <div class="alert alert-warning mt-3 mb-0">
+                      Brakuje w <code>.env</code>: <% st.missing.forEach((name, i) => { %><code><%= name %></code><%= i < st.missing.length - 1 ? ', ' : '' %><% }) %>.
+                    </div>
+                  <% } %>
+                  <div class="mt-3 d-none" id="storage-test-result"></div>
                 </div>
-                <div class="card-footer text-end"><button class="btn btn-primary" type="button">Zapisz ustawienia</button></div>
+                <div class="card-footer d-flex align-items-center">
+                  <span class="text-secondary small">Konfiguracja pochodzi z pliku <code>.env</code> na serwerze — nie z tego panelu.</span>
+                  <div class="ms-auto btn-list">
+                    <button class="btn btn-sm" type="button" id="storage-cors-btn">Reguła CORS</button>
+                    <% if (role === 'admin') { %>
+                      <button class="btn btn-primary btn-sm" type="button" id="storage-test-btn" <%= st.configured ? '' : 'disabled' %>>
+                        Testuj połączenie
+                      </button>
+                    <% } %>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="col-12">
@@ -910,10 +1012,17 @@
                         <td class="text-secondary">Rekomendacje treści na podstawie danych z Facebooka. Bez danych z FB nie ma czego analizować.</td>
                       </tr>
                       <tr>
-                        <td>Magazyn zdjęć (S3 / MEGA)</td>
-                        <td><span class="badge bg-secondary-lt">Nieskonfigurowany</span></td>
-                        <td class="text-secondary">endpoint, bucket, klucze</td>
-                        <td class="text-secondary">Zdjęcia, assety i eksporty poza serwerem aplikacji. Na razie eksporty zapisują się lokalnie.</td>
+                        <td>Magazyn zdjęć (MEGA S4)</td>
+                        <td>
+                          <% if (st.configured) { %>
+                            <span class="badge bg-green-lt">Skonfigurowany</span>
+                            <span class="text-secondary small ms-2">bucket <%= st.bucket %></span>
+                          <% } else { %>
+                            <span class="badge bg-secondary-lt">Nieskonfigurowany</span>
+                          <% } %>
+                        </td>
+                        <td class="text-secondary"><code>S3_ENDPOINT</code>, <code>S3_BUCKET</code>, <code>S3_ACCESS_KEY</code>, <code>S3_SECRET_KEY</code></td>
+                        <td class="text-secondary">Zdjęcia meczowe w buckecie. Wysyłka z przeglądarki idzie prosto do magazynu podpisanym adresem — klucze nie opuszczają serwera.</td>
                       </tr>
                     </tbody>
                   </table>
@@ -935,6 +1044,64 @@
 
 
 <!-- ==================== MODALE ==================== -->
+<div class="modal modal-blur fade" id="folder-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="folder-modal-title">Nowy folder</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+      <form id="folder-form" novalidate>
+        <div class="modal-body">
+          <div class="alert alert-danger d-none" id="folder-form-error" role="alert"></div>
+          <input type="hidden" name="id">
+          <div class="mb-3">
+            <label class="form-label required" for="folder-name">Nazwa</label>
+            <input class="form-control" id="folder-name" name="name" maxlength="160" required
+                   placeholder="Zastal – Legia, zdjęcia z meczu">
+          </div>
+          <div class="mb-3">
+            <label class="form-label required" for="folder-prefix">Ścieżka w buckecie</label>
+            <div class="input-group">
+              <span class="input-group-text"><%= st.bucket || 'bucket' %>/</span>
+              <input class="form-control" id="folder-prefix" name="prefix_path" maxlength="700" required
+                     placeholder="2026-27/kolejka-1/">
+            </div>
+            <div class="form-hint">Katalog w magazynie. Jeśli nie istnieje, powstanie przy pierwszym pliku.</div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="folder-role">Przeznaczenie</label>
+              <select class="form-select" id="folder-role" name="role">
+                <option value="photographer">Zdjęcia od fotografa</option>
+                <option value="selected">Wybrane do grafik</option>
+                <option value="social">Social media</option>
+                <option value="archive">Archiwum</option>
+                <option value="custom" selected>Inne</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="folder-match">Mecz</label>
+              <select class="form-select" id="folder-match" name="match_id">
+                <option value="">Bez meczu</option>
+              </select>
+            </div>
+          </div>
+          <label class="form-check mt-3 mb-0">
+            <input class="form-check-input" type="checkbox" id="folder-upload-enabled" name="is_upload_enabled" checked>
+            <span class="form-check-label">Zezwól na wysyłkę zdjęć do tego folderu</span>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Anuluj</button>
+          <button type="submit" class="btn btn-primary">Zapisz</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
 <div class="modal modal-blur fade" id="match-modal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
     <div class="modal-content">

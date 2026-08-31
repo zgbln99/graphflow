@@ -5,6 +5,7 @@
  */
 
 const Database = require('../config/database');
+const storage = require('./storage');
 
 const db = Database.getInstance();
 
@@ -631,6 +632,248 @@ async function getMatchFolders(matchId) {
   `, [Number(matchId)]);
 }
 
+/* ------------------------------------------------- foldery magazynu (S3) */
+
+const FOLDER_ROLES = ['photographer', 'social', 'selected', 'archive', 'custom'];
+
+/**
+ * Folder to wskaźnik na prefix w buckecie — sam w sobie nie tworzy niczego
+ * w magazynie. Usunięcie folderu kasuje tylko indeks, pliki zostają w S3.
+ */
+function normalizeFolder(payload, { requireAll = true } = {}) {
+  const data = {};
+
+  if (requireAll || payload.name !== undefined) {
+    const name = String(payload.name || '').trim();
+    if (!name) throw new ValidationError('Podaj nazwę folderu.', 'name');
+    if (name.length > 160) throw new ValidationError('Nazwa folderu może mieć maksymalnie 160 znaków.', 'name');
+    data.name = name;
+  }
+
+  if (requireAll || payload.prefix_path !== undefined) {
+    let prefix;
+    try {
+      prefix = storage.normalizePrefix(payload.prefix_path);
+    } catch (error) {
+      throw new ValidationError(error.message, 'prefix_path');
+    }
+    if (!prefix) throw new ValidationError('Podaj ścieżkę (prefix) w buckecie.', 'prefix_path');
+    data.prefix_path = prefix;
+  }
+
+  if (requireAll || payload.role !== undefined) {
+    const role = String(payload.role || 'custom').trim();
+    if (!FOLDER_ROLES.includes(role)) {
+      throw new ValidationError(`Nieznana rola folderu: ${role}.`, 'role');
+    }
+    data.role = role;
+  }
+
+  if (requireAll || payload.bucket !== undefined) {
+    const bucket = String(payload.bucket || storage.getBucket() || '').trim();
+    if (!bucket) throw new ValidationError('Brak nazwy bucketa — uzupełnij S3_BUCKET w .env.', 'bucket');
+    data.bucket = bucket.slice(0, 190);
+  }
+
+  if (requireAll || payload.match_id !== undefined) {
+    const matchId = payload.match_id === undefined || payload.match_id === null || payload.match_id === ''
+      ? null
+      : Number(payload.match_id);
+    if (matchId !== null && !Number.isInteger(matchId)) {
+      throw new ValidationError('Nieprawidłowy mecz.', 'match_id');
+    }
+    data.match_id = matchId;
+  }
+
+  if (requireAll || payload.is_upload_enabled !== undefined) {
+    data.is_upload_enabled = payload.is_upload_enabled === false || payload.is_upload_enabled === 'false'
+      || payload.is_upload_enabled === 0 || payload.is_upload_enabled === '0' ? 0 : 1;
+  }
+
+  return data;
+}
+
+async function listFolders({ matchId = null } = {}) {
+  const conditions = [];
+  const params = [];
+  if (matchId !== null && matchId !== undefined && matchId !== '') {
+    conditions.push('f.match_id = ?');
+    params.push(Number(matchId));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  return db.query(`
+    SELECT f.id, f.match_id, f.name, f.bucket, f.prefix_path, f.role,
+           f.is_upload_enabled, f.created_at,
+           m.home_team, m.away_team, m.match_date,
+           COUNT(p.id) AS photo_count,
+           SUM(p.is_selected) AS selected_count,
+           MAX(p.indexed_at) AS last_indexed_at
+    FROM cg_s3_folders f
+    LEFT JOIN cg_photo_index p ON p.folder_id = f.id
+    LEFT JOIN cg_matches m ON m.id = f.match_id
+    ${where}
+    GROUP BY f.id
+    ORDER BY COALESCE(m.match_date, f.created_at) DESC, f.name
+  `, params);
+}
+
+async function getFolder(id) {
+  return db.fetch(`
+    SELECT f.id, f.match_id, f.name, f.bucket, f.prefix_path, f.role,
+           f.is_upload_enabled, f.created_at
+    FROM cg_s3_folders f WHERE f.id = ? LIMIT 1
+  `, [Number(id)]);
+}
+
+async function requireFolder(id) {
+  const folder = await getFolder(id);
+  if (!folder) throw new ValidationError('Nie znaleziono folderu.', 'id');
+  return folder;
+}
+
+async function createFolder(payload) {
+  const data = normalizeFolder(payload);
+  if (data.match_id) {
+    const match = await getMatch(data.match_id);
+    if (!match) throw new ValidationError('Nie znaleziono meczu.', 'match_id');
+  }
+  const duplicate = await db.fetch(
+    'SELECT id FROM cg_s3_folders WHERE bucket = ? AND prefix_path = ? LIMIT 1',
+    [data.bucket, data.prefix_path]
+  );
+  if (duplicate) throw new ValidationError('Folder o tym prefixie już istnieje.', 'prefix_path');
+
+  const id = await db.insert('cg_s3_folders', data);
+  return getFolder(id);
+}
+
+async function updateFolder(id, payload) {
+  await requireFolder(id);
+  const data = normalizeFolder(payload, { requireAll: false });
+  if (!Object.keys(data).length) return getFolder(id);
+
+  if (data.prefix_path) {
+    const bucket = data.bucket || (await getFolder(id)).bucket;
+    const duplicate = await db.fetch(
+      'SELECT id FROM cg_s3_folders WHERE bucket = ? AND prefix_path = ? AND id <> ? LIMIT 1',
+      [bucket, data.prefix_path, Number(id)]
+    );
+    if (duplicate) throw new ValidationError('Folder o tym prefixie już istnieje.', 'prefix_path');
+  }
+
+  await db.update('cg_s3_folders', data, 'id = ?', [Number(id)]);
+  return getFolder(id);
+}
+
+async function deleteFolder(id) {
+  await requireFolder(id);
+  // Kasujemy tylko wpis i indeks — pliki w buckecie zostają nietknięte.
+  await db.delete('cg_s3_folders', 'id = ?', [Number(id)]);
+}
+
+/* ------------------------------------------------------- indeks zdjęć */
+
+async function listPhotos(folderId, { selectedOnly = false, limit = 500 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 500, 1), 2000);
+  const conditions = ['p.folder_id = ?'];
+  const params = [Number(folderId)];
+  if (selectedOnly) conditions.push('p.is_selected = 1');
+
+  return db.query(`
+    SELECT p.id, p.folder_id, p.object_key, p.file_name, p.etag, p.width, p.height,
+           p.file_size, p.taken_at, p.thumb_key, p.is_selected, p.metadata, p.indexed_at
+    FROM cg_photo_index p
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY p.file_name
+    LIMIT ${safeLimit}
+  `, params).then((rows) => rows.map((row) => ({ ...row, metadata: parseJson(row.metadata, null) })));
+}
+
+async function getPhoto(id) {
+  const row = await db.fetch(`
+    SELECT p.id, p.folder_id, p.object_key, p.file_name, p.etag, p.width, p.height,
+           p.file_size, p.taken_at, p.thumb_key, p.is_selected, p.metadata, p.indexed_at,
+           f.bucket, f.prefix_path, f.match_id
+    FROM cg_photo_index p
+    JOIN cg_s3_folders f ON f.id = p.folder_id
+    WHERE p.id = ? LIMIT 1
+  `, [Number(id)]);
+  return row ? { ...row, metadata: parseJson(row.metadata, null) } : null;
+}
+
+/**
+ * Zapisuje listę obiektów z bucketa w indeksie. Istniejące wpisy aktualizuje
+ * (rozmiar, etag), nowe dodaje — flaga is_selected zawsze zostaje nietknięta.
+ */
+async function upsertPhotos(folderId, objects = []) {
+  const id = Number(folderId);
+  if (!objects.length) return { indexed: 0 };
+
+  const CHUNK = 100;
+  let indexed = 0;
+
+  for (let i = 0; i < objects.length; i += CHUNK) {
+    const chunk = objects.slice(i, i + CHUNK);
+    const values = [];
+    const params = [];
+
+    chunk.forEach((object) => {
+      values.push('(?, ?, ?, ?, ?, ?, ?)');
+      params.push(
+        id,
+        String(object.key).slice(0, 700),
+        String(object.fileName || object.key).split('/').pop().slice(0, 255),
+        object.etag || null,
+        object.size ?? null,
+        toMysqlDateTime(object.lastModified) || null,
+        JSON.stringify(object.metadata || {})
+      );
+    });
+
+    const [result] = await db.getPool().query(`
+      INSERT INTO cg_photo_index (folder_id, object_key, file_name, etag, file_size, taken_at, metadata)
+      VALUES ${values.join(', ')}
+      ON DUPLICATE KEY UPDATE
+        file_name = VALUES(file_name),
+        etag = VALUES(etag),
+        file_size = VALUES(file_size),
+        taken_at = COALESCE(cg_photo_index.taken_at, VALUES(taken_at))
+    `, params);
+    indexed += result.affectedRows ? chunk.length : 0;
+  }
+
+  return { indexed };
+}
+
+/** Usuwa z indeksu zdjęcia, których nie ma już w buckecie. */
+async function pruneMissingPhotos(folderId, existingKeys = []) {
+  const id = Number(folderId);
+  if (!existingKeys.length) {
+    const [result] = await db.getPool().query('DELETE FROM cg_photo_index WHERE folder_id = ?', [id]);
+    return result.affectedRows;
+  }
+  const [result] = await db.getPool().query(
+    'DELETE FROM cg_photo_index WHERE folder_id = ? AND object_key NOT IN (?)',
+    [id, existingKeys]
+  );
+  return result.affectedRows;
+}
+
+async function setPhotoSelected(id, isSelected) {
+  const photo = await getPhoto(id);
+  if (!photo) throw new ValidationError('Nie znaleziono zdjęcia.', 'id');
+  await db.update('cg_photo_index', { is_selected: isSelected ? 1 : 0 }, 'id = ?', [Number(id)]);
+  return getPhoto(id);
+}
+
+async function deletePhoto(id) {
+  const photo = await getPhoto(id);
+  if (!photo) throw new ValidationError('Nie znaleziono zdjęcia.', 'id');
+  await db.delete('cg_photo_index', 'id = ?', [Number(id)]);
+  return photo;
+}
+
 async function getRecentExports(limit = 6) {
   const safeLimit = Math.min(Math.max(Number(limit) || 6, 1), 50);
   return db.query(`
@@ -765,6 +1008,18 @@ async function getDashboard() {
 
 module.exports = {
   ValidationError,
+  FOLDER_ROLES,
+  listFolders,
+  getFolder,
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  listPhotos,
+  getPhoto,
+  upsertPhotos,
+  pruneMissingPhotos,
+  setPhotoSelected,
+  deletePhoto,
   MATCH_STATUSES,
   MATERIAL_STATUSES,
   FIELD_TYPES,

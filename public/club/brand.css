@@ -105,3 +105,8 @@
 
 /* Logowanie: logo klubu nad kartą formularza */
 .login-logo{display:block;width:auto;max-width:min(320px,72vw);height:clamp(56px,7vw,84px);margin:0 auto;object-fit:contain}
+
+/* Magazyn zdjęć: kafelek zdjęcia i strefa upuszczania plików */
+.object-cover{object-fit:cover}
+#library-dropzone.is-dropping{outline:2px dashed var(--tblr-primary);outline-offset:-8px;background:rgba(13,143,79,.06)}
+.list-group-item .min-w-0{min-width:0}

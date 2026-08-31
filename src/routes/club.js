@@ -12,6 +12,7 @@ const {
   getCachedState
 } = require('../services/social-intelligence');
 const repo = require('../services/club-repository');
+const storage = require('../services/storage');
 
 const router = express.Router();
 const db = Database.getInstance();
@@ -78,6 +79,10 @@ function requireRole(...roles) {
 function handleRepoError(res, next, error) {
   if (error instanceof repo.ValidationError) {
     return res.status(error.status || 400).json({ success: false, error: error.message, field: error.field });
+  }
+  // Błędy magazynu niosą własny status (503 = brak konfiguracji, 502 = problem po stronie S3).
+  if (error instanceof storage.StorageError) {
+    return res.status(error.status || 502).json({ success: false, error: error.message, code: error.code });
   }
   return next(error);
 }
@@ -428,6 +433,184 @@ router.delete('/api/assets/:id', requireAuth, requireRole('admin', 'designer'), 
   } catch (err) { handleRepoError(res, next, err); }
 });
 
+/* ============================ MAGAZYN ZDJĘĆ (S3 / MEGA S4) ============================ */
+
+// Ile plików naraz można podpisać do wysyłki — jeden fotograf zrzuca zwykle
+// całą kartę, ale bez limitu łatwo o przypadkowe podpisanie tysięcy kluczy.
+const MAX_UPLOAD_BATCH = 100;
+
+router.get('/api/storage/status', requireAuth, async (req, res, next) => {
+  try {
+    res.json({
+      success: true,
+      storage: storage.getStorageStatus(),
+      cors: storage.corsPolicy(`${req.protocol}://${req.get('host')}`)
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/api/storage/test', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.json({ success: true, result: await storage.testConnection() });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.get('/api/folders', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, folders: await repo.listFolders({ matchId: req.query.match_id || null }) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.post('/api/folders', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    res.status(201).json({ success: true, folder: await repo.createFolder(req.body || {}) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.patch('/api/folders/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    res.json({ success: true, folder: await repo.updateFolder(req.params.id, req.body || {}) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.delete('/api/folders/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    await repo.deleteFolder(req.params.id);
+    res.json({ success: true });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+/**
+ * Synchronizacja: bucket jest źródłem prawdy. Zdjęcia wrzucone z pulpitu
+ * (klientem S3) pojawiają się w panelu dopiero po tej operacji.
+ */
+router.post('/api/folders/:id/sync', requireAuth, async (req, res, next) => {
+  try {
+    const folder = await repo.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ success: false, error: 'Nie znaleziono folderu.' });
+
+    const listing = await storage.listObjects(folder.prefix_path, { imagesOnly: true });
+    const { indexed } = await repo.upsertPhotos(folder.id, listing.objects);
+    const removed = await repo.pruneMissingPhotos(folder.id, listing.objects.map((object) => object.key));
+
+    res.json({
+      success: true,
+      indexed,
+      removed,
+      truncated: listing.truncated,
+      photos: await withPreviewUrls(await repo.listPhotos(folder.id))
+    });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.get('/api/folders/:id/photos', requireAuth, async (req, res, next) => {
+  try {
+    const folder = await repo.getFolder(req.params.id);
+    if (!folder) return res.status(404).json({ success: false, error: 'Nie znaleziono folderu.' });
+
+    const photos = await repo.listPhotos(folder.id, { selectedOnly: req.query.selected === '1' });
+    res.json({ success: true, folder, photos: await withPreviewUrls(photos) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+/**
+ * §13: przeglądarka nie dostaje klucza do bucketa. Serwer podpisuje adresy PUT
+ * na konkretne pliki, a wysyłka idzie bezpośrednio do magazynu.
+ */
+router.post('/api/folders/:id/upload-url', requireAuth,
+  requireRole('admin', 'designer', 'photographer'), async (req, res, next) => {
+    try {
+      const folder = await repo.getFolder(req.params.id);
+      if (!folder) return res.status(404).json({ success: false, error: 'Nie znaleziono folderu.' });
+      if (!folder.is_upload_enabled) {
+        return res.status(409).json({ success: false, error: 'Wysyłka do tego folderu jest wyłączona.' });
+      }
+
+      const files = Array.isArray(req.body?.files) ? req.body.files : [];
+      if (!files.length) return res.status(400).json({ success: false, error: 'Nie wskazano plików.' });
+      if (files.length > MAX_UPLOAD_BATCH) {
+        return res.status(400).json({
+          success: false,
+          error: `Maksymalnie ${MAX_UPLOAD_BATCH} plików naraz — podziel wysyłkę na partie.`
+        });
+      }
+
+      const uploads = [];
+      for (const file of files) {
+        const name = storage.safeFileName(file?.name || '');
+        if (!storage.isImageKey(name)) {
+          return res.status(400).json({ success: false, error: `Plik ${file?.name || ''} nie jest zdjęciem (JPG, PNG, WEBP).` });
+        }
+        // Znacznik czasu chroni przed nadpisaniem pliku o tej samej nazwie z innego aparatu.
+        const key = `${folder.prefix_path}${Date.now().toString(36)}-${name}`;
+        uploads.push({
+          originalName: file?.name || name,
+          ...(await storage.presignUpload(key, { contentType: storage.contentTypeFor(name) }))
+        });
+      }
+
+      res.json({ success: true, uploads });
+    } catch (err) { handleRepoError(res, next, err); }
+  });
+
+/** Po zakończonej wysyłce przeglądarka zgłasza klucze — serwer sprawdza je w buckecie i indeksuje. */
+router.post('/api/folders/:id/register', requireAuth,
+  requireRole('admin', 'designer', 'photographer'), async (req, res, next) => {
+    try {
+      const folder = await repo.getFolder(req.params.id);
+      if (!folder) return res.status(404).json({ success: false, error: 'Nie znaleziono folderu.' });
+
+      const keys = Array.isArray(req.body?.keys) ? req.body.keys.slice(0, MAX_UPLOAD_BATCH) : [];
+      if (!keys.length) return res.status(400).json({ success: false, error: 'Nie wskazano plików.' });
+
+      const objects = [];
+      for (const rawKey of keys) {
+        const key = storage.normalizeKey(rawKey);
+        // Klucz musi leżeć w prefixie folderu — inaczej upload mógłby zaindeksować cudzy katalog.
+        if (!key.startsWith(folder.prefix_path)) {
+          return res.status(400).json({ success: false, error: 'Plik spoza folderu.' });
+        }
+        const head = await storage.headObject(key);
+        objects.push({
+          key,
+          fileName: key.split('/').pop(),
+          size: head.size,
+          etag: head.etag,
+          lastModified: head.lastModified,
+          metadata: { contentType: head.contentType, uploadedBy: req.session.user.id }
+        });
+      }
+
+      await repo.upsertPhotos(folder.id, objects);
+      res.status(201).json({ success: true, photos: await withPreviewUrls(await repo.listPhotos(folder.id)) });
+    } catch (err) { handleRepoError(res, next, err); }
+  });
+
+router.patch('/api/photos/:id', requireAuth, requireRole('admin', 'designer', 'social'), async (req, res, next) => {
+  try {
+    const photo = await repo.setPhotoSelected(req.params.id, Boolean(req.body?.is_selected));
+    res.json({ success: true, photo });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.delete('/api/photos/:id', requireAuth, requireRole('admin', 'photographer'), async (req, res, next) => {
+  try {
+    const photo = await repo.deletePhoto(req.params.id);
+    // Domyślnie kasujemy tylko wpis w indeksie; plik znika z bucketa dopiero na wyraźne żądanie.
+    if (req.query.purge === '1') await storage.deleteObject(photo.object_key);
+    res.json({ success: true });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+/** Podgląd zdjęcia to podpisany adres GET — bucket zostaje prywatny. */
+async function withPreviewUrls(photos) {
+  if (!storage.isConfigured()) return photos;
+  return Promise.all(photos.map(async (photo) => ({
+    ...photo,
+    url: await storage.presignDownload(photo.object_key)
+  })));
+}
+
 router.get('/api/exports', requireAuth, async (req, res, next) => {
   try {
     res.json({ success: true, exports: await repo.listExports() });
@@ -442,7 +625,8 @@ router.get('/', requireAuth, async (req, res, next) => {
       user: req.session.user,
       branding,
       dashboard: await repo.getDashboard(),
-      integrations: getIntegrationStatus()
+      integrations: getIntegrationStatus(),
+      storage: storage.getStorageStatus()
     });
   } catch (err) {
     next(err);

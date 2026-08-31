@@ -22,6 +22,41 @@ Wymagane ustawienia:
 Widok „Monitoring social” pobiera ostatnie posty, liczy reakcje, komentarze i udostępnienia, a następnie generuje ustrukturyzowane rekomendacje przez OpenAI Responses API.
 Serwer odświeża dane w tle zgodnie z `SOCIAL_MONITOR_INTERVAL_MS`. Ustawienie `SOCIAL_AUTO_ANALYZE=true` uruchamia nową analizę automatycznie po wykryciu nowego posta.
 
+### Magazyn zdjęć (MEGA S4)
+
+Zdjęcia meczowe leżą w buckecie zgodnym z S3. Aplikacja nigdy nie przekazuje kluczy do przeglądarki —
+wysyłka i podgląd działają na podpisanych adresach (presigned URL) generowanych po stronie serwera.
+
+Co trzeba przygotować w panelu MEGA S4:
+
+1. bucket (u nas: `zastal`),
+2. parę kluczy dostępu (Access key + Secret key) z prawem odczytu i zapisu w tym buckecie,
+3. regułę CORS pozwalającą przeglądarce na `PUT` — gotową do wklejenia pokazuje przycisk
+   **Reguła CORS** w Ustawieniach.
+
+Ustawienia w `.env` (na VPS: `/opt/club-graphics/.env`, nigdy w repozytorium):
+
+- `S3_ENDPOINT` — `https://s3.eu-luxembourg-1.megas4.com`,
+- `S3_REGION` — `eu-luxembourg-1`,
+- `S3_BUCKET` — `zastal`,
+- `S3_ACCESS_KEY`, `S3_SECRET_KEY` — klucze z punktu 2,
+- `S3_FORCE_PATH_STYLE` — `true` (adres `endpoint/bucket/klucz`); `false` przełącza na
+  adresowanie po nazwie hosta (`zastal.s3.g.megas4.com`),
+- `S3_UPLOAD_URL_TTL`, `S3_DOWNLOAD_URL_TTL` — ważność podpisanych adresów w sekundach.
+
+Po zmianie `.env` konieczny jest restart procesu: `pm2 restart zastal-marketing-center`.
+Poprawność konfiguracji sprawdza przycisk **Testuj połączenie** w Ustawieniach.
+
+Jak to działa w panelu (widok „Biblioteka zdjęć”):
+
+- **folder** wskazuje katalog (prefix) w buckecie i można go powiązać z meczem;
+  usunięcie folderu kasuje tylko wpis w bazie — pliki w magazynie zostają,
+- **Synchronizuj** wczytuje zawartość prefixu do indeksu; bucket jest źródłem prawdy,
+  więc zdjęcia wgrane klientem S3 z pulpitu pojawiają się tak samo jak te z przeglądarki,
+- **Prześlij zdjęcia** (admin, grafik, fotograf) wysyła pliki bezpośrednio do bucketa,
+- **oznaczanie zdjęć** (admin, grafik, social media) wybiera kadry do grafik — zgodnie z zasadą,
+  że social media decyduje o treści.
+
 ## Funkcje
 
 ### Dla klientów:

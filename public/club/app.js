@@ -93,6 +93,7 @@ function showView(name) {
   if (name === 'templates' && !templates.length) loadTemplates().catch(() => {});
   if (name === 'other') loadOtherTemplates().catch(() => {});
   if (name === 'history') loadHistory().catch(() => {});
+  if (name === 'library' && !foldersLoaded) loadFolders();
 }
 
 document.querySelectorAll('[data-view]').forEach((el) => {
@@ -1312,4 +1313,385 @@ socialElements.analyze?.addEventListener('click', async () => {
   } finally {
     setSocialBusy(socialElements.analyze, false);
   }
+});
+
+/* ================= Magazyn zdjęć (S3 / MEGA S4) ================= */
+
+const FOLDER_ROLE_LABELS = {
+  photographer: 'Fotograf',
+  selected: 'Wybrane',
+  social: 'Social media',
+  archive: 'Archiwum',
+  custom: 'Inne'
+};
+
+const canManageFolders = ['admin', 'designer'].includes(document.body.dataset.role);
+const canUploadPhotos = ['admin', 'designer', 'photographer'].includes(document.body.dataset.role);
+const canSelectPhotos = ['admin', 'designer', 'social'].includes(document.body.dataset.role);
+const canDeletePhotos = ['admin', 'photographer'].includes(document.body.dataset.role);
+
+const lib = {
+  list: document.getElementById('folders-list'),
+  empty: document.getElementById('folders-empty'),
+  grid: document.getElementById('library-grid'),
+  gridEmpty: document.getElementById('library-empty'),
+  title: document.getElementById('library-title'),
+  subtitle: document.getElementById('library-subtitle'),
+  footer: document.getElementById('library-footer'),
+  error: document.getElementById('library-error'),
+  progress: document.getElementById('library-progress'),
+  syncBtn: document.getElementById('library-sync'),
+  uploadBtn: document.getElementById('library-upload'),
+  fileInput: document.getElementById('library-file-input'),
+  filter: document.getElementById('library-filter'),
+  selectedOnly: document.getElementById('library-selected-only'),
+  dropzone: document.getElementById('library-dropzone')
+};
+
+let folders = [];
+let currentFolder = null;
+let photos = [];
+let foldersLoaded = false;
+
+function setLibraryError(message) {
+  setFormError(lib.error, message);
+}
+
+function setLibraryBusy(busy) {
+  lib.progress?.classList.toggle('d-none', !busy);
+  [lib.syncBtn, lib.uploadBtn].forEach((button) => { if (button) button.disabled = busy; });
+}
+
+function folderSubtitle(folder) {
+  const parts = [FOLDER_ROLE_LABELS[folder.role] || folder.role];
+  if (folder.home_team) parts.push(`${folder.home_team} – ${folder.away_team}`);
+  return parts.join(' · ');
+}
+
+function renderFolders() {
+  if (!lib.list) return;
+  lib.empty?.classList.toggle('d-none', folders.length > 0);
+
+  lib.list.innerHTML = folders.map((folder) => `
+    <div class="list-group-item list-group-item-action d-flex align-items-center ${currentFolder?.id === folder.id ? 'active' : ''}"
+         data-folder-id="${folder.id}" role="button">
+      <span class="me-2 text-secondary">${icon('folder')}</span>
+      <div class="flex-fill min-w-0">
+        <div class="text-truncate">${escapeHTML(folder.name)}</div>
+        <div class="text-secondary small text-truncate">${escapeHTML(folderSubtitle(folder))}</div>
+      </div>
+      <span class="badge bg-secondary-lt ms-2">${Number(folder.photo_count) || 0}</span>
+      ${canManageFolders ? `
+        <button class="btn btn-icon btn-sm btn-ghost-secondary ms-1" type="button"
+                data-folder-edit="${folder.id}" title="Edytuj folder"
+                data-bs-toggle="modal" data-bs-target="#folder-modal">${icon('edit')}</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderPhotos() {
+  if (!lib.grid) return;
+
+  const visible = lib.selectedOnly?.checked ? photos.filter((photo) => Number(photo.is_selected) === 1) : photos;
+
+  if (!currentFolder) {
+    lib.grid.innerHTML = '';
+    lib.gridEmpty.textContent = 'Wybierz folder, żeby zobaczyć zdjęcia.';
+    lib.gridEmpty.classList.remove('d-none');
+    lib.footer?.classList.add('d-none');
+    return;
+  }
+
+  lib.gridEmpty.classList.toggle('d-none', visible.length > 0);
+  if (!visible.length) {
+    lib.gridEmpty.textContent = photos.length
+      ? 'Żadne zdjęcie w tym folderze nie zostało jeszcze wybrane.'
+      : 'Folder jest pusty. Przeciągnij tu zdjęcia albo kliknij „Synchronizuj”, jeśli wrzucono je klientem S3.';
+  }
+
+  lib.grid.innerHTML = visible.map((photo) => `
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="photo-tile photo-tile-43 ${Number(photo.is_selected) === 1 ? 'selected' : ''}"
+           data-photo-id="${photo.id}" title="${escapeHTML(photo.file_name)}">
+        ${photo.url ? `<img src="${escapeHTML(photo.url)}" alt="${escapeHTML(photo.file_name)}" loading="lazy"
+             class="position-absolute top-0 start-0 w-100 h-100 object-cover rounded">` : ''}
+        <div class="position-absolute bottom-0 start-0 end-0 p-1 d-flex align-items-center gap-1">
+          ${canSelectPhotos ? `
+            <button class="btn btn-icon btn-sm ${Number(photo.is_selected) === 1 ? 'btn-primary' : ''}"
+                    type="button" data-photo-select="${photo.id}"
+                    title="${Number(photo.is_selected) === 1 ? 'Odznacz' : 'Oznacz jako wybrane'}">${icon('check')}</button>` : ''}
+          ${canDeletePhotos ? `
+            <button class="btn btn-icon btn-sm ms-auto" type="button" data-photo-delete="${photo.id}"
+                    title="Usuń z magazynu">${icon('trash')}</button>` : ''}
+        </div>
+      </div>
+      <div class="text-secondary small text-truncate mt-1" title="${escapeHTML(photo.file_name)}">${escapeHTML(photo.file_name)}</div>
+    </div>
+  `).join('');
+
+  const selected = photos.filter((photo) => Number(photo.is_selected) === 1).length;
+  if (lib.footer) {
+    lib.footer.classList.remove('d-none');
+    lib.footer.textContent = `${photos.length} zdjęć w indeksie · ${selected} wybranych · bucket ${currentFolder.bucket}/${currentFolder.prefix_path}`;
+  }
+}
+
+async function loadFolders() {
+  if (!lib.list) return;
+  try {
+    const payload = await api('/api/folders');
+    folders = payload.folders;
+    foldersLoaded = true;
+    if (currentFolder) currentFolder = folders.find((folder) => folder.id === currentFolder.id) || null;
+    renderFolders();
+  } catch (error) {
+    setLibraryError(error.message);
+  }
+}
+
+async function selectFolder(id) {
+  setLibraryError('');
+  setLibraryBusy(true);
+  try {
+    const payload = await api(`/api/folders/${id}/photos`);
+    currentFolder = payload.folder;
+    photos = payload.photos;
+    lib.title.textContent = currentFolder.name;
+    lib.subtitle.textContent = `${currentFolder.bucket}/${currentFolder.prefix_path}`;
+    lib.syncBtn?.classList.remove('d-none');
+    lib.filter?.classList.remove('d-none');
+    if (canUploadPhotos && currentFolder.is_upload_enabled) lib.uploadBtn?.classList.remove('d-none');
+    else lib.uploadBtn?.classList.add('d-none');
+    renderFolders();
+    renderPhotos();
+  } catch (error) {
+    setLibraryError(error.message);
+  } finally {
+    setLibraryBusy(false);
+  }
+}
+
+lib.list?.addEventListener('click', (event) => {
+  const editButton = event.target.closest('[data-folder-edit]');
+  if (editButton) return;                                  // modal otworzy się z data-bs-*
+  const row = event.target.closest('[data-folder-id]');
+  if (row) selectFolder(Number(row.dataset.folderId));
+});
+
+lib.selectedOnly?.addEventListener('change', renderPhotos);
+
+lib.syncBtn?.addEventListener('click', async () => {
+  if (!currentFolder) return;
+  setLibraryError('');
+  setLibraryBusy(true);
+  try {
+    const payload = await api(`/api/folders/${currentFolder.id}/sync`, { method: 'POST', body: '{}' });
+    photos = payload.photos;
+    renderPhotos();
+    await loadFolders();
+    if (payload.truncated) {
+      setLibraryError('Folder zawiera więcej plików, niż mieści się w jednym odczycie — zawęź prefix.');
+    }
+  } catch (error) {
+    setLibraryError(error.message);
+  } finally {
+    setLibraryBusy(false);
+  }
+});
+
+lib.grid?.addEventListener('click', async (event) => {
+  const selectButton = event.target.closest('[data-photo-select]');
+  const deleteButton = event.target.closest('[data-photo-delete]');
+  if (!selectButton && !deleteButton) return;
+
+  setLibraryError('');
+  try {
+    if (selectButton) {
+      const id = Number(selectButton.dataset.photoSelect);
+      const photo = photos.find((item) => item.id === id);
+      const payload = await api(`/api/photos/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_selected: Number(photo.is_selected) !== 1 })
+      });
+      Object.assign(photo, payload.photo);
+      renderPhotos();
+      await loadFolders();
+      return;
+    }
+
+    const id = Number(deleteButton.dataset.photoDelete);
+    const photo = photos.find((item) => item.id === id);
+    if (!confirm(`Usunąć zdjęcie ${photo.file_name} z magazynu? Operacji nie da się cofnąć.`)) return;
+    await api(`/api/photos/${id}?purge=1`, { method: 'DELETE' });
+    photos = photos.filter((item) => item.id !== id);
+    renderPhotos();
+    await loadFolders();
+  } catch (error) {
+    setLibraryError(error.message);
+  }
+});
+
+/* ---- wysyłka zdjęć: presigned PUT prosto do bucketa (§13) ---- */
+
+async function uploadFiles(fileList) {
+  const files = [...fileList].filter((file) => file.type.startsWith('image/'));
+  if (!currentFolder || !files.length) return;
+
+  setLibraryError('');
+  setLibraryBusy(true);
+  try {
+    const payload = await api(`/api/folders/${currentFolder.id}/upload-url`, {
+      method: 'POST',
+      body: JSON.stringify({ files: files.map((file) => ({ name: file.name, size: file.size })) })
+    });
+
+    const uploaded = [];
+    for (let i = 0; i < files.length; i += 1) {
+      const target = payload.uploads[i];
+      const response = await fetch(target.url, {
+        method: 'PUT',
+        headers: { 'Content-Type': target.contentType },
+        body: files[i]
+      });
+      if (!response.ok) {
+        throw new Error(`Magazyn odrzucił plik ${files[i].name} (HTTP ${response.status}). `
+          + 'Jeśli to pierwszy upload, sprawdź regułę CORS bucketa w Ustawieniach.');
+      }
+      uploaded.push(target.key);
+    }
+
+    const registered = await api(`/api/folders/${currentFolder.id}/register`, {
+      method: 'POST',
+      body: JSON.stringify({ keys: uploaded })
+    });
+    photos = registered.photos;
+    renderPhotos();
+    await loadFolders();
+  } catch (error) {
+    setLibraryError(error.message);
+  } finally {
+    setLibraryBusy(false);
+    if (lib.fileInput) lib.fileInput.value = '';
+  }
+}
+
+lib.uploadBtn?.addEventListener('click', () => lib.fileInput?.click());
+lib.fileInput?.addEventListener('change', (event) => uploadFiles(event.target.files));
+
+['dragenter', 'dragover'].forEach((type) => {
+  lib.dropzone?.addEventListener(type, (event) => {
+    if (!currentFolder || !canUploadPhotos) return;
+    event.preventDefault();
+    lib.dropzone.classList.add('is-dropping');
+  });
+});
+['dragleave', 'drop'].forEach((type) => {
+  lib.dropzone?.addEventListener(type, (event) => {
+    event.preventDefault();
+    lib.dropzone.classList.remove('is-dropping');
+    if (type === 'drop' && currentFolder && canUploadPhotos) uploadFiles(event.dataTransfer.files);
+  });
+});
+
+/* ---- formularz folderu ---- */
+
+const folderModalEl = document.getElementById('folder-modal');
+const folderForm = document.getElementById('folder-form');
+const folderFormError = document.getElementById('folder-form-error');
+
+folderModalEl?.addEventListener('show.bs.modal', async (event) => {
+  if (!folderForm) return;
+  const trigger = event.relatedTarget;
+  const editId = trigger?.dataset?.folderEdit ? Number(trigger.dataset.folderEdit) : null;
+  const folder = editId ? folders.find((item) => item.id === editId) : null;
+
+  folderForm.reset();
+  setFormError(folderFormError, '');
+  document.getElementById('folder-modal-title').textContent = folder ? 'Edytuj folder' : 'Nowy folder';
+  folderForm.elements.id.value = folder?.id || '';
+  folderForm.elements.name.value = folder?.name || '';
+  folderForm.elements.prefix_path.value = folder?.prefix_path || '';
+  folderForm.elements.role.value = folder?.role || 'custom';
+  document.getElementById('folder-upload-enabled').checked = folder ? Number(folder.is_upload_enabled) === 1 : true;
+
+  // Lista meczów jest krótka i zmienia się rzadko — pobieramy ją przy otwarciu.
+  try {
+    const payload = await api('/api/matches');
+    const select = folderForm.elements.match_id;
+    select.innerHTML = '<option value="">Bez meczu</option>'
+      + payload.matches.map((match) => `<option value="${match.id}">${escapeHTML(`${match.home_team} – ${match.away_team}`)}</option>`).join('');
+    select.value = folder?.match_id || '';
+  } catch (error) {
+    setFormError(folderFormError, error.message);
+  }
+});
+
+folderForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  setFormError(folderFormError, '');
+
+  const id = folderForm.elements.id.value;
+  const body = {
+    name: folderForm.elements.name.value,
+    prefix_path: folderForm.elements.prefix_path.value,
+    role: folderForm.elements.role.value,
+    match_id: folderForm.elements.match_id.value || null,
+    is_upload_enabled: document.getElementById('folder-upload-enabled').checked
+  };
+
+  try {
+    const payload = await api(id ? `/api/folders/${id}` : '/api/folders', {
+      method: id ? 'PATCH' : 'POST',
+      body: JSON.stringify(body)
+    });
+    hideModal(folderModalEl);
+    await loadFolders();
+    await selectFolder(payload.folder.id);
+  } catch (error) {
+    setFormError(folderFormError, error.message);
+  }
+});
+
+/* ---- ustawienia: test połączenia i reguła CORS ---- */
+
+const storageTestBtn = document.getElementById('storage-test-btn');
+const storageCorsBtn = document.getElementById('storage-cors-btn');
+const storageTestResult = document.getElementById('storage-test-result');
+
+function showStorageResult(kind, html) {
+  if (!storageTestResult) return;
+  // d-block: Tabler układa treść alertu w wiersz, a blok z regułą CORS ma być pełnej szerokości.
+  storageTestResult.className = `mt-3 alert alert-${kind} d-block`;
+  storageTestResult.innerHTML = html;
+}
+
+storageTestBtn?.addEventListener('click', async () => {
+  storageTestBtn.disabled = true;
+  showStorageResult('info', 'Sprawdzam połączenie z magazynem…');
+  try {
+    const payload = await api('/api/storage/test', { method: 'POST', body: '{}' });
+    showStorageResult('success', `Połączono z bucketem <code>${escapeHTML(payload.result.bucket)}</code> (${payload.result.tookMs} ms).`);
+  } catch (error) {
+    showStorageResult('danger', escapeHTML(error.message));
+  } finally {
+    storageTestBtn.disabled = false;
+  }
+});
+
+storageCorsBtn?.addEventListener('click', async () => {
+  try {
+    const payload = await api('/api/storage/status');
+    showStorageResult('info',
+      '<div class="mb-2">Wklej tę regułę CORS w panelu MEGA S4, żeby przeglądarka mogła wysyłać zdjęcia:</div>'
+      + `<pre class="mb-0 overflow-auto"><code>${escapeHTML(JSON.stringify(payload.cors, null, 2))}</code></pre>`);
+  } catch (error) {
+    showStorageResult('danger', escapeHTML(error.message));
+  }
+});
+
+// Fotograf ma w nagłówku skrót do wysyłki — prowadzi do biblioteki zdjęć.
+document.getElementById('new-action')?.addEventListener('click', (event) => {
+  if (document.body.dataset.role !== 'photographer') return;
+  event.preventDefault();
+  showView('library');
 });
