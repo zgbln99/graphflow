@@ -49,7 +49,7 @@
     const sources = [];
     (template.definition.layers || []).forEach((layer) => {
       if (layer.asset_id && assetsById[layer.asset_id]) sources.push(assetsById[layer.asset_id].object_key);
-      if (layer.type === 'photo' && layer.field) {
+      if ((layer.type === 'photo' || layer.type === 'logo') && layer.field) {
         const { url } = photoValue(values[layer.field]);
         if (url) sources.push(url);
       }
@@ -219,7 +219,18 @@
         }
         ctx.restore();
       } else if (layer.type === 'overlay' || layer.type === 'logo') {
-        if (assetImage) {
+        // Logo rywala zmienia się co mecz, więc warstwa logo może być związana
+        // z polem tak samo jak zdjęcie; plik grafika służy wtedy za wartość domyślną.
+        const bound = layer.field ? photoValue(values[layer.field]) : { url: null, crop: {} };
+        const boundImage = bound.url ? await loadImage(bound.url) : null;
+
+        if (boundImage) {
+          ctx.save();
+          clipToLayer(ctx, layer);
+          const box = fitImage(boundImage, { ...layer, fit: layer.fit || 'contain' }, bound.crop);
+          ctx.drawImage(boundImage, box.x, box.y, box.w, box.h);
+          ctx.restore();
+        } else if (assetImage) {
           ctx.drawImage(assetImage, layer.x, layer.y, layer.w, layer.h);
         } else if (options.placeholders !== false) {
           ctx.save();

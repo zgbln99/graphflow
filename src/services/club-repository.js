@@ -280,8 +280,9 @@ function normalizeLayers(rawLayers, { width, height, fieldKeys }) {
     seen.add(id);
 
     // Powiązanie z polem dynamicznym — tylko dla warstw, które biorą treść z formularza.
+    // Logo jest wśród nich, bo herb rywala zmienia się z meczu na mecz.
     let field = null;
-    if (type === 'text' || type === 'photo') {
+    if (type === 'text' || type === 'photo' || type === 'logo') {
       const key = String(layer.field || '').trim();
       if (key && !fieldKeys.includes(key)) {
         throw new ValidationError(
@@ -308,8 +309,9 @@ function normalizeLayers(rawLayers, { width, height, fieldKeys }) {
       asset_id: layer.asset_id ? Number(layer.asset_id) : null
     };
 
-    if (type === 'photo') {
-      base.fit = FIT_MODES.includes(layer.fit) ? layer.fit : 'cover';
+    if (type === 'photo' || type === 'logo') {
+      // Zdjęcie domyślnie wypełnia maskę, logo domyślnie mieści się w całości.
+      base.fit = FIT_MODES.includes(layer.fit) ? layer.fit : (type === 'logo' ? 'contain' : 'cover');
       base.mask = MASK_SHAPES.includes(layer.mask) ? layer.mask : 'rect';
       base.radius = Math.round(number(layer.radius, 0, 0, 2000));
     }
@@ -609,7 +611,7 @@ async function getNextMatch(seasonId) {
 async function getMatchMaterials(matchId) {
   if (!matchId) return [];
   return db.query(`
-    SELECT mt.id, mt.status, mt.deadline_at, mt.owner_role, mt.note, mt.sort_order,
+    SELECT mt.id, mt.template_id, mt.status, mt.deadline_at, mt.owner_role, mt.note, mt.sort_order,
            t.name AS template_name, t.width, t.height, t.category
     FROM cg_match_templates mt
     JOIN cg_templates t ON t.id = mt.template_id
@@ -630,6 +632,208 @@ async function getMatchFolders(matchId) {
     GROUP BY f.id
     ORDER BY f.name
   `, [Number(matchId)]);
+}
+
+/* --------------------------------------------------------------- grafiki */
+
+/**
+ * Grafika (design) to szablon plus wartości pól. Układ, czcionki i maski
+ * należą do szablonu i grafika ich nie rusza — social media wypełnia wyłącznie
+ * treść: teksty, wyniki i zdjęcia (§29).
+ *
+ * Wartość pola zdjęcia zapisujemy jako { photo_id, crop }, a nie jako adres:
+ * adresy podglądu wygasają, a plik w magazynie zostaje.
+ */
+function normalizeDesignValues(template, raw) {
+  const fields = template.definition.fields || [];
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const values = {};
+
+  fields.forEach((field) => {
+    const value = source[field.key];
+    if (value === undefined || value === null || value === '') return;
+
+    if (field.type === 'photo') {
+      const photoId = Number(value.photo_id ?? value);
+      if (!Number.isInteger(photoId) || photoId <= 0) return;
+      const crop = value.crop && typeof value.crop === 'object' ? value.crop : {};
+      values[field.key] = {
+        photo_id: photoId,
+        crop: {
+          x: clampCrop(crop.x),
+          y: clampCrop(crop.y),
+          zoom: Math.min(Math.max(Number(crop.zoom) || 1, 1), 4)
+        }
+      };
+      return;
+    }
+
+    if (field.type === 'number') {
+      const number = Number(value);
+      if (!Number.isFinite(number)) throw new ValidationError(`Pole „${field.label}" wymaga liczby.`, field.key);
+      values[field.key] = number;
+      return;
+    }
+
+    if (field.type === 'select' && Array.isArray(field.options) && field.options.length
+        && !field.options.includes(String(value))) {
+      throw new ValidationError(`Pole „${field.label}" ma nieznaną wartość.`, field.key);
+    }
+
+    const text = String(value);
+    if (text.length > 2000) throw new ValidationError(`Pole „${field.label}" jest za długie.`, field.key);
+    values[field.key] = text;
+  });
+
+  return values;
+}
+
+/**
+ * Pola wymagane sprawdzamy dopiero przy eksporcie. Grafika zaczyna życie pusta
+ * i wypełnia się stopniowo — blokowanie zapisu zmusiłoby do wpisania wszystkiego
+ * za jednym razem albo do utraty tego, co już wpisano.
+ */
+function missingRequiredFields(template, values) {
+  return (template.definition.fields || [])
+    .filter((field) => field.required && (values[field.key] === undefined || values[field.key] === ''))
+    .map((field) => field.label);
+}
+
+function clampCrop(value) {
+  const number = Number(value) || 0;
+  return Math.min(Math.max(number, -1), 1);
+}
+
+/**
+ * Podmienia identyfikatory zdjęć na adresy, spod których płótno je pobierze.
+ * Adres wskazuje na naszą aplikację, a nie na magazyn: obraz z innej domeny
+ * „zatruwa" płótno i uniemożliwia eksport do pliku.
+ */
+async function resolveDesignValues(values) {
+  const ids = Object.values(values)
+    .filter((value) => value && typeof value === 'object' && value.photo_id)
+    .map((value) => value.photo_id);
+  if (!ids.length) return values;
+
+  const rows = await db.getPool().query(
+    'SELECT id, file_name FROM cg_photo_index WHERE id IN (?)', [[...new Set(ids)]]
+  ).then(([result]) => result);
+  const byId = new Map(rows.map((row) => [row.id, row]));
+
+  const resolved = { ...values };
+  Object.entries(resolved).forEach(([key, value]) => {
+    if (!value || typeof value !== 'object' || !value.photo_id) return;
+    const photo = byId.get(value.photo_id);
+    resolved[key] = photo
+      ? { ...value, url: `/api/photos/${value.photo_id}/file`, file_name: photo.file_name }
+      // Zdjęcie zniknęło z indeksu — zostawiamy pole puste zamiast psuć całą grafikę.
+      : { ...value, url: null, file_name: null };
+  });
+  return resolved;
+}
+
+function decorateDesign(row) {
+  if (!row) return null;
+  return { ...row, values: parseJson(row.values_json, {}), state: parseJson(row.state_json, null) };
+}
+
+async function listDesigns({ matchId = null, limit = 100 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
+  const conditions = [];
+  const params = [];
+  if (matchId !== null && matchId !== undefined && matchId !== '') {
+    conditions.push('d.match_id = ?');
+    params.push(Number(matchId));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  return db.query(`
+    SELECT d.id, d.template_id, d.match_id, d.title, d.updated_at,
+           t.name AS template_name, t.category, t.width, t.height,
+           m.home_team, m.away_team, m.match_date,
+           (SELECT COUNT(*) FROM cg_exports e WHERE e.design_id = d.id) AS export_count
+    FROM cg_designs d
+    JOIN cg_templates t ON t.id = d.template_id
+    LEFT JOIN cg_matches m ON m.id = d.match_id
+    ${where}
+    ORDER BY d.updated_at DESC
+    LIMIT ${safeLimit}
+  `, params);
+}
+
+async function getDesign(id) {
+  const design = decorateDesign(await db.fetch(`
+    SELECT d.id, d.template_id, d.match_id, d.title, d.values_json, d.state_json,
+           d.created_at, d.updated_at,
+           m.home_team, m.away_team, m.match_date
+    FROM cg_designs d
+    LEFT JOIN cg_matches m ON m.id = d.match_id
+    WHERE d.id = ?
+  `, [Number(id)]));
+  if (!design) return null;
+
+  design.template = await getTemplate(design.template_id, { withAssets: true });
+  design.values = await resolveDesignValues(design.values);
+  return design;
+}
+
+async function createDesign(payload, userId = null) {
+  const template = await getTemplate(payload.template_id);
+  if (!template) throw new ValidationError('Nie znaleziono szablonu.', 'template_id');
+  if (!template.is_active) throw new ValidationError('Ten szablon jest wyłączony.', 'template_id');
+
+  const matchId = payload.match_id ? Number(payload.match_id) : null;
+  if (matchId && !(await getMatch(matchId))) throw new ValidationError('Nie znaleziono meczu.', 'match_id');
+
+  const title = String(payload.title || template.name).trim().slice(0, 180);
+  if (!title) throw new ValidationError('Podaj nazwę grafiki.', 'title');
+
+  const id = await db.insert('cg_designs', {
+    template_id: template.id,
+    match_id: matchId,
+    title,
+    values_json: JSON.stringify(normalizeDesignValues(template, payload.values)),
+    created_by: userId
+  });
+  return getDesign(id);
+}
+
+async function updateDesign(id, payload) {
+  const current = await db.fetch('SELECT id, template_id, title FROM cg_designs WHERE id = ?', [Number(id)]);
+  if (!current) throw new ValidationError('Nie znaleziono grafiki.', 'id');
+
+  const data = {};
+  if (payload.title !== undefined) {
+    const title = String(payload.title).trim().slice(0, 180);
+    if (!title) throw new ValidationError('Podaj nazwę grafiki.', 'title');
+    data.title = title;
+  }
+  if (payload.values !== undefined) {
+    const template = await getTemplate(current.template_id);
+    data.values_json = JSON.stringify(normalizeDesignValues(template, payload.values));
+  }
+
+  if (Object.keys(data).length) await db.update('cg_designs', data, 'id = ?', [Number(id)]);
+  return getDesign(id);
+}
+
+async function deleteDesign(id) {
+  const design = await db.fetch('SELECT id FROM cg_designs WHERE id = ?', [Number(id)]);
+  if (!design) throw new ValidationError('Nie znaleziono grafiki.', 'id');
+  await db.delete('cg_designs', 'id = ?', [Number(id)]);
+}
+
+async function recordExport({ designId, objectKey, format, width, height, fileSize, userId = null }) {
+  const id = await db.insert('cg_exports', {
+    design_id: Number(designId),
+    object_key: objectKey,
+    format,
+    width: Number(width),
+    height: Number(height),
+    file_size: fileSize ?? null,
+    created_by: userId
+  });
+  return db.fetch('SELECT id, design_id, object_key, format, width, height, created_at FROM cg_exports WHERE id = ?', [id]);
 }
 
 /* ------------------------------------------------- foldery magazynu (S3) */
@@ -1008,6 +1212,13 @@ async function getDashboard() {
 
 module.exports = {
   ValidationError,
+  missingRequiredFields,
+  listDesigns,
+  getDesign,
+  createDesign,
+  updateDesign,
+  deleteDesign,
+  recordExport,
   FOLDER_ROLES,
   listFolders,
   getFolder,

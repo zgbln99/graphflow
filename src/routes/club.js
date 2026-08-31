@@ -446,6 +446,26 @@ const MAX_PHOTO_SIZE = 60 * 1024 * 1024;
 const photoTmpDir = path.join(os.tmpdir(), 'zmc-uploads');
 fs.mkdirSync(photoTmpDir, { recursive: true });
 
+// Eksporty leżą w magazynie obok zdjęć, w osobnym katalogu.
+const EXPORT_PREFIX = 'eksporty/';
+const MAX_EXPORT_SIZE = 40 * 1024 * 1024;
+
+const uploadExport = multer({
+  storage: multer.diskStorage({ destination: photoTmpDir }),
+  limits: { fileSize: MAX_EXPORT_SIZE, files: 1 }
+});
+
+function receiveExport(req, res, next) {
+  uploadExport.single('file')(req, res, (error) => {
+    if (!error) return next();
+    if (req.file) fs.unlink(req.file.path, () => {});
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ success: false, error: 'Wyeksportowany plik jest za duży.' });
+    }
+    return handleRepoError(res, next, error);
+  });
+}
+
 const uploadPhotos = multer({
   storage: multer.diskStorage({ destination: photoTmpDir }),
   limits: { fileSize: MAX_PHOTO_SIZE, files: MAX_UPLOAD_BATCH },
@@ -628,6 +648,118 @@ async function withPreviewUrls(photos) {
     url: await storage.presignDownload(photo.object_key)
   })));
 }
+
+/**
+ * Plik zdjęcia podany z naszej domeny.
+ *
+ * Podgląd w siatce leci prosto z magazynu podpisanym adresem, ale płótno musi
+ * dostać obraz z tej samej domeny: obraz z obcej domeny „zatruwa" canvas i
+ * przeglądarka nie pozwala go potem zapisać do pliku. MEGA S4 nie obsługuje
+ * CORS, więc nie da się tego obejść nagłówkiem — plik idzie przez serwer.
+ */
+router.get('/api/photos/:id/file', requireAuth, async (req, res, next) => {
+  try {
+    const photo = await repo.getPhoto(req.params.id);
+    if (!photo) return res.status(404).send('Nie znaleziono zdjęcia.');
+
+    const object = await storage.getObjectStream(photo.object_key);
+    res.set({
+      'Content-Type': object.contentType || storage.contentTypeFor(photo.object_key),
+      'Cache-Control': 'private, max-age=3600',
+      ...(object.contentLength ? { 'Content-Length': object.contentLength } : {})
+    });
+    object.body.on('error', next);
+    object.body.pipe(res);
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+/* ================================ GRAFIKI ================================ */
+
+router.get('/api/designs', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, designs: await repo.listDesigns({ matchId: req.query.match_id || null }) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.get('/api/designs/:id', requireAuth, async (req, res, next) => {
+  try {
+    const design = await repo.getDesign(req.params.id);
+    if (!design) return res.status(404).json({ success: false, error: 'Nie znaleziono grafiki.' });
+    res.json({ success: true, design });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+// Treść grafiki tworzy i zmienia social media — to jego rola w podziale z §29.
+router.post('/api/designs', requireAuth, requireRole('admin', 'designer', 'social'), async (req, res, next) => {
+  try {
+    res.status(201).json({ success: true, design: await repo.createDesign(req.body || {}, req.session.user.id) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.patch('/api/designs/:id', requireAuth, requireRole('admin', 'designer', 'social'), async (req, res, next) => {
+  try {
+    res.json({ success: true, design: await repo.updateDesign(req.params.id, req.body || {}) });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+router.delete('/api/designs/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
+  try {
+    await repo.deleteDesign(req.params.id);
+    res.json({ success: true });
+  } catch (err) { handleRepoError(res, next, err); }
+});
+
+/**
+ * Eksport. Płótno renderuje grafikę w natywnej rozdzielczości szablonu (§15),
+ * a gotowy PNG trafia do magazynu i do historii eksportów.
+ */
+router.post('/api/designs/:id/export', requireAuth, requireRole('admin', 'designer', 'social'),
+  receiveExport, async (req, res, next) => {
+    const file = req.file;
+    try {
+      const design = await repo.getDesign(req.params.id);
+      if (!design) return res.status(404).json({ success: false, error: 'Nie znaleziono grafiki.' });
+      if (!file) return res.status(400).json({ success: false, error: 'Brak pliku eksportu.' });
+
+      // Brakujące pola wychodzą tutaj, a nie przy zapisie — grafikę można odkładać niedokończoną.
+      const missing = repo.missingRequiredFields(design.template, design.values);
+      if (missing.length) {
+        return res.status(400).json({
+          success: false,
+          error: `Uzupełnij przed eksportem: ${missing.join(', ')}.`
+        });
+      }
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      const key = `${EXPORT_PREFIX}${stamp}/${design.id}-${Date.now().toString(36)}`
+        + `-${storage.safeFileName(`${design.title}.png`)}`;
+
+      await storage.putObject(key, fs.createReadStream(file.path), {
+        contentType: 'image/png',
+        contentLength: file.size
+      });
+
+      const record = await repo.recordExport({
+        designId: design.id,
+        objectKey: key,
+        format: 'png',
+        width: design.template.width,
+        height: design.template.height,
+        fileSize: file.size,
+        userId: req.session.user.id
+      });
+
+      res.status(201).json({
+        success: true,
+        export: record,
+        url: await storage.presignDownload(key, { download: true })
+      });
+    } catch (err) {
+      handleRepoError(res, next, err);
+    } finally {
+      if (file) fs.unlink(file.path, () => {});
+    }
+  });
 
 router.get('/api/exports', requireAuth, async (req, res, next) => {
   try {

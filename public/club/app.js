@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-magazyn-4';
+const APP_BUILD = '2026-08-31-edytor-1';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -136,6 +136,7 @@ function showView(name) {
   if (name === 'other') loadOtherTemplates().catch(() => {});
   if (name === 'history') loadHistory().catch(() => {});
   if (name === 'library' && !foldersLoaded) loadFolders();
+  if (name === 'editor' && !design) showEditorEmpty(true);
 }
 
 document.querySelectorAll('[data-view]').forEach((el) => {
@@ -1057,11 +1058,16 @@ async function loadMaterials() {
       <td class="text-secondary text-nowrap">${deadline ? deadline.date + ' · ' + deadline.time : '—'}</td>
       <td class="text-secondary">${item.owner_role ? ROLE_LABELS[item.owner_role] : '—'}</td>
       <td>${statusCell}</td>
-      ${canEditMaterials ? `<td>
-        <button class="btn btn-icon btn-sm" type="button" data-material-delete="${item.id}" aria-label="Odepnij materiał">
-          ${icon('trash')}
+      <td class="text-nowrap">
+        <button class="btn btn-sm" type="button"
+                data-open-editor="${item.template_id}" data-material-title="${escapeHTML(item.template_name)}">
+          ${icon('edit')}Otwórz
         </button>
-      </td>` : ''}
+        ${canEditMaterials ? `
+          <button class="btn btn-icon btn-sm ms-1" type="button" data-material-delete="${item.id}" aria-label="Odepnij materiał">
+            ${icon('trash')}
+          </button>` : ''}
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1124,8 +1130,14 @@ async function loadOtherTemplates() {
             <div class="card-body p-2">
               <div class="text-truncate">${escapeHTML(template.name)}</div>
               <div class="text-secondary small">
-                ${template.width}×${template.height} · ${template.field_count} ${template.field_count === 1 ? 'pole' : 'pól'}
+                ${template.width}×${template.height} · ${template.field_count} ${plural(template.field_count, 'pole', 'pola', 'pól')}
               </div>
+            </div>
+            <div class="card-footer p-2">
+              <button class="btn btn-sm w-100" type="button" data-open-editor="${template.id}"
+                      data-material-title="${escapeHTML(template.name)}">
+                ${icon('edit')}Przygotuj
+              </button>
             </div>
           </div>
         </div>`).join('')
@@ -1781,6 +1793,418 @@ document.getElementById('new-action')?.addEventListener('click', (event) => {
   if (document.body.dataset.role !== 'photographer') return;
   event.preventDefault();
   showView('library');
+});
+
+// Wejście do edytora: z listy materiałów meczu i z „Innych grafik".
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-open-editor]');
+  if (!button) return;
+  const insideMatch = Boolean(button.closest('#view-match'));
+  openMaterialInEditor({
+    templateId: button.dataset.openEditor,
+    matchId: insideMatch ? currentMatch?.id || null : null,
+    title: button.dataset.materialTitle
+  });
+});
+
+/* ================= Edytor grafiki (social media) ================= */
+
+/* Układ, czcionki i maski należą do szablonu — tutaj wypełnia się wyłącznie
+   treść: teksty, wyniki i zdjęcia (§29). Ten sam silnik rysuje podgląd i
+   eksport, więc to, co widać, jest tym, co wyjdzie w pliku. */
+
+const canEditDesigns = ['admin', 'designer', 'social'].includes(document.body.dataset.role);
+
+const ed = {
+  workspace: document.getElementById('editor-workspace'),
+  empty: document.getElementById('editor-empty'),
+  name: document.getElementById('editor-template-name'),
+  context: document.getElementById('editor-context'),
+  title: document.getElementById('editor-title'),
+  fields: document.getElementById('editor-fields'),
+  noFields: document.getElementById('editor-no-fields'),
+  error: document.getElementById('editor-error'),
+  save: document.getElementById('editor-save'),
+  savedAt: document.getElementById('editor-saved-at'),
+  canvas: document.getElementById('design-canvas'),
+  size: document.getElementById('canvas-size'),
+  scale: document.getElementById('editor-scale'),
+  download: document.getElementById('editor-download'),
+  export: document.getElementById('editor-export'),
+  photos: document.getElementById('editor-photos'),
+  pickerField: document.getElementById('picker-field'),
+  pickerFolder: document.getElementById('picker-folder'),
+  pickerGrid: document.getElementById('picker-grid'),
+  pickerEmpty: document.getElementById('picker-empty'),
+  pickerClose: document.getElementById('picker-close'),
+  crop: document.getElementById('picker-crop'),
+  cropZoom: document.getElementById('crop-zoom'),
+  cropX: document.getElementById('crop-x'),
+  cropY: document.getElementById('crop-y')
+};
+
+let design = null;          // aktualnie edytowana grafika z serwera
+let designValues = {};      // wartości pól w trakcie edycji
+let activePhotoField = null;
+let pickerFolders = [];
+let pickerPhotos = [];
+let dirty = false;
+
+function setEditorError(message) {
+  setFormError(ed.error, message);
+}
+
+function showEditorEmpty(show) {
+  ed.workspace?.classList.toggle('d-none', show);
+  ed.empty?.classList.toggle('d-none', !show);
+}
+
+/** Podgląd rysujemy w rozsądnej szerokości; eksport i tak idzie w natywnej. */
+function sizePreviewCanvas(template) {
+  const maxWidth = 900;
+  const width = Math.min(template.width, maxWidth);
+  ed.canvas.width = width;
+  ed.canvas.height = Math.round(template.height * (width / template.width));
+  ed.size.textContent = `${template.width} × ${template.height}`;
+  ed.scale.textContent = `Podgląd ${Math.round(width / template.width * 100)}% — eksport zawsze ${template.width} × ${template.height}`;
+}
+
+let redrawTimer;
+function scheduleRedraw() {
+  clearTimeout(redrawTimer);
+  redrawTimer = setTimeout(() => { drawDesign().catch(() => {}); }, 60);
+}
+
+async function drawDesign(canvas = ed.canvas, options = {}) {
+  if (!design) return;
+  await ZmcRenderer.render(canvas, design.template, designValues, design.template.assets || [], options);
+}
+
+function fieldControl(field) {
+  const value = designValues[field.key];
+  const id = `field-${field.key}`;
+  const label = `<label class="form-label ${field.required ? 'required' : ''}" for="${id}">${escapeHTML(field.label)}</label>`;
+
+  if (field.type === 'photo') {
+    const chosen = value && value.url;
+    return `<div class="mb-3" data-field="${field.key}">
+      ${label}
+      <button class="btn w-100 text-start d-flex align-items-center" type="button" data-pick-photo="${field.key}">
+        <span class="me-2 text-secondary">${icon('photos')}</span>
+        <span class="flex-fill text-truncate">${chosen ? escapeHTML(value.file_name || 'Wybrane zdjęcie') : 'Wybierz zdjęcie z magazynu'}</span>
+        ${chosen ? `<span class="badge bg-green-lt ms-2">ok</span>` : ''}
+      </button>
+    </div>`;
+  }
+
+  if (field.type === 'select') {
+    const options = (field.options || []).map((option) =>
+      `<option value="${escapeHTML(option)}" ${String(value) === option ? 'selected' : ''}>${escapeHTML(option)}</option>`).join('');
+    return `<div class="mb-3" data-field="${field.key}">${label}
+      <select class="form-select" id="${id}" data-value-field="${field.key}">
+        <option value="">—</option>${options}
+      </select></div>`;
+  }
+
+  if (field.type === 'textarea') {
+    return `<div class="mb-3" data-field="${field.key}">${label}
+      <textarea class="form-control" id="${id}" rows="3" data-value-field="${field.key}">${escapeHTML(value ?? '')}</textarea></div>`;
+  }
+
+  const types = { number: 'number', date: 'date' };
+  return `<div class="mb-3" data-field="${field.key}">${label}
+    <input class="form-control" id="${id}" type="${types[field.type] || 'text'}"
+           value="${escapeHTML(value ?? '')}" data-value-field="${field.key}"></div>`;
+}
+
+function renderEditorFields() {
+  const fields = design.template.definition.fields || [];
+  ed.noFields.classList.toggle('d-none', fields.length > 0);
+  ed.fields.innerHTML = fields.map(fieldControl).join('');
+  ed.fields.querySelectorAll('[data-value-field], [data-pick-photo], button').forEach((el) => {
+    el.disabled = !canEditDesigns;
+  });
+}
+
+async function openDesign(designId) {
+  setEditorError('');
+  try {
+    const payload = await api(`/api/designs/${designId}`);
+    design = payload.design;
+    designValues = { ...design.values };
+    dirty = false;
+
+    ed.name.textContent = design.template.name;
+    ed.context.textContent = design.match_id
+      ? `${design.home_team} – ${design.away_team} · ${design.template.width}×${design.template.height}`
+      : `Poza kalendarzem meczowym · ${design.template.width}×${design.template.height}`;
+    ed.title.value = design.title;
+    ed.savedAt.textContent = '';
+
+    renderEditorFields();
+    sizePreviewCanvas(design.template);
+    showEditorEmpty(false);
+    closePicker();
+    showView('editor');
+    await drawDesign();
+    await loadPickerFolders();
+  } catch (error) {
+    setEditorError(error.message);
+  }
+}
+
+/** Wejście z listy materiałów meczu: pierwsze otwarcie zakłada grafikę. */
+async function openMaterialInEditor({ templateId, matchId, title }) {
+  setEditorError('');
+  try {
+    const list = await api(`/api/designs${matchId ? `?match_id=${matchId}` : ''}`);
+    const existing = list.designs.find((item) => item.template_id === Number(templateId));
+    if (existing) return openDesign(existing.id);
+
+    const created = await api('/api/designs', {
+      method: 'POST',
+      body: JSON.stringify({ template_id: Number(templateId), match_id: matchId || null, title })
+    });
+    return openDesign(created.design.id);
+  } catch (error) {
+    showEditorEmpty(true);
+    showView('editor');
+    setEditorError(error.message);
+  }
+}
+
+ed.title?.addEventListener('input', () => { dirty = true; });
+
+ed.fields?.addEventListener('input', (event) => {
+  const key = event.target.dataset.valueField;
+  if (!key) return;
+  const raw = event.target.value;
+  designValues[key] = raw === '' ? undefined : raw;
+  if (raw === '') delete designValues[key];
+  dirty = true;
+  scheduleRedraw();
+});
+
+ed.fields?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-pick-photo]');
+  if (button) openPicker(button.dataset.pickPhoto);
+});
+
+/* ---- wybór zdjęcia i kadrowanie ---- */
+
+function closePicker() {
+  activePhotoField = null;
+  ed.photos?.classList.add('d-none');
+}
+
+async function openPicker(fieldKey) {
+  const field = (design.template.definition.fields || []).find((item) => item.key === fieldKey);
+  if (!field) return;
+
+  activePhotoField = fieldKey;
+  ed.pickerField.textContent = field.label;
+  ed.photos.classList.remove('d-none');
+
+  const current = designValues[fieldKey];
+  ed.crop.classList.toggle('d-none', !current);
+  if (current) {
+    ed.cropZoom.value = current.crop?.zoom ?? 1;
+    ed.cropX.value = current.crop?.x ?? 0;
+    ed.cropY.value = current.crop?.y ?? 0;
+  }
+  if (!pickerFolders.length) await loadPickerFolders();
+  await loadPickerPhotos();
+}
+
+async function loadPickerFolders() {
+  if (!ed.pickerFolder) return;
+  try {
+    const payload = await api('/api/folders');
+    // Foldery tego meczu na górze — to z nich najczęściej wybiera się kadr.
+    pickerFolders = payload.folders.sort((a, b) => {
+      const mine = (folder) => (design?.match_id && folder.match_id === design.match_id ? 0 : 1);
+      return mine(a) - mine(b);
+    });
+    ed.pickerFolder.innerHTML = pickerFolders.map((folder) =>
+      `<option value="${folder.id}">${escapeHTML(folder.name)} (${folder.photo_count})</option>`).join('')
+      || '<option value="">Brak folderów</option>';
+  } catch (error) {
+    setEditorError(error.message);
+  }
+}
+
+async function loadPickerPhotos() {
+  const folderId = ed.pickerFolder.value;
+  if (!folderId) {
+    pickerPhotos = [];
+    ed.pickerGrid.innerHTML = '';
+    ed.pickerEmpty.classList.remove('d-none');
+    return;
+  }
+  try {
+    const payload = await api(`/api/folders/${folderId}/photos`);
+    pickerPhotos = payload.photos;
+    renderPicker();
+  } catch (error) {
+    setEditorError(error.message);
+  }
+}
+
+function renderPicker() {
+  const current = designValues[activePhotoField];
+  ed.pickerEmpty.classList.toggle('d-none', pickerPhotos.length > 0);
+  ed.pickerGrid.innerHTML = pickerPhotos.map((photo) => `
+    <div class="col-6">
+      <div class="photo-tile photo-tile-43 ${current?.photo_id === photo.id ? 'selected' : ''}"
+           data-pick-id="${photo.id}" title="${escapeHTML(photo.file_name)}">
+        ${photo.url ? `<img src="${escapeHTML(photo.url)}" alt="" loading="lazy"
+             class="position-absolute top-0 start-0 w-100 h-100 object-cover rounded">` : ''}
+      </div>
+    </div>`).join('');
+}
+
+ed.pickerFolder?.addEventListener('change', loadPickerPhotos);
+ed.pickerClose?.addEventListener('click', closePicker);
+
+ed.pickerGrid?.addEventListener('click', (event) => {
+  const tile = event.target.closest('[data-pick-id]');
+  if (!tile || !activePhotoField) return;
+
+  const photo = pickerPhotos.find((item) => item.id === Number(tile.dataset.pickId));
+  designValues[activePhotoField] = {
+    photo_id: photo.id,
+    file_name: photo.file_name,
+    // Płótno pobiera zdjęcie z naszej domeny — inaczej nie da się go wyeksportować.
+    url: `/api/photos/${photo.id}/file`,
+    crop: { x: 0, y: 0, zoom: 1 }
+  };
+  dirty = true;
+  ed.cropZoom.value = 1;
+  ed.cropX.value = 0;
+  ed.cropY.value = 0;
+  ed.crop.classList.remove('d-none');
+  renderPicker();
+  renderEditorFields();
+  scheduleRedraw();
+});
+
+[ed.cropZoom, ed.cropX, ed.cropY].forEach((slider) => {
+  slider?.addEventListener('input', () => {
+    const current = designValues[activePhotoField];
+    if (!current) return;
+    current.crop = {
+      zoom: Number(ed.cropZoom.value),
+      x: Number(ed.cropX.value),
+      y: Number(ed.cropY.value)
+    };
+    dirty = true;
+    scheduleRedraw();
+  });
+});
+
+/* ---- zapis i eksport ---- */
+
+function valuesForServer() {
+  const payload = {};
+  Object.entries(designValues).forEach(([key, value]) => {
+    payload[key] = value && typeof value === 'object' && value.photo_id
+      ? { photo_id: value.photo_id, crop: value.crop }
+      : value;
+  });
+  return payload;
+}
+
+ed.save?.addEventListener('click', async () => {
+  if (!design) return;
+  ed.save.disabled = true;
+  setEditorError('');
+  try {
+    const payload = await api(`/api/designs/${design.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title: ed.title.value, values: valuesForServer() })
+    });
+    design = payload.design;
+    designValues = { ...design.values };
+    dirty = false;
+    renderEditorFields();
+    ed.savedAt.textContent = `Zapisano ${new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`;
+    scheduleRedraw();
+  } catch (error) {
+    setEditorError(error.message);
+  } finally {
+    ed.save.disabled = false;
+  }
+});
+
+/** Rysuje grafikę w natywnej rozdzielczości szablonu i oddaje ją jako PNG. */
+async function renderExportBlob() {
+  const canvas = document.createElement('canvas');
+  canvas.width = design.template.width;
+  canvas.height = design.template.height;
+  // Bez zastępników: w pliku nie może wylądować ramka „brak zdjęcia".
+  await drawDesign(canvas, { placeholders: false });
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Nie udało się przygotować pliku PNG.'))), 'image/png');
+  });
+}
+
+function exportFileName() {
+  const base = design.title || design.template.name;
+  return `${base.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'grafika'}.png`;
+}
+
+ed.download?.addEventListener('click', async () => {
+  if (!design) return;
+  ed.download.disabled = true;
+  setEditorError('');
+  try {
+    const blob = await renderExportBlob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = exportFileName();
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    setEditorError(error.message);
+  } finally {
+    ed.download.disabled = false;
+  }
+});
+
+ed.export?.addEventListener('click', async () => {
+  if (!design) return;
+  ed.export.disabled = true;
+  setEditorError('');
+  try {
+    if (dirty) {
+      await api(`/api/designs/${design.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: ed.title.value, values: valuesForServer() })
+      });
+      dirty = false;
+    }
+    const blob = await renderExportBlob();
+    const form = new FormData();
+    form.append('file', blob, exportFileName());
+
+    const response = await fetch(`/api/designs/${design.id}/export`, { method: 'POST', body: form });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.success === false) {
+      throw new Error(payload.error || 'Eksport nie powiódł się.');
+    }
+    ed.savedAt.textContent = `Wyeksportowano ${payload.export.width}×${payload.export.height} do magazynu`;
+  } catch (error) {
+    setEditorError(error.message);
+  } finally {
+    ed.export.disabled = false;
+  }
+});
+
+moduleInit('edytor', () => {
+  // Do czasu wybrania grafiki edytor pokazuje, skąd ją otworzyć.
+  showEditorEmpty(true);
 });
 
 moduleInit('wersja', () => {

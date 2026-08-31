@@ -449,73 +449,104 @@
       <!-- ==================== EDYTOR ==================== -->
       <div id="view-editor" class="view">
         <div class="container-fluid">
-          <div class="row row-cards">
-            <div class="col-lg-3">
-              <div class="card">
-                <div class="card-header">
-                  <ul class="nav nav-tabs card-header-tabs" role="tablist">
-                    <li class="nav-item"><a href="#" class="nav-link active">Edytor</a></li>
-                    <li class="nav-item"><a href="#" class="nav-link">Ustawienia</a></li>
-                    <li class="nav-item"><a href="#" class="nav-link">Historia</a></li>
-                  </ul>
-                </div>
-                <div class="card-body">
-                  <h4 id="editor-template-name" class="mb-3">Final Score</h4>
-                  <div id="dynamic-fields"></div>
-                </div>
-              </div>
-            </div>
+          <div class="row row-cards" id="editor-workspace">
 
-            <div class="col-lg-6">
-              <div class="card">
+            <!-- treść grafiki: to wypełnia social media -->
+            <div class="col-xl-3 col-lg-4">
+              <div class="card h-100">
                 <div class="card-header">
-                  <div class="btn-list">
-                    <button class="btn btn-icon btn-sm" type="button" aria-label="Cofnij"><svg class="icon"><use href="#i-undo"></use></svg></button>
-                    <button class="btn btn-icon btn-sm" type="button" aria-label="Ponów"><svg class="icon"><use href="#i-redo"></use></svg></button>
+                  <div class="min-w-0">
+                    <h3 class="card-title text-truncate" id="editor-template-name">Wybierz grafikę</h3>
+                    <div class="text-secondary small text-truncate" id="editor-context">—</div>
                   </div>
-                  <div class="card-actions text-secondary small" id="canvas-size">1080 × 1350</div>
                 </div>
-                <div class="card-body">
-                  <div class="canvas-stage bg-dark rounded p-2" style="height:min(60vh,640px)">
-                    <canvas id="design-canvas" width="540" height="675"></canvas>
+                <div class="card-body scroll-y" id="editor-form-body">
+                  <div class="alert alert-danger d-none" id="editor-error" role="alert"></div>
+                  <div class="mb-3">
+                    <label class="form-label" for="editor-title">Nazwa grafiki</label>
+                    <input class="form-control" id="editor-title" maxlength="180">
                   </div>
+                  <div id="editor-fields"></div>
+                  <p class="text-secondary small mb-0" id="editor-no-fields">
+                    Ten szablon nie ma pól do wypełnienia — układ jest w całości po stronie grafika.
+                  </p>
                 </div>
                 <div class="card-footer">
-                  <div class="row align-items-center">
-                    <div class="col text-secondary small">Podgląd 68% — eksport zawsze w rozdzielczości szablonu</div>
-                    <div class="col-auto"><button class="btn btn-primary btn-sm" type="button">Eksportuj PNG</button></div>
+                  <button class="btn btn-primary w-100" type="button" id="editor-save">Zapisz grafikę</button>
+                  <div class="text-secondary small mt-2" id="editor-saved-at"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- podgląd -->
+            <div class="col-xl-6 col-lg-8">
+              <div class="card h-100">
+                <div class="card-header">
+                  <h3 class="card-title">Podgląd</h3>
+                  <div class="card-actions text-secondary small" id="canvas-size">—</div>
+                </div>
+                <div class="card-body d-flex align-items-center justify-content-center bg-dark-lt" id="canvas-stage">
+                  <canvas id="design-canvas" width="540" height="675" class="rounded shadow-sm"></canvas>
+                </div>
+                <div class="card-footer d-flex align-items-center">
+                  <span class="text-secondary small" id="editor-scale">Eksport zawsze w rozdzielczości szablonu</span>
+                  <div class="ms-auto btn-list">
+                    <button class="btn btn-sm" type="button" id="editor-download">Pobierz PNG</button>
+                    <button class="btn btn-primary btn-sm" type="button" id="editor-export">Eksportuj do magazynu</button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="col-lg-3">
-              <div class="card">
+            <!-- zdjęcia z magazynu -->
+            <div class="col-xl-3 d-none" id="editor-photos">
+              <div class="card h-100">
                 <div class="card-header">
-                  <div>
-                    <h3 class="card-title">Zdjęcia z meczu</h3>
-                    <div class="text-secondary small">Foldery przypisane do spotkania</div>
+                  <div class="min-w-0">
+                    <h3 class="card-title">Wybierz zdjęcie</h3>
+                    <div class="text-secondary small text-truncate" id="picker-field">—</div>
                   </div>
                   <div class="card-actions">
-                    <button class="btn btn-icon btn-sm" type="button" aria-label="Odśwież"><svg class="icon"><use href="#i-refresh"></use></svg></button>
+                    <button class="btn btn-icon btn-sm icon-close" type="button" id="picker-close" aria-label="Zamknij wybór">
+                      <svg class="icon"><use href="#i-plus"></use></svg>
+                    </button>
                   </div>
                 </div>
-                <div class="card-body">
-                  <div class="btn-group w-100 mb-3" role="group">
-                    <input type="radio" class="btn-check" name="photo-folder" id="pf-all" checked>
-                    <label for="pf-all" class="btn btn-sm">Wszystkie</label>
-                    <input type="radio" class="btn-check" name="photo-folder" id="pf-photo">
-                    <label for="pf-photo" class="btn btn-sm">Photo</label>
-                    <input type="radio" class="btn-check" name="photo-folder" id="pf-sel">
-                    <label for="pf-sel" class="btn btn-sm">Wybrane</label>
-                  </div>
-                  <div class="row g-2 scroll-y" id="photo-grid" style="max-height:min(48vh,460px)"></div>
+                <div class="card-body pb-2">
+                  <select class="form-select form-select-sm" id="picker-folder" aria-label="Folder ze zdjęciami"></select>
                 </div>
-                <div class="card-footer">
-                  <button class="btn btn-sm w-100" type="button"><svg class="icon"><use href="#i-upload"></use></svg>Prześlij zdjęcia</button>
+                <div class="card-body pt-2 scroll-y">
+                  <div class="row g-2" id="picker-grid"></div>
+                  <p class="text-secondary small mb-0 d-none" id="picker-empty">
+                    W tym folderze nie ma zdjęć. Wgraj je w Bibliotece zdjęć.
+                  </p>
+                </div>
+                <div class="card-footer d-none" id="picker-crop">
+                  <label class="form-label small mb-1">Powiększenie</label>
+                  <input type="range" class="form-range mb-2" id="crop-zoom" min="1" max="3" step="0.05" value="1">
+                  <div class="row g-2">
+                    <div class="col">
+                      <label class="form-label small mb-1">W poziomie</label>
+                      <input type="range" class="form-range" id="crop-x" min="-1" max="1" step="0.02" value="0">
+                    </div>
+                    <div class="col">
+                      <label class="form-label small mb-1">W pionie</label>
+                      <input type="range" class="form-range" id="crop-y" min="-1" max="1" step="0.02" value="0">
+                    </div>
+                  </div>
+                  <div class="text-secondary small mt-2">Kadr zostaje w obszarze wyznaczonym przez grafika.</div>
                 </div>
               </div>
             </div>
+
+          </div>
+
+          <div class="empty" id="editor-empty">
+            <div class="empty-icon"><svg class="icon icon-lg"><use href="#i-template"></use></svg></div>
+            <p class="empty-title">Nie wybrano grafiki</p>
+            <p class="empty-subtitle text-secondary">
+              Wejdź w mecz i otwórz materiał z listy albo wybierz szablon w „Inne grafiki”.
+            </p>
           </div>
         </div>
       </div>

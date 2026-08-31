@@ -275,6 +275,23 @@ async function headObject(key) {
   }
 }
 
+/**
+ * Strumień z zawartością obiektu. Używany przez trasę podającą zdjęcie
+ * z naszej domeny — nie buforujemy pliku w pamięci, tylko przepuszczamy dalej.
+ */
+async function getObjectStream(key) {
+  try {
+    const result = await getClient().send(new GetObjectCommand({ Bucket: getBucket(), Key: normalizeKey(key) }));
+    return {
+      body: result.Body,
+      contentType: result.ContentType || null,
+      contentLength: Number(result.ContentLength) || null
+    };
+  } catch (error) {
+    throw wrap(error, 'Nie udało się pobrać pliku z magazynu');
+  }
+}
+
 async function deleteObject(key) {
   try {
     await getClient().send(new DeleteObjectCommand({ Bucket: getBucket(), Key: normalizeKey(key) }));
@@ -331,6 +348,7 @@ module.exports = {
   testConnection,
   listObjects,
   headObject,
+  getObjectStream,
   deleteObject,
   putObject,
   presignDownload,
