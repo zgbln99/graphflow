@@ -110,3 +110,11 @@
 .object-cover{object-fit:cover}
 #library-dropzone.is-dropping{outline:2px dashed var(--tblr-primary);outline-offset:-8px;background:rgba(13,143,79,.06)}
 .list-group-item .min-w-0{min-width:0}
+
+/* Kafelek zdjęcia, którego nie ma już w buckecie (indeks rozjechał się z magazynem) */
+.photo-missing-note{display:none}
+.photo-tile.is-missing{border-color:var(--tblr-warning);border-style:dashed}
+.photo-tile.is-missing img{display:none}
+.photo-tile.is-missing .photo-missing-note{display:flex;position:absolute;inset:0;
+  align-items:center;justify-content:center;text-align:center;
+  padding:.75rem;font-size:.75rem;line-height:1.3;color:var(--tblr-secondary)}

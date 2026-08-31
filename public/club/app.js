@@ -1414,7 +1414,9 @@ function renderPhotos() {
       <div class="photo-tile photo-tile-43 ${Number(photo.is_selected) === 1 ? 'selected' : ''}"
            data-photo-id="${photo.id}" title="${escapeHTML(photo.file_name)}">
         ${photo.url ? `<img src="${escapeHTML(photo.url)}" alt="${escapeHTML(photo.file_name)}" loading="lazy"
-             class="position-absolute top-0 start-0 w-100 h-100 object-cover rounded">` : ''}
+             class="position-absolute top-0 start-0 w-100 h-100 object-cover rounded"
+             onerror="this.closest('.photo-tile').classList.add('is-missing')">` : ''}
+        <span class="photo-missing-note">Nie ma go już w magazynie — kliknij „Synchronizuj”</span>
         <div class="position-absolute bottom-0 start-0 end-0 p-1 d-flex align-items-center gap-1">
           ${canSelectPhotos ? `
             <button class="btn btn-icon btn-sm ${Number(photo.is_selected) === 1 ? 'btn-primary' : ''}"
@@ -1432,7 +1434,9 @@ function renderPhotos() {
   const selected = photos.filter((photo) => Number(photo.is_selected) === 1).length;
   if (lib.footer) {
     lib.footer.classList.remove('d-none');
-    lib.footer.textContent = `${photos.length} zdjęć w indeksie · ${selected} wybranych · bucket ${currentFolder.bucket}/${currentFolder.prefix_path}`;
+    lib.footer.textContent = `${photos.length} ${plural(photos.length, 'zdjęcie', 'zdjęcia', 'zdjęć')} w indeksie`
+      + ` · ${selected} ${plural(selected, 'wybrane', 'wybrane', 'wybranych')}`
+      + ` · bucket ${currentFolder.bucket}/${currentFolder.prefix_path}`;
   }
 }
 
@@ -1531,46 +1535,98 @@ lib.grid?.addEventListener('click', async (event) => {
   }
 });
 
-/* ---- wysyłka zdjęć: presigned PUT prosto do bucketa (§13) ---- */
+/* ---- wysyłka zdjęć ----
+   MEGA S4 nie pozwala ustawić CORS, więc przeglądarka nie może wysłać pliku
+   wprost do bucketa — pliki idą przez nasz serwer, partiami, żeby pasek
+   postępu pokazywał realny stan, a zerwane połączenie nie cofało całości. */
+
+/** Polska odmiana liczebnika: 1 plik, 2 pliki, 5 plików. */
+function plural(count, one, few, many) {
+  const n = Math.abs(count);
+  if (n === 1) return one;
+  const lastTwo = n % 100;
+  const last = n % 10;
+  if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return few;
+  return many;
+}
+
+const UPLOAD_BATCH = 5;
+
+function setUploadProgress(done, total) {
+  if (!lib.progress) return;
+  const bar = lib.progress.querySelector('.progress-bar');
+  if (!bar) return;
+  if (total === null) {
+    bar.className = 'progress-bar progress-bar-indeterminate';
+    bar.style.width = '';
+    bar.textContent = '';
+    return;
+  }
+  const percent = Math.round(done / total * 100);
+  bar.className = 'progress-bar';
+  bar.style.width = `${percent}%`;
+  bar.textContent = `${done} / ${total}`;
+}
+
+/** XHR zamiast fetch — tylko on daje postęp wysyłki. */
+function sendBatch(folderId, files, onProgress) {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    files.forEach((file) => form.append('files', file, file.name));
+
+    const request = new XMLHttpRequest();
+    request.open('POST', `/api/folders/${folderId}/upload`);
+    request.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total);
+    });
+    request.addEventListener('load', () => {
+      let payload = {};
+      try { payload = JSON.parse(request.responseText); } catch { /* pusta odpowiedź */ }
+      if (request.status >= 200 && request.status < 300 && payload.success !== false) return resolve(payload);
+      reject(new Error(payload.error || `Serwer odrzucił wysyłkę (HTTP ${request.status}).`));
+    });
+    request.addEventListener('error', () => reject(new Error('Połączenie przerwane w trakcie wysyłki.')));
+    request.send(form);
+  });
+}
 
 async function uploadFiles(fileList) {
-  const files = [...fileList].filter((file) => file.type.startsWith('image/'));
-  if (!currentFolder || !files.length) return;
+  const all = [...fileList];
+  const files = all.filter((file) => file.type.startsWith('image/'));
+  const skipped = all.length - files.length;
+  if (!currentFolder) return;
 
-  setLibraryError('');
+  // Pliki inne niż zdjęcia odrzucamy od razu, ale mówimy o tym wprost —
+  // po przeciągnięciu całego katalogu łatwo nie zauważyć, że część nie poszła.
+  setLibraryError(skipped
+    ? `Pominięto ${skipped} ${plural(skipped, 'plik', 'pliki', 'plików')}, ${plural(skipped, 'który nie jest zdjęciem', 'które nie są zdjęciami', 'które nie są zdjęciami')}.`
+    : '');
+  if (!files.length) return;
+
   setLibraryBusy(true);
+  setUploadProgress(0, files.length);
+
+  let sent = 0;
   try {
-    const payload = await api(`/api/folders/${currentFolder.id}/upload-url`, {
-      method: 'POST',
-      body: JSON.stringify({ files: files.map((file) => ({ name: file.name, size: file.size })) })
-    });
-
-    const uploaded = [];
-    for (let i = 0; i < files.length; i += 1) {
-      const target = payload.uploads[i];
-      const response = await fetch(target.url, {
-        method: 'PUT',
-        headers: { 'Content-Type': target.contentType },
-        body: files[i]
-      });
-      if (!response.ok) {
-        throw new Error(`Magazyn odrzucił plik ${files[i].name} (HTTP ${response.status}). `
-          + 'Jeśli to pierwszy upload, sprawdź regułę CORS bucketa w Ustawieniach.');
-      }
-      uploaded.push(target.key);
+    for (let i = 0; i < files.length; i += UPLOAD_BATCH) {
+      const batch = files.slice(i, i + UPLOAD_BATCH);
+      const payload = await sendBatch(currentFolder.id, batch,
+        (ratio) => setUploadProgress(sent + ratio * batch.length, files.length));
+      sent += batch.length;
+      setUploadProgress(sent, files.length);
+      photos = payload.photos;
     }
-
-    const registered = await api(`/api/folders/${currentFolder.id}/register`, {
-      method: 'POST',
-      body: JSON.stringify({ keys: uploaded })
-    });
-    photos = registered.photos;
     renderPhotos();
     await loadFolders();
   } catch (error) {
-    setLibraryError(error.message);
+    // Partie wysłane przed błędem są już w magazynie — pokazujemy je zamiast udawać, że nic się nie stało.
+    setLibraryError(sent
+      ? `${error.message} Wysłano ${sent} z ${files.length} — pozostałe spróbuj ponownie.`
+      : error.message);
+    if (sent) await selectFolder(currentFolder.id);
   } finally {
     setLibraryBusy(false);
+    setUploadProgress(null, null);
     if (lib.fileInput) lib.fileInput.value = '';
   }
 }
@@ -1655,12 +1711,11 @@ folderForm?.addEventListener('submit', async (event) => {
 /* ---- ustawienia: test połączenia i reguła CORS ---- */
 
 const storageTestBtn = document.getElementById('storage-test-btn');
-const storageCorsBtn = document.getElementById('storage-cors-btn');
 const storageTestResult = document.getElementById('storage-test-result');
 
 function showStorageResult(kind, html) {
   if (!storageTestResult) return;
-  // d-block: Tabler układa treść alertu w wiersz, a blok z regułą CORS ma być pełnej szerokości.
+  // d-block: Tabler układa treść alertu w wiersz, a komunikat ma być pełnej szerokości.
   storageTestResult.className = `mt-3 alert alert-${kind} d-block`;
   storageTestResult.innerHTML = html;
 }
@@ -1678,16 +1733,6 @@ storageTestBtn?.addEventListener('click', async () => {
   }
 });
 
-storageCorsBtn?.addEventListener('click', async () => {
-  try {
-    const payload = await api('/api/storage/status');
-    showStorageResult('info',
-      '<div class="mb-2">Wklej tę regułę CORS w panelu MEGA S4, żeby przeglądarka mogła wysyłać zdjęcia:</div>'
-      + `<pre class="mb-0 overflow-auto"><code>${escapeHTML(JSON.stringify(payload.cors, null, 2))}</code></pre>`);
-  } catch (error) {
-    showStorageResult('danger', escapeHTML(error.message));
-  }
-});
 
 // Fotograf ma w nagłówku skrót do wysyłki — prowadzi do biblioteki zdjęć.
 document.getElementById('new-action')?.addEventListener('click', (event) => {

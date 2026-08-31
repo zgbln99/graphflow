@@ -897,7 +897,7 @@
                 <div class="card-header">
                   <div>
                     <h3 class="card-title">Magazyn zdjęć</h3>
-                    <div class="text-secondary small">Storage zgodny z S3 — zdjęcia, assety i eksporty poza serwerem aplikacji.</div>
+                    <div class="text-secondary small">MEGA S4 (API zgodne z S3). Zdjęcia idą przez serwer aplikacji — MEGA nie pozwala ustawić CORS, więc przeglądarka nie może wysyłać ich wprost do bucketa. Klucze dostępu zostają na serwerze.</div>
                   </div>
                 </div>
                 <div class="card-body">
@@ -923,8 +923,8 @@
                       <div class="datagrid-content"><code><%= st.accessKey || '—' %></code></div>
                     </div>
                     <div class="datagrid-item">
-                      <div class="datagrid-title">Ważność linków</div>
-                      <div class="datagrid-content">wysyłka <%= Math.round(st.uploadUrlTtl / 60) %> min · podgląd <%= Math.round(st.downloadUrlTtl / 60) %> min</div>
+                      <div class="datagrid-title">Ważność podglądów</div>
+                      <div class="datagrid-content"><%= Math.round(st.downloadUrlTtl / 60) %> min</div>
                     </div>
                   </div>
                   <% if (st.missing.length) { %>
@@ -936,14 +936,13 @@
                 </div>
                 <div class="card-footer d-flex align-items-center">
                   <span class="text-secondary small">Konfiguracja pochodzi z pliku <code>.env</code> na serwerze — nie z tego panelu.</span>
-                  <div class="ms-auto btn-list">
-                    <button class="btn btn-sm" type="button" id="storage-cors-btn">Reguła CORS</button>
-                    <% if (role === 'admin') { %>
+                  <% if (role === 'admin') { %>
+                    <div class="ms-auto">
                       <button class="btn btn-primary btn-sm" type="button" id="storage-test-btn" <%= st.configured ? '' : 'disabled' %>>
                         Testuj połączenie
                       </button>
-                    <% } %>
-                  </div>
+                    </div>
+                  <% } %>
                 </div>
               </div>
             </div>

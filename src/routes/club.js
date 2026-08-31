@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
+const os = require('os');
 const fs = require('fs');
 const Database = require('../config/database');
 const {
@@ -435,17 +436,31 @@ router.delete('/api/assets/:id', requireAuth, requireRole('admin', 'designer'), 
 
 /* ============================ MAGAZYN ZDJĘĆ (S3 / MEGA S4) ============================ */
 
-// Ile plików naraz można podpisać do wysyłki — jeden fotograf zrzuca zwykle
-// całą kartę, ale bez limitu łatwo o przypadkowe podpisanie tysięcy kluczy.
-const MAX_UPLOAD_BATCH = 100;
+// Ile plików naraz przyjmujemy w jednym żądaniu. Fotograf zrzuca całą kartę,
+// ale przeglądarka wysyła to partiami — dzięki temu pasek postępu ma sens,
+// a jedno zerwane połączenie nie unieważnia całej wysyłki.
+const MAX_UPLOAD_BATCH = 20;
+const MAX_PHOTO_SIZE = 60 * 1024 * 1024;
+
+// Katalog przelotowy: plik leży tu tylko na czas strumieniowania do bucketa.
+const photoTmpDir = path.join(os.tmpdir(), 'zmc-uploads');
+fs.mkdirSync(photoTmpDir, { recursive: true });
+
+const uploadPhotos = multer({
+  storage: multer.diskStorage({ destination: photoTmpDir }),
+  limits: { fileSize: MAX_PHOTO_SIZE, files: MAX_UPLOAD_BATCH },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new repo.ValidationError(`Plik ${file.originalname} nie jest zdjęciem (JPG, PNG, WEBP).`, 'files'));
+    }
+    cb(null, true);
+  }
+});
 
 router.get('/api/storage/status', requireAuth, async (req, res, next) => {
   try {
-    res.json({
-      success: true,
-      storage: storage.getStorageStatus(),
-      cors: storage.corsPolicy(`${req.protocol}://${req.get('host')}`)
-    });
+    res.json({ success: true, storage: storage.getStorageStatus() });
   } catch (err) { next(err); }
 });
 
@@ -514,76 +529,79 @@ router.get('/api/folders/:id/photos', requireAuth, async (req, res, next) => {
 });
 
 /**
- * §13: przeglądarka nie dostaje klucza do bucketa. Serwer podpisuje adresy PUT
- * na konkretne pliki, a wysyłka idzie bezpośrednio do magazynu.
+ * Multer zgłasza własne błędy (za duży plik, za dużo plików, zły format).
+ * Bez tego opakowania trafiłyby do globalnej obsługi błędów jako 500,
+ * a formularz pokazałby "Operacja nie powiodła się" zamiast konkretu.
  */
-router.post('/api/folders/:id/upload-url', requireAuth,
-  requireRole('admin', 'designer', 'photographer'), async (req, res, next) => {
+function receivePhotos(req, res, next) {
+  uploadPhotos.array('files', MAX_UPLOAD_BATCH)(req, res, (error) => {
+    if (!error) return next();
+    (req.files || []).forEach((file) => fs.unlink(file.path, () => {}));
+
+    if (error instanceof multer.MulterError) {
+      const messages = {
+        LIMIT_FILE_SIZE: `Maksymalny rozmiar zdjęcia to ${Math.round(MAX_PHOTO_SIZE / 1024 / 1024)} MB.`,
+        LIMIT_FILE_COUNT: `Maksymalnie ${MAX_UPLOAD_BATCH} zdjęć w jednej partii.`
+      };
+      return res.status(400).json({ success: false, error: messages[error.code] || 'Nie udało się odebrać plików.' });
+    }
+    return handleRepoError(res, next, error);
+  });
+}
+
+/**
+ * Wysyłka zdjęć do magazynu.
+ *
+ * MEGA S4 nie pozwala skonfigurować CORS, więc przeglądarka nie może wysłać
+ * pliku wprost do bucketa — plik idzie przez nasz serwer. Multer zapisuje go
+ * do katalogu tymczasowego, stamtąd strumień trafia do magazynu i plik
+ * tymczasowy znika. Klucze dostępu zostają po stronie serwera (§13).
+ */
+router.post('/api/folders/:id/upload', requireAuth,
+  requireRole('admin', 'designer', 'photographer'),
+  receivePhotos, async (req, res, next) => {
+    const files = req.files || [];
+    const cleanup = () => files.forEach((file) => fs.unlink(file.path, () => {}));
+
     try {
       const folder = await repo.getFolder(req.params.id);
       if (!folder) return res.status(404).json({ success: false, error: 'Nie znaleziono folderu.' });
       if (!folder.is_upload_enabled) {
         return res.status(409).json({ success: false, error: 'Wysyłka do tego folderu jest wyłączona.' });
       }
-
-      const files = Array.isArray(req.body?.files) ? req.body.files : [];
-      if (!files.length) return res.status(400).json({ success: false, error: 'Nie wskazano plików.' });
-      if (files.length > MAX_UPLOAD_BATCH) {
-        return res.status(400).json({
-          success: false,
-          error: `Maksymalnie ${MAX_UPLOAD_BATCH} plików naraz — podziel wysyłkę na partie.`
-        });
-      }
-
-      const uploads = [];
-      for (const file of files) {
-        const name = storage.safeFileName(file?.name || '');
-        if (!storage.isImageKey(name)) {
-          return res.status(400).json({ success: false, error: `Plik ${file?.name || ''} nie jest zdjęciem (JPG, PNG, WEBP).` });
-        }
-        // Znacznik czasu chroni przed nadpisaniem pliku o tej samej nazwie z innego aparatu.
-        const key = `${folder.prefix_path}${Date.now().toString(36)}-${name}`;
-        uploads.push({
-          originalName: file?.name || name,
-          ...(await storage.presignUpload(key, { contentType: storage.contentTypeFor(name) }))
-        });
-      }
-
-      res.json({ success: true, uploads });
-    } catch (err) { handleRepoError(res, next, err); }
-  });
-
-/** Po zakończonej wysyłce przeglądarka zgłasza klucze — serwer sprawdza je w buckecie i indeksuje. */
-router.post('/api/folders/:id/register', requireAuth,
-  requireRole('admin', 'designer', 'photographer'), async (req, res, next) => {
-    try {
-      const folder = await repo.getFolder(req.params.id);
-      if (!folder) return res.status(404).json({ success: false, error: 'Nie znaleziono folderu.' });
-
-      const keys = Array.isArray(req.body?.keys) ? req.body.keys.slice(0, MAX_UPLOAD_BATCH) : [];
-      if (!keys.length) return res.status(400).json({ success: false, error: 'Nie wskazano plików.' });
+      if (!files.length) return res.status(400).json({ success: false, error: 'Nie wybrano plików.' });
 
       const objects = [];
-      for (const rawKey of keys) {
-        const key = storage.normalizeKey(rawKey);
-        // Klucz musi leżeć w prefixie folderu — inaczej upload mógłby zaindeksować cudzy katalog.
-        if (!key.startsWith(folder.prefix_path)) {
-          return res.status(400).json({ success: false, error: 'Plik spoza folderu.' });
-        }
-        const head = await storage.headObject(key);
+      for (const file of files) {
+        const name = storage.safeFileName(file.originalname);
+        // Znacznik czasu chroni przed nadpisaniem pliku o tej samej nazwie z innego aparatu.
+        const key = `${folder.prefix_path}${Date.now().toString(36)}-${name}`;
+
+        await storage.putObject(key, fs.createReadStream(file.path), {
+          contentType: storage.contentTypeFor(name, file.mimetype),
+          contentLength: file.size
+        });
+
         objects.push({
           key,
           fileName: key.split('/').pop(),
-          size: head.size,
-          etag: head.etag,
-          lastModified: head.lastModified,
-          metadata: { contentType: head.contentType, uploadedBy: req.session.user.id }
+          size: file.size,
+          lastModified: new Date(),
+          metadata: { originalName: file.originalname, uploadedBy: req.session.user.id }
         });
       }
 
       await repo.upsertPhotos(folder.id, objects);
-      res.status(201).json({ success: true, photos: await withPreviewUrls(await repo.listPhotos(folder.id)) });
-    } catch (err) { handleRepoError(res, next, err); }
+      res.status(201).json({
+        success: true,
+        uploaded: objects.length,
+        photos: await withPreviewUrls(await repo.listPhotos(folder.id))
+      });
+    } catch (err) {
+      handleRepoError(res, next, err);
+    } finally {
+      cleanup();
+    }
   });
 
 router.patch('/api/photos/:id', requireAuth, requireRole('admin', 'designer', 'social'), async (req, res, next) => {

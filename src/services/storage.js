@@ -28,7 +28,6 @@ class StorageError extends Error {
   }
 }
 
-const UPLOAD_URL_TTL = toPositiveInt(process.env.S3_UPLOAD_URL_TTL, 900);
 const DOWNLOAD_URL_TTL = toPositiveInt(process.env.S3_DOWNLOAD_URL_TTL, 3600);
 const LIST_HARD_LIMIT = 5000;
 
@@ -95,7 +94,6 @@ function getStorageStatus() {
     accessKey: config.accessKey ? maskKey(config.accessKey) : null,
     missing: ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY']
       .filter((name) => !env(name)),
-    uploadUrlTtl: UPLOAD_URL_TTL,
     downloadUrlTtl: DOWNLOAD_URL_TTL
   };
 }
@@ -286,21 +284,28 @@ async function deleteObject(key) {
 }
 
 /**
- * Presigned PUT — przeglądarka wysyła plik prosto do bucketa, z pominięciem
- * naszego serwera (§13). Adres jest ważny kilkanaście minut i dotyczy
- * jednego, konkretnego klucza.
+ * Wysyłka pliku do bucketa.
+ *
+ * MEGA S4 nie obsługuje konfiguracji CORS (brak PutBucketCors w API i brak tej
+ * opcji w panelu), więc przeglądarka nie może wysłać pliku wprost do magazynu —
+ * zablokowałaby takie żądanie sama. Plik idzie więc przez nasz serwer, ale
+ * strumieniem: nie ląduje w pamięci procesu, a klucze dostępu i tak nigdy nie
+ * opuszczają serwera, co było celem §13.
  */
-async function presignUpload(key, { contentType = null, expiresIn = UPLOAD_URL_TTL } = {}) {
+async function putObject(key, body, { contentType = null, contentLength = null } = {}) {
   const normalized = normalizeKey(key);
   try {
-    const url = await getSignedUrl(getClient(), new PutObjectCommand({
+    await getClient().send(new PutObjectCommand({
       Bucket: getBucket(),
       Key: normalized,
-      ContentType: contentType || contentTypeFor(normalized)
-    }), { expiresIn });
-    return { key: normalized, url, expiresIn, contentType: contentType || contentTypeFor(normalized) };
+      Body: body,
+      ContentType: contentType || contentTypeFor(normalized),
+      // Bez jawnej długości SDK musiałby buforować strumień, żeby ją policzyć.
+      ContentLength: contentLength ?? undefined
+    }));
+    return normalized;
   } catch (error) {
-    throw wrap(error, 'Nie udało się przygotować adresu do wysyłki');
+    throw wrap(error, 'Nie udało się wysłać pliku do magazynu');
   }
 }
 
@@ -318,21 +323,6 @@ async function presignDownload(key, { expiresIn = DOWNLOAD_URL_TTL, download = f
   }
 }
 
-/**
- * Reguła CORS, którą trzeba wkleić w panelu MEGA S4, żeby przeglądarka mogła
- * wysyłać pliki presigned PUT-em. Pokazujemy ją w ustawieniach zamiast kazać
- * właścicielowi szukać w dokumentacji.
- */
-function corsPolicy(origin) {
-  return [{
-    AllowedOrigins: [origin || env('APP_URL') || 'https://srv33-20319.wykr.es'],
-    AllowedMethods: ['GET', 'PUT', 'HEAD'],
-    AllowedHeaders: ['*'],
-    ExposeHeaders: ['ETag'],
-    MaxAgeSeconds: 3000
-  }];
-}
-
 module.exports = {
   StorageError,
   isConfigured,
@@ -342,13 +332,12 @@ module.exports = {
   listObjects,
   headObject,
   deleteObject,
-  presignUpload,
+  putObject,
   presignDownload,
   normalizeKey,
   normalizePrefix,
   safeFileName,
   contentTypeFor,
   isImageKey,
-  corsPolicy,
   resetClient
 };
