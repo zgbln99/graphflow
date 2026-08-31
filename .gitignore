@@ -1,4 +1,8 @@
-# Uploads (user files)
+# Pliki wgrywane przez użytkowników (logo klubu, overlaye szablonów, zdjęcia).
+# Wzorzec ze slashem jest zakotwiczony w katalogu .gitignore, więc samo
+# "uploads/*" nie obejmowało public/uploads — stąd jawna ścieżka.
+/public/uploads/**
+!/public/uploads/.gitkeep
 uploads/*
 !uploads/.gitkeep
 
@@ -15,3 +19,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Zależności
+node_modules/

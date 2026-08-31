@@ -17,6 +17,9 @@ class Database {
             database: process.env.DB_NAME || 'panel_zlecen',
             port: process.env.DB_PORT || 3306,
             charset: 'utf8mb4',
+            // DATETIME wraca jako 'YYYY-MM-DD HH:MM:SS', a nie jako obiekt Date:
+            // dzięki temu zapis i odczyt są symetryczne i nie zależą od strefy czasowej.
+            dateStrings: true,
             waitForConnections: true,
             connectionLimit: 10,
             queueLimit: 0

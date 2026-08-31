@@ -1,0 +1,294 @@
+/**
+ * Silnik rysujący szablon na płótnie.
+ *
+ * Ten sam kod obsługuje podgląd i eksport — różni je wyłącznie skala. Rysujemy
+ * zawsze w układzie współrzędnych szablonu (np. 1080×1350), a skalowanie robi
+ * transformacja płótna. Dzięki temu eksport ma natywną rozdzielczość szablonu
+ * niezależnie od wielkości podglądu (§15).
+ *
+ * Kolejność rysowania wynika z pola z warstwy — overlay z przezroczystością
+ * leży nad zdjęciem, zdjęcie nad tłem (§9).
+ */
+(function (global) {
+  'use strict';
+
+  const imageCache = new Map();
+
+  /** Adresem obrazka jest tylko ścieżka, URL albo data: — nie dowolny tekst z formularza. */
+  function isImageUrl(value) {
+    return typeof value === 'string'
+      && (value.startsWith('/') || value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:'));
+  }
+
+  /** Wyciąga adres i kadrowanie z wartości pola zdjęcia. */
+  function photoValue(value) {
+    if (value && typeof value === 'object') {
+      return { url: isImageUrl(value.url) ? value.url : null, crop: value.crop || {} };
+    }
+    return { url: isImageUrl(value) ? value : null, crop: {} };
+  }
+
+  /** Ładuje obrazek raz i trzyma go w pamięci podręcznej. */
+  function loadImage(src) {
+    if (!src) return Promise.resolve(null);
+    if (imageCache.has(src)) return imageCache.get(src);
+
+    const promise = new Promise((resolve) => {
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      image.onload = () => resolve(image);
+      image.onerror = () => resolve(null);
+      image.src = src;
+    });
+    imageCache.set(src, promise);
+    return promise;
+  }
+
+  /** Zbiera adresy wszystkich obrazków potrzebnych do narysowania szablonu. */
+  function collectSources(template, values, assetsById) {
+    const sources = [];
+    (template.definition.layers || []).forEach((layer) => {
+      if (layer.asset_id && assetsById[layer.asset_id]) {
+        const asset = assetsById[layer.asset_id];
+        sources.push(asset.url || asset.object_key);
+      }
+      if ((layer.type === 'photo' || layer.type === 'logo') && layer.field) {
+        const { url } = photoValue(values[layer.field]);
+        if (url) sources.push(url);
+      }
+    });
+    return [...new Set(sources)];
+  }
+
+  function roundedPath(ctx, x, y, w, h, radius) {
+    const r = Math.max(0, Math.min(radius, Math.min(w, h) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function clipToLayer(ctx, layer) {
+    if (layer.mask === 'circle') {
+      ctx.beginPath();
+      ctx.ellipse(layer.x + layer.w / 2, layer.y + layer.h / 2, layer.w / 2, layer.h / 2, 0, 0, Math.PI * 2);
+      ctx.closePath();
+    } else {
+      roundedPath(ctx, layer.x, layer.y, layer.w, layer.h, layer.radius || 0);
+    }
+    ctx.clip();
+  }
+
+  /**
+   * Zakres kadru. Powiększenie liczymy względem wpasowania w ramkę, więc 1 to
+   * „dokładnie na maskę". Poniżej jedynki zdjęcie robi się mniejsze od maski —
+   * i tak ma być, bo nie każde zdjęcie ma wypełniać cały kadr.
+   */
+  const CROP = { minZoom: 0.1, maxZoom: 4 };
+
+  function clampCrop(crop = {}) {
+    const between = (value, min, max, fallback) => {
+      const number = Number(value);
+      return Math.min(Math.max(Number.isFinite(number) ? number : fallback, min), max);
+    };
+    return {
+      zoom: between(crop.zoom, CROP.minZoom, CROP.maxZoom, 1),
+      x: between(crop.x, -1, 1, 0),
+      y: between(crop.y, -1, 1, 0)
+    };
+  }
+
+  /**
+   * Wpasowuje obrazek w obszar warstwy. Zwraca prostokąt docelowy
+   * z uwzględnieniem kadrowania użytkownika (przesunięcie i powiększenie);
+   * widoczna zostaje i tak tylko część w masce wyznaczonej przez grafika (§11).
+   */
+  function fitImage(image, layer, crop) {
+    const { zoom, x, y } = clampCrop(crop);
+    const scale = (layer.fit === 'contain'
+      ? Math.min(layer.w / image.width, layer.h / image.height)
+      : Math.max(layer.w / image.width, layer.h / image.height)) * zoom;
+
+    const drawWidth = image.width * scale;
+    const drawHeight = image.height * scale;
+    // Przesunięcie -1..1 liczymy w połówkach ramki, a nie w nadmiarze obrazu
+    // poza nią — inaczej przy zdjęciu mniejszym od maski kierunek by się
+    // odwracał, a przy zdjęciu równym masce przesuwanie nic by nie dawało.
+    return {
+      x: layer.x + (layer.w - drawWidth) / 2 + (x * layer.w) / 2,
+      y: layer.y + (layer.h - drawHeight) / 2 + (y * layer.h) / 2,
+      w: drawWidth,
+      h: drawHeight
+    };
+  }
+
+  // Kroje pisma muszą być te same w podglądzie i w eksporcie, więc lista
+  // mieszka tutaj, obok rysowania, a nie w warstwie interfejsu.
+  const FONT_STACKS = {
+    talk: '"ZT Talk", sans-serif',
+    'talk-expanded': '"ZT Talk Expanded", "ZT Talk", sans-serif',
+    sans: 'system-ui, "Segoe UI", Roboto, Arial, sans-serif',
+    serif: 'Georgia, "Times New Roman", serif',
+    mono: 'ui-monospace, "Courier New", monospace'
+  };
+
+  function fontStack(key) {
+    // Czcionka wgrana przez grafika ma rodzinę nazwaną numerem zasobu —
+    // rejestruje ją panel, zanim cokolwiek narysujemy.
+    if (typeof key === 'string' && key.startsWith('asset:')) {
+      return `"zmc-font-${key.slice(6)}", "ZT Talk", sans-serif`;
+    }
+    return FONT_STACKS[key] || FONT_STACKS.talk;
+  }
+
+  function drawText(ctx, layer, rawValue) {
+    const text = String(rawValue ?? layer.text ?? '');
+    if (!text) return;
+    const content = layer.uppercase ? text.toUpperCase() : text;
+
+    ctx.fillStyle = layer.color || '#ffffff';
+    // Gdy krój nie ma odmiany pochylonej, przeglądarka pochyla go sama.
+    ctx.font = `${layer.italic ? 'italic ' : ''}${layer.fontWeight || 700} `
+      + `${layer.fontSize || 64}px ${fontStack(layer.fontFamily)}`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = layer.align === 'center' ? 'center' : (layer.align === 'right' ? 'right' : 'left');
+    if ('letterSpacing' in ctx) ctx.letterSpacing = `${layer.letterSpacing || 0}px`;
+
+    const anchorX = layer.align === 'center'
+      ? layer.x + layer.w / 2
+      : (layer.align === 'right' ? layer.x + layer.w : layer.x);
+
+    // Łamanie wierszy do szerokości warstwy — tekst nie wychodzi poza obszar grafika.
+    const lineHeight = (layer.fontSize || 64) * (layer.lineHeight || 1.1);
+    const lines = [];
+    content.split('\n').forEach((paragraph) => {
+      let line = '';
+      paragraph.split(' ').forEach((word) => {
+        const candidate = line ? `${line} ${word}` : word;
+        if (ctx.measureText(candidate).width > layer.w && line) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = candidate;
+        }
+      });
+      lines.push(line);
+    });
+
+    lines.forEach((line, index) => ctx.fillText(line, anchorX, layer.y + index * lineHeight));
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+  }
+
+  function drawPlaceholder(ctx, layer, label) {
+    ctx.fillStyle = 'rgba(255,255,255,.05)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.22)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([12, 10]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    ctx.font = '500 28px "ZT Talk", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, layer.x + layer.w / 2, layer.y + layer.h / 2);
+  }
+
+  /**
+   * Rysuje szablon na płótnie.
+   * @param {HTMLCanvasElement} canvas płótno o wymiarach szablonu (lub przeskalowane)
+   * @param {object} template szablon z definition.layers
+   * @param {object} values wartości pól dynamicznych (klucz → wartość lub {url, crop})
+   * @param {Array} assets zasoby szablonu
+   * @param {object} options { placeholders: boolean }
+   */
+  async function render(canvas, template, values = {}, assets = [], options = {}) {
+    const { width, height } = template;
+    const ctx = canvas.getContext('2d');
+    const assetsById = {};
+    assets.forEach((asset) => { assetsById[asset.id] = asset; });
+
+    await Promise.all(collectSources(template, values, assetsById).map(loadImage));
+
+    const scale = canvas.width / width;
+    ctx.save();
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const layers = [...(template.definition.layers || [])].sort((a, b) => a.z - b.z);
+    for (const layer of layers) {
+      if (!layer.visible) continue;
+
+      ctx.save();
+      ctx.globalAlpha = layer.opacity ?? 1;
+      if (layer.rotation) {
+        const cx = layer.x + layer.w / 2;
+        const cy = layer.y + layer.h / 2;
+        ctx.translate(cx, cy);
+        ctx.rotate((layer.rotation * Math.PI) / 180);
+        ctx.translate(-cx, -cy);
+      }
+
+      const asset = layer.asset_id ? assetsById[layer.asset_id] : null;
+      const assetImage = asset ? await loadImage(asset.url || asset.object_key) : null;
+
+      if (layer.type === 'background') {
+        if (assetImage) {
+          ctx.drawImage(assetImage, layer.x, layer.y, layer.w, layer.h);
+        } else {
+          ctx.fillStyle = layer.color || '#111111';
+          roundedPath(ctx, layer.x, layer.y, layer.w, layer.h, layer.radius || 0);
+          ctx.fill();
+        }
+      } else if (layer.type === 'shape') {
+        ctx.fillStyle = layer.color || '#111111';
+        roundedPath(ctx, layer.x, layer.y, layer.w, layer.h, layer.radius || 0);
+        ctx.fill();
+      } else if (layer.type === 'photo') {
+        const { url, crop } = photoValue(layer.field ? values[layer.field] : null);
+        const photo = url ? await loadImage(url) : null;
+
+        ctx.save();
+        clipToLayer(ctx, layer);
+        if (photo) {
+          const box = fitImage(photo, layer, crop);
+          ctx.drawImage(photo, box.x, box.y, box.w, box.h);
+        } else if (options.placeholders !== false) {
+          drawPlaceholder(ctx, layer, layer.name || 'Zdjęcie');
+        }
+        ctx.restore();
+      } else if (layer.type === 'overlay' || layer.type === 'logo') {
+        // Logo rywala zmienia się co mecz, więc warstwa logo może być związana
+        // z polem tak samo jak zdjęcie; plik grafika służy wtedy za wartość domyślną.
+        const bound = layer.field ? photoValue(values[layer.field]) : { url: null, crop: {} };
+        const boundImage = bound.url ? await loadImage(bound.url) : null;
+
+        if (boundImage) {
+          ctx.save();
+          clipToLayer(ctx, layer);
+          const box = fitImage(boundImage, { ...layer, fit: layer.fit || 'contain' }, bound.crop);
+          ctx.drawImage(boundImage, box.x, box.y, box.w, box.h);
+          ctx.restore();
+        } else if (assetImage) {
+          ctx.drawImage(assetImage, layer.x, layer.y, layer.w, layer.h);
+        } else if (options.placeholders !== false) {
+          ctx.save();
+          roundedPath(ctx, layer.x, layer.y, layer.w, layer.h, 0);
+          drawPlaceholder(ctx, layer, `${layer.name} — brak pliku`);
+          ctx.restore();
+        }
+      } else if (layer.type === 'text') {
+        drawText(ctx, layer, layer.field ? values[layer.field] : null);
+      }
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  global.ZmcRenderer = { render, loadImage, fitImage, clampCrop, CROP };
+})(window);

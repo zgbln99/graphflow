@@ -1,0 +1,11 @@
+<%# Zalogowany użytkownik + wylogowanie %>
+<span class="avatar avatar-sm me-2"><%= initials %></span>
+<div class="flex-fill lh-sm text-truncate">
+  <div class="text-truncate"><%= user.displayName %></div>
+  <div class="text-secondary small text-truncate"><%= roleLabels[role] || role %></div>
+</div>
+<form method="post" action="/logout" class="ms-2">
+  <button type="submit" class="btn btn-icon btn-ghost-secondary" title="Wyloguj się" aria-label="Wyloguj się">
+    <svg class="icon"><use href="#i-logout"></use></svg>
+  </button>
+</form>

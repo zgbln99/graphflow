@@ -1,0 +1,1226 @@
+<!doctype html>
+<html lang="pl" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <title><%= title %></title>
+  <link rel="icon" href="<%= (branding && branding.logoUrl) ? branding.logoUrl : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%230b0d0d%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229%22 fill=%22none%22 stroke=%22%230d8f4f%22 stroke-width=%222%22/%3E%3Cpath d=%22M7 16h18M16 7c-3 4-3 14 0 18M16 7c3 4 3 14 0 18%22 fill=%22none%22 stroke=%22%230d8f4f%22 stroke-width=%221.4%22/%3E%3C/svg%3E' %>">
+  <link rel="stylesheet" href="/vendor/tabler/css/tabler.min.css">
+  <link rel="stylesheet" href="<%= asset('/club/brand.css') %>">
+</head>
+<%
+  const role = user.role || 'social';
+  const can = (...roles) => roles.includes(role);
+  const initials = String(user.displayName || user.email)
+    .split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
+  const roleLabels = { admin: 'Administrator', designer: 'Grafik', social: 'Social media', photographer: 'Fotograf' };
+  const d = dashboard;
+  const m = d.nextMatch;
+  const clubName = (branding && branding.clubName) || 'Zastal';
+  const progress = d.counters.materialsTotal
+    ? Math.round(d.counters.materialsReady / d.counters.materialsTotal * 100)
+    : 0;
+  // Układ nawigacji: pasek górny (wariant wybrany przez właściciela projektu).
+  const partials = { branding, user, role, can, initials, roleLabels, d, integrations };
+  const st = storage;
+%>
+<body class="app-body" data-role="<%= role %>" data-club="<%= clubName %>">
+<%- include('_icons') %>
+
+<div class="page">
+  <!-- ======================= NAWIGACJA ======================= -->
+  <header class="navbar navbar-expand-md d-print-none" data-bs-theme="dark">
+    <div class="container-fluid">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topbar-menu"
+              aria-controls="topbar-menu" aria-expanded="false" aria-label="Menu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="navbar-brand navbar-brand-club me-3 me-lg-4"><%- include('_brand', partials) %></div>
+
+      <div class="navbar-nav flex-row order-md-last ms-auto align-items-center">
+        <div class="nav-item status-magazyn d-none d-md-flex me-3">
+          <span class="status status-lite <%= st.configured ? 'status-green' : 'status-warning' %>"
+                id="storage-chip"
+                title="<%= st.configured ? ('Magazyn: ' + st.bucket + ' @ ' + st.endpoint) : 'Magazyn zdjęć nieskonfigurowany — uzupełnij S3_* w .env' %>">
+            <span class="status-dot"></span>Magazyn
+          </span>
+        </div>
+        <div class="d-flex align-items-center"><%- include('_user', partials) %></div>
+      </div>
+
+      <div class="collapse navbar-collapse" id="topbar-menu">
+        <ul class="navbar-nav"><%- include('_nav-items', partials) %></ul>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======================= OBSZAR ROBOCZY ======================= -->
+  <div class="page-wrapper">
+    <div class="page-header d-print-none">
+      <div class="container-fluid">
+        <div class="row g-2 align-items-center">
+          <div class="col">
+            <div class="page-pretitle" id="eyebrow"><%= d.season ? 'Sezon ' + d.season.name : 'Brak sezonu' %></div>
+            <h2 class="page-title" id="page-title">Dashboard</h2>
+          </div>
+          <div class="col-auto ms-auto">
+            <div class="btn-list align-items-center">
+              <% if (d.seasons.length) { %>
+                <select class="form-select form-select-sm w-auto" id="season-switch" aria-label="Aktywny sezon"
+                        <%= role === 'admin' ? '' : 'disabled' %>>
+                  <% d.seasons.forEach(season => { %>
+                    <option value="<%= season.id %>" <%= d.season && season.id === d.season.id ? 'selected' : '' %>>
+                      <%= season.name %>
+                    </option>
+                  <% }) %>
+                </select>
+              <% } %>
+              <% if (role === 'admin') { %>
+                <button class="btn btn-primary" id="new-action" type="button"
+                        data-match-new data-bs-toggle="modal" data-bs-target="#match-modal">
+                  <svg class="icon"><use href="#i-plus"></use></svg>Nowy mecz
+                </button>
+              <% } else if (role === 'photographer') { %>
+                <button class="btn btn-primary" id="new-action" type="button">
+                  <svg class="icon"><use href="#i-upload"></use></svg>Prześlij zdjęcia
+                </button>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- ==================== DASHBOARD ==================== -->
+      <div id="view-dashboard" class="view active-view">
+        <div class="container-fluid">
+
+          <% if (!d.season) { %>
+            <div class="empty">
+              <div class="empty-icon"><svg class="icon icon-lg"><use href="#i-calendar"></use></svg></div>
+              <p class="empty-title">Brak sezonu</p>
+              <p class="empty-subtitle text-secondary">
+                Aplikacja układa pracę wokół sezonu i meczów. Zacznij od utworzenia sezonu,
+                potem dodasz do niego mecze.
+              </p>
+              <% if (role === 'admin') { %>
+                <div class="empty-action">
+                  <button class="btn btn-primary" type="button" data-season-new data-bs-toggle="modal" data-bs-target="#season-modal">
+                    <svg class="icon"><use href="#i-plus"></use></svg>Utwórz sezon
+                  </button>
+                </div>
+              <% } else { %>
+                <p class="empty-subtitle text-secondary">Poproś administratora o utworzenie sezonu.</p>
+              <% } %>
+            </div>
+
+          <% } else if (!m) { %>
+            <div class="empty">
+              <div class="empty-icon"><svg class="icon icon-lg"><use href="#i-match"></use></svg></div>
+              <p class="empty-title">Sezon <%= d.season.name %> nie ma jeszcze meczów</p>
+              <p class="empty-subtitle text-secondary">Dodaj pierwszy mecz, żeby zobaczyć harmonogram materiałów.</p>
+              <% if (role === 'admin') { %>
+                <div class="empty-action">
+                  <button class="btn btn-primary" type="button" data-match-new data-bs-toggle="modal" data-bs-target="#match-modal">
+                    <svg class="icon"><use href="#i-plus"></use></svg>Dodaj mecz
+                  </button>
+                </div>
+              <% } %>
+            </div>
+
+          <% } else { %>
+            <div class="row row-cards">
+
+              <!-- Najbliższy mecz -->
+              <div class="col-12">
+                <div class="card">
+                  <div class="card-header">
+                    <h3 class="card-title">
+                      <%= m.status === 'finished' ? 'Ostatni mecz' : 'Najbliższy mecz' %>
+                    </h3>
+                    <div class="card-actions btn-actions">
+                      <% if (m.competition || m.round_name) { %>
+                        <span class="badge bg-secondary-lt me-2">
+                          <%= [m.competition, m.round_name].filter(Boolean).join(' · ') %>
+                        </span>
+                      <% } %>
+                      <span class="badge <%= fmt.matchStatus(m.status).badge %> me-2"><%= fmt.matchStatus(m.status).label %></span>
+                      <button class="btn btn-primary btn-sm" type="button" data-view="matches">Otwórz mecz</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="fixture-title mb-3">
+                      <span class="<%= fmt.isClub(m.home_team, clubName) ? 'club' : '' %>"><%= m.home_team %></span>
+                      <span class="text-secondary mx-2">—</span>
+                      <span class="<%= fmt.isClub(m.away_team, clubName) ? 'club' : '' %>"><%= m.away_team %></span>
+                      <% if (fmt.score(m)) { %>
+                        <span class="ms-3"><%= fmt.score(m) %></span>
+                      <% } %>
+                    </div>
+                    <div class="datagrid">
+                      <div class="datagrid-item">
+                        <div class="datagrid-title">Termin</div>
+                        <div class="datagrid-content"><%= fmt.dateTime(m.match_date) %></div>
+                      </div>
+                      <div class="datagrid-item">
+                        <div class="datagrid-title">Hala</div>
+                        <div class="datagrid-content"><%= m.venue || '—' %></div>
+                      </div>
+                      <div class="datagrid-item">
+                        <div class="datagrid-title">Do meczu</div>
+                        <div class="datagrid-content"><%= fmt.relativeDays(m.match_date) || '—' %></div>
+                      </div>
+                      <div class="datagrid-item d-none d-sm-block">
+                        <div class="datagrid-title">Materiały gotowe</div>
+                        <div class="datagrid-content"><%= d.counters.materialsReady %> / <%= d.counters.materialsTotal %></div>
+                      </div>
+                      <div class="datagrid-item d-none d-sm-block">
+                        <div class="datagrid-title">Zdjęcia w folderach</div>
+                        <div class="datagrid-content"><%= d.counters.photoCount %></div>
+                      </div>
+                      <div class="datagrid-item d-none d-sm-block">
+                        <div class="datagrid-title">Eksporty (7 dni)</div>
+                        <div class="datagrid-content"><%= d.counters.weekExports %></div>
+                      </div>
+                    </div>
+                  </div>
+                  <% if (d.counters.materialsTotal) { %>
+                    <div class="card-footer">
+                      <div class="row align-items-center g-2">
+                        <div class="col-auto text-secondary small">Pakiet materiałów meczowych</div>
+                        <div class="col">
+                          <div class="progress progress-sm">
+                            <div class="progress-bar bg-green" style="width: <%= progress %>%" role="progressbar"
+                                 aria-valuenow="<%= progress %>" aria-valuemin="0" aria-valuemax="100">
+                              <span class="visually-hidden"><%= progress %>% gotowych</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-auto text-secondary small"><%= d.counters.materialsReady %> / <%= d.counters.materialsTotal %> gotowych</div>
+                      </div>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+
+              <!-- Harmonogram materiałów -->
+              <div class="col-lg-8">
+                <div class="card">
+                  <div class="card-header">
+                    <h3 class="card-title">Materiały na ten mecz</h3>
+                    <div class="card-actions text-secondary small"><%= d.materials.length %></div>
+                  </div>
+                  <% if (!d.materials.length) { %>
+                    <div class="card-body text-secondary">
+                      Do tego meczu nie przypisano jeszcze żadnych szablonów.
+                      Pakiet grafik przypisuje się w bibliotece szablonów.
+                    </div>
+                  <% } else { %>
+                    <div class="table-responsive">
+                      <table class="table table-vcenter card-table">
+                        <thead>
+                          <tr><th>Materiał</th><th>Format</th><th>Termin</th><th>Odpowiedzialny</th><th class="w-1">Status</th></tr>
+                        </thead>
+                        <tbody>
+                          <% d.materials.forEach(item => { %>
+                            <tr>
+                              <td>
+                                <div><%= item.template_name %></div>
+                                <% if (item.note) { %><div class="text-secondary small"><%= item.note %></div><% } %>
+                              </td>
+                              <td class="text-secondary text-nowrap"><%= item.width %>×<%= item.height %></td>
+                              <td class="text-secondary text-nowrap">
+                                <%= item.deadline_at ? fmt.dateTime(item.deadline_at) : '—' %>
+                              </td>
+                              <td class="text-secondary"><%= item.owner_role ? fmt.roleLabel(item.owner_role) : '—' %></td>
+                              <td>
+                                <span class="badge <%= fmt.materialStatus(item.status).badge %>">
+                                  <%= fmt.materialStatus(item.status).label %>
+                                </span>
+                              </td>
+                            </tr>
+                          <% }) %>
+                        </tbody>
+                      </table>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+
+              <!-- Kolumna kontrolna -->
+              <div class="col-lg-4">
+                <div class="row row-cards">
+                  <div class="col-12">
+                    <div class="card">
+                      <div class="card-header">
+                        <h3 class="card-title">Wymaga decyzji</h3>
+                        <div class="card-actions">
+                          <span class="badge <%= d.alerts.length ? 'bg-red-lt' : 'bg-green-lt' %>"><%= d.alerts.length %></span>
+                        </div>
+                      </div>
+                      <% if (!d.alerts.length) { %>
+                        <div class="card-body text-secondary">Nic nie wymaga reakcji.</div>
+                      <% } else { %>
+                        <div class="list-group list-group-flush">
+                          <% d.alerts.forEach(item => { %>
+                            <div class="list-group-item">
+                              <div class="row align-items-center g-2">
+                                <div class="col-auto">
+                                  <span class="status-dot <%= item.level === 'urgent' ? 'status-dot-animated bg-red' : 'bg-yellow' %>"></span>
+                                </div>
+                                <div class="col">
+                                  <div><%= item.title %></div>
+                                  <div class="text-secondary small"><%= item.detail %></div>
+                                </div>
+                              </div>
+                            </div>
+                          <% }) %>
+                        </div>
+                      <% } %>
+                    </div>
+                  </div>
+
+                  <div class="col-12">
+                    <div class="card">
+                      <div class="card-header">
+                        <h3 class="card-title">Zdjęcia z meczu</h3>
+                        <div class="card-actions"><a href="#" class="btn btn-link btn-sm" data-view="library">Otwórz</a></div>
+                      </div>
+                      <div class="card-body">
+                        <% if (!d.photos.total) { %>
+                          <p class="text-secondary mb-0">Nie ma jeszcze zdjęć z tego spotkania.</p>
+                        <% } else { %>
+                          <div class="datagrid">
+                            <div class="datagrid-item">
+                              <div class="datagrid-title">W magazynie</div>
+                              <div class="datagrid-content"><%= d.photos.total %></div>
+                            </div>
+                            <div class="datagrid-item">
+                              <div class="datagrid-title">Wybrane do grafik</div>
+                              <div class="datagrid-content"><%= d.photos.selected %></div>
+                            </div>
+                            <div class="datagrid-item">
+                              <div class="datagrid-title">Ostatnia synchronizacja</div>
+                              <div class="datagrid-content">
+                                <%= d.photos.lastIndexedAt ? fmt.dateTime(d.photos.lastIndexedAt) : '—' %>
+                              </div>
+                            </div>
+                          </div>
+                        <% } %>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col-12">
+                    <div class="card">
+                      <div class="card-header">
+                        <h3 class="card-title">Ostatnie eksporty</h3>
+                        <div class="card-actions"><a href="#" class="btn btn-link btn-sm" data-view="history">Historia</a></div>
+                      </div>
+                      <% if (!d.exports.length) { %>
+                        <div class="card-body text-secondary">Nie wyeksportowano jeszcze żadnej grafiki.</div>
+                      <% } else { %>
+                        <div class="list-group list-group-flush">
+                          <% d.exports.forEach(item => { %>
+                            <div class="list-group-item d-flex align-items-center">
+                              <div class="flex-fill text-truncate">
+                                <div class="text-truncate"><%= item.design_title || item.template_name %></div>
+                                <div class="text-secondary small text-truncate">
+                                  <%= item.format.toUpperCase() %> <%= item.width %>×<%= item.height %>
+                                </div>
+                              </div>
+                              <span class="text-secondary small ms-2"><%= fmt.date(item.created_at) %></span>
+                            </div>
+                          <% }) %>
+                        </div>
+                      <% } %>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- ==================== MECZE ==================== -->
+      <div id="view-matches" class="view">
+        <div class="container-fluid">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                Mecze<% if (d.season) { %> — sezon <%= d.season.name %><% } %>
+              </h3>
+              <div class="card-actions d-flex gap-2">
+                <div class="input-group input-group-flat w-auto">
+                  <span class="input-group-text"><svg class="icon"><use href="#i-search"></use></svg></span>
+                  <input type="search" class="form-control" id="match-search" placeholder="Szukaj drużyny lub hali…" aria-label="Szukaj meczu">
+                </div>
+                <select class="form-select w-auto" id="match-status-filter" aria-label="Status">
+                  <option value="">Wszystkie statusy</option>
+                  <option value="planned">Zaplanowane</option>
+                  <option value="live">Na żywo</option>
+                  <option value="finished">Rozegrane</option>
+                  <option value="cancelled">Odwołane</option>
+                </select>
+                <% if (role === 'admin') { %>
+                  <button class="btn btn-primary" type="button" data-match-new data-bs-toggle="modal" data-bs-target="#match-modal">
+                    <svg class="icon"><use href="#i-plus"></use></svg>Dodaj mecz
+                  </button>
+                <% } %>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-vcenter card-table table-hover">
+                <thead>
+                  <tr>
+                    <th>Mecz</th><th>Termin</th><th>Wynik</th><th>Status</th><th>Materiały</th>
+                    <% if (role === 'admin') { %><th class="w-1"></th><% } %>
+                  </tr>
+                </thead>
+                <tbody id="matches-body"></tbody>
+              </table>
+            </div>
+            <div class="card-body text-secondary d-none" id="matches-empty"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== CENTRUM MECZU ==================== -->
+      <div id="view-match" class="view">
+        <div class="container-fluid">
+          <div class="row row-cards">
+            <div class="col-12">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title" id="match-detail-title">Mecz</h3>
+                  <div class="card-actions">
+                    <button class="btn btn-sm" type="button" data-view="matches">Wróć do listy</button>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="datagrid" id="match-detail-grid"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Materiały meczowe</h3>
+                  <div class="card-actions">
+                    <% if (can('admin','designer')) { %>
+                      <div class="d-flex gap-2">
+                        <select class="form-select form-select-sm w-auto" id="material-template"></select>
+                        <input class="form-control form-control-sm w-auto" id="material-deadline" type="datetime-local"
+                               aria-label="Termin materiału">
+                        <select class="form-select form-select-sm w-auto" id="material-owner" aria-label="Odpowiedzialny">
+                          <option value="">Odpowiedzialny…</option>
+                          <option value="designer">Grafik</option>
+                          <option value="social">Social media</option>
+                          <option value="photographer">Fotograf</option>
+                          <option value="admin">Administrator</option>
+                        </select>
+                        <button class="btn btn-primary btn-sm text-nowrap" type="button" id="material-add">
+                          <svg class="icon"><use href="#i-plus"></use></svg>Dodaj
+                        </button>
+                      </div>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="alert alert-danger m-3 d-none" id="material-error" role="alert"></div>
+                <div class="table-responsive">
+                  <table class="table table-vcenter card-table">
+                    <thead>
+                      <tr>
+                        <th>Materiał</th><th>Format</th><th>Termin</th><th>Odpowiedzialny</th><th style="width:170px">Status</th>
+                        <% if (can('admin','designer')) { %><th class="w-1"></th><% } %>
+                      </tr>
+                    </thead>
+                    <tbody id="materials-body"></tbody>
+                  </table>
+                </div>
+                <div class="card-body text-secondary d-none" id="materials-empty">
+                  Do tego meczu nie przypisano jeszcze materiałów.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== EDYTOR ==================== -->
+      <div id="view-editor" class="view">
+        <div class="container-fluid">
+          <div class="row row-cards" id="editor-workspace">
+
+            <!-- treść grafiki: to wypełnia social media -->
+            <div class="col-xl-3 col-lg-4">
+              <div class="card h-100">
+                <div class="card-header">
+                  <div class="min-w-0">
+                    <h3 class="card-title text-truncate" id="editor-template-name">Wybierz grafikę</h3>
+                    <div class="text-secondary small text-truncate" id="editor-context">—</div>
+                  </div>
+                </div>
+                <div class="card-body scroll-y" id="editor-form-body">
+                  <div class="alert alert-danger d-none" id="editor-error" role="alert"></div>
+                  <div class="mb-3">
+                    <label class="form-label" for="editor-title">Nazwa grafiki</label>
+                    <input class="form-control" id="editor-title" maxlength="180">
+                  </div>
+                  <div id="editor-fields"></div>
+                  <p class="text-secondary small mb-0" id="editor-no-fields">
+                    Ten szablon nie ma pól do wypełnienia — układ jest w całości po stronie grafika.
+                  </p>
+                </div>
+                <div class="card-footer">
+                  <button class="btn btn-primary w-100" type="button" id="editor-save">Zapisz grafikę</button>
+                  <div class="text-secondary small mt-2" id="editor-saved-at"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- podgląd -->
+            <div class="col-xl-6 col-lg-8">
+              <div class="card h-100">
+                <div class="card-header">
+                  <h3 class="card-title">Podgląd</h3>
+                  <div class="card-actions text-secondary small" id="canvas-size">—</div>
+                </div>
+                <div class="card-body d-flex align-items-center justify-content-center bg-dark-lt" id="canvas-stage">
+                  <div class="preview-stage design-stage" id="design-stage">
+                    <canvas id="design-canvas" width="540" height="675" class="rounded shadow-sm"></canvas>
+                    <div class="preview-handles" id="design-handles"></div>
+                  </div>
+                </div>
+                <div class="card-footer d-flex align-items-center">
+                  <span class="text-secondary small" id="editor-scale">Eksport zawsze w rozdzielczości szablonu</span>
+                  <div class="ms-auto btn-list">
+                    <button class="btn btn-sm" type="button" id="editor-download">Pobierz PNG</button>
+                    <button class="btn btn-primary btn-sm" type="button" id="editor-export">Eksportuj do magazynu</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- zdjęcia z magazynu -->
+            <div class="col-xl-3 d-none" id="editor-photos">
+              <div class="card h-100">
+                <div class="card-header">
+                  <div class="min-w-0">
+                    <h3 class="card-title">Wybierz zdjęcie</h3>
+                    <div class="text-secondary small text-truncate" id="picker-field">—</div>
+                  </div>
+                  <div class="card-actions">
+                    <button class="btn btn-icon btn-sm icon-close" type="button" id="picker-close" aria-label="Zamknij wybór">
+                      <svg class="icon"><use href="#i-plus"></use></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body scroll-y">
+                  <select class="form-select form-select-sm mb-3" id="picker-folder"
+                          aria-label="Mecz, z którego wybierasz zdjęcie"></select>
+                  <div class="row g-2" id="picker-grid"></div>
+                  <p class="text-secondary small mb-0 d-none" id="picker-empty">
+                    Ten mecz nie ma jeszcze zdjęć. Wgraj je w zakładce Zdjęcia.
+                  </p>
+                </div>
+                <div class="card-footer d-none" id="picker-crop">
+                  <label class="form-label small mb-1">Powiększenie</label>
+                  <input type="range" class="form-range mb-2" id="crop-zoom" min="0.1" max="4" step="0.05" value="1">
+                  <div class="row g-2">
+                    <div class="col">
+                      <label class="form-label small mb-1">W poziomie</label>
+                      <input type="range" class="form-range" id="crop-x" min="-1" max="1" step="0.02" value="0">
+                    </div>
+                    <div class="col">
+                      <label class="form-label small mb-1">W pionie</label>
+                      <input type="range" class="form-range" id="crop-y" min="-1" max="1" step="0.02" value="0">
+                    </div>
+                  </div>
+                  <div class="text-secondary small mt-2">
+                    Na podglądzie zdjęcie ma ramkę: środek przeciąga, narożniki skalują
+                    (także na mniejsze niż kadr), a kółko myszy przybliża w miejscu kursora.
+                    Widoczna zostaje tylko część w obszarze wyznaczonym przez grafika.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="empty" id="editor-empty">
+            <div class="empty-icon"><svg class="icon icon-lg"><use href="#i-template"></use></svg></div>
+            <p class="empty-title">Nie wybrano grafiki</p>
+            <p class="empty-subtitle text-secondary">
+              Wejdź w mecz i otwórz materiał z listy albo wybierz szablon w „Inne grafiki”.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== SZABLONY ==================== -->
+      <div id="view-templates" class="view">
+        <div class="container-fluid">
+          <div class="row row-cards">
+            <div class="col-xl-3 col-lg-4">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Szablony</h3>
+                  <div class="card-actions">
+                    <% if (can('admin','designer')) { %>
+                      <button class="btn btn-primary btn-sm" id="template-new" type="button">
+                        <svg class="icon"><use href="#i-plus"></use></svg>Nowy
+                      </button>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="list-group list-group-flush" id="template-list"></div>
+                <div class="card-body text-secondary d-none" id="template-list-empty">
+                  Nie ma jeszcze żadnego szablonu.
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-5 col-lg-8">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title" id="template-editor-title">Wybierz szablon</h3>
+                  <div class="card-actions" id="template-editor-actions"></div>
+                </div>
+                <div class="card-body" id="template-editor-empty">
+                  <p class="text-secondary mb-0">
+                    Wybierz szablon z listy albo utwórz nowy. Szablon opisuje pola, które
+                    zobaczy osoba przygotowująca grafikę, oraz warstwy, z których składa się obraz.
+                  </p>
+                </div>
+
+                <div id="template-editor" class="d-none">
+                  <ul class="nav nav-tabs" role="tablist">
+                    <li class="nav-item"><a href="#tab-basic" class="nav-link active" data-bs-toggle="tab">Podstawy</a></li>
+                    <li class="nav-item"><a href="#tab-fields" class="nav-link" data-bs-toggle="tab">Pola</a></li>
+                    <li class="nav-item"><a href="#tab-layers" class="nav-link" data-bs-toggle="tab">Warstwy</a></li>
+                    <li class="nav-item"><a href="#tab-assets" class="nav-link" data-bs-toggle="tab">Pliki</a></li>
+                  </ul>
+                  <form id="template-form">
+                    <div class="card-body">
+                      <div class="alert alert-danger d-none" id="template-form-error" role="alert"></div>
+                      <input type="hidden" name="id">
+                      <div class="tab-content">
+
+                        <div class="tab-pane active show" id="tab-basic">
+                          <div class="row g-3">
+                            <div class="col-md-6">
+                              <label class="form-label required" for="template-name">Nazwa</label>
+                              <input class="form-control" id="template-name" name="name" maxlength="160" required>
+                            </div>
+                            <div class="col-md-6">
+                              <label class="form-label" for="template-category">Rodzaj</label>
+                              <select class="form-select" id="template-category" name="category">
+                                <option value="match">Meczowy</option>
+                                <option value="other">Inny</option>
+                              </select>
+                            </div>
+                            <div class="col-md-6">
+                              <label class="form-label" for="template-width">Szerokość (px)</label>
+                              <input class="form-control" id="template-width" name="width" type="number" min="100" max="8000">
+                            </div>
+                            <div class="col-md-6">
+                              <label class="form-label" for="template-height">Wysokość (px)</label>
+                              <input class="form-control" id="template-height" name="height" type="number" min="100" max="8000">
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="tab-pane" id="tab-fields">
+                          <p class="text-secondary small">
+                            Te pola zobaczy osoba przygotowująca grafikę. Klucz podpina pole pod warstwę.
+                          </p>
+                          <div id="template-fields"></div>
+                          <button class="btn btn-sm mt-2" type="button" id="template-add-field">
+                            <svg class="icon"><use href="#i-plus"></use></svg>Dodaj pole
+                          </button>
+                        </div>
+
+                        <div class="tab-pane" id="tab-layers">
+                          <p class="text-secondary small">
+                            Warstwy rysowane są od dołu do góry. Overlay z przezroczystością połóż nad
+                            zdjęciem, a zablokowana warstwa jest nieruszalna dla social media.
+                          </p>
+                          <div class="row g-3">
+                            <div class="col-md-5">
+                              <div class="text-secondary small mb-1">Od wierzchu do spodu</div>
+                              <div class="list-group list-group-flush border rounded" id="layer-list"></div>
+                              <div class="alert alert-warning mt-2 d-none" id="layer-warning" role="alert"></div>
+                              <div class="btn-list mt-2">
+                                <select class="form-select form-select-sm w-auto" id="layer-type">
+                                  <option value="background">Tło</option>
+                                  <option value="photo">Zdjęcie</option>
+                                  <option value="text">Tekst</option>
+                                  <option value="overlay">Overlay</option>
+                                  <option value="logo">Logo</option>
+                                  <option value="shape">Kształt</option>
+                                </select>
+                                <button class="btn btn-sm" type="button" id="layer-add">
+                                  <svg class="icon"><use href="#i-plus"></use></svg>Dodaj
+                                </button>
+                              </div>
+                            </div>
+                            <div class="col-md-7">
+                              <div id="layer-props" class="text-secondary small">Wybierz warstwę z listy.</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="tab-pane" id="tab-assets">
+                          <p class="text-secondary small">
+                            Pliki szablonu: overlay z przezroczystością, tło, maska.
+                            PNG, JPG, WEBP lub SVG, maks. 25 MB.
+                            Rodzaj „Czcionka" przyjmuje TTF, OTF i WOFF — raz wgrany krój
+                            jest do wyboru we wszystkich szablonach.
+                          </p>
+                          <div class="btn-list mb-3">
+                            <select class="form-select form-select-sm w-auto" id="asset-kind">
+                              <option value="overlay">Overlay</option>
+                              <option value="background">Tło</option>
+                              <option value="mask">Maska</option>
+                              <option value="image">Obraz</option>
+                              <option value="font">Czcionka</option>
+                            </select>
+                            <label class="btn btn-sm mb-0">
+                              <input type="file" id="asset-file" hidden
+                                     accept="image/png,image/jpeg,image/webp,image/svg+xml,.ttf,.otf,.woff,.woff2">
+                              <svg class="icon"><use href="#i-upload"></use></svg>Wgraj plik
+                            </label>
+                          </div>
+                          <div class="alert alert-danger d-none" id="asset-error" role="alert"></div>
+                          <div class="row g-2" id="asset-list"></div>
+                        </div>
+
+                      </div>
+                    </div>
+                    <div class="card-footer d-flex">
+                      <button class="btn btn-link link-secondary" type="button" id="template-cancel">Anuluj</button>
+                      <button class="btn btn-primary ms-auto" type="submit">Zapisz szablon</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-4 col-lg-12">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Podgląd</h3>
+                  <div class="card-actions text-secondary small" id="preview-size"></div>
+                </div>
+                <div class="card-body d-flex justify-content-center align-items-start">
+                  <div class="preview-stage" id="preview-stage">
+                    <canvas id="template-preview" class="border rounded"></canvas>
+                    <div class="preview-handles" id="preview-handles"></div>
+                  </div>
+                </div>
+                <div class="card-footer text-secondary small">
+                  Przeciągnij warstwę, żeby ją przesunąć; ciągnij za róg, żeby zmienić rozmiar.
+                  Strzałki przesuwają o piksel, z Shiftem o dziesięć.
+                  Podgląd rysuje te same warstwy co eksport — różni je tylko skala.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== INNE GRAFIKI ==================== -->
+      <div id="view-other" class="view">
+        <div class="container-fluid">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Inne grafiki</h3>
+              <div class="card-actions">
+                <button class="btn btn-primary btn-sm" type="button"><svg class="icon"><use href="#i-plus"></use></svg>Nowa grafika</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="row row-cards" id="other-grid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== BIBLIOTEKA ZDJĘĆ ==================== -->
+      <div id="view-library" class="view">
+        <div class="container-fluid">
+
+          <% if (!st.configured) { %>
+            <div class="alert alert-warning">
+              <h4 class="alert-title">Magazyn zdjęć nie jest podłączony</h4>
+              <p class="mb-0 text-secondary">
+                Uzupełnij <code>S3_ENDPOINT</code>, <code>S3_BUCKET</code>, <code>S3_ACCESS_KEY</code> i
+                <code>S3_SECRET_KEY</code> w pliku <code>/opt/club-graphics/.env</code> na serwerze,
+                a potem zrestartuj proces: <code>pm2 restart zastal-marketing-center</code>.
+                Kluczy nie trzymamy w repozytorium.
+              </p>
+            </div>
+          <% } %>
+
+          <div class="row row-cards">
+            <div class="col-lg-4 col-xl-3">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h3 class="card-title">Mecze</h3>
+                    <div class="text-secondary small">Zdjęcia są przypisane do spotkania</div>
+                  </div>
+                </div>
+                <div class="list-group list-group-flush scroll-y" id="sets-list"></div>
+                <div class="card-body text-secondary d-none" id="sets-empty">
+                  Sezon nie ma jeszcze meczów. Dodaj mecz, żeby wgrywać do niego zdjęcia.
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-8 col-xl-9">
+              <div class="card">
+                <div class="card-header">
+                  <div class="min-w-0">
+                    <h3 class="card-title" id="library-title">Biblioteka zdjęć</h3>
+                    <div class="text-secondary small text-truncate" id="library-subtitle">Wybierz mecz z listy po lewej.</div>
+                  </div>
+                  <div class="card-actions btn-list">
+                    <div class="form-check form-check-inline mb-0 d-none" id="library-filter">
+                      <input class="form-check-input" type="checkbox" id="library-selected-only">
+                      <label class="form-check-label" for="library-selected-only">Tylko wybrane</label>
+                    </div>
+                    <button class="btn btn-sm d-none" type="button" id="library-sync">
+                      <svg class="icon"><use href="#i-refresh"></use></svg>Synchronizuj
+                    </button>
+                    <% if (can('admin', 'designer', 'photographer')) { %>
+                      <button class="btn btn-primary btn-sm d-none" type="button" id="library-upload">
+                        <svg class="icon"><use href="#i-upload"></use></svg>Prześlij zdjęcia
+                      </button>
+                      <input type="file" id="library-file-input" accept="image/jpeg,image/png,image/webp" multiple hidden>
+                    <% } %>
+                  </div>
+                </div>
+
+                <div class="card-body" id="library-dropzone">
+                  <div class="upload-panel d-none" id="library-progress">
+                    <div class="d-flex align-items-center mb-2">
+                      <span class="flex-fill text-truncate" id="upload-label">Przygotowuję wysyłkę…</span>
+                      <span class="text-secondary ms-2" id="upload-count"></span>
+                    </div>
+                    <div class="progress">
+                      <div class="progress-bar" id="upload-bar" style="width:0%"></div>
+                    </div>
+                    <div class="text-secondary small mt-2" id="upload-file"></div>
+                  </div>
+                  <div class="alert alert-danger d-none" id="library-error" role="alert"></div>
+                  <div class="text-secondary" id="library-empty">Wybierz mecz, żeby zobaczyć zdjęcia.</div>
+                  <div class="row g-2" id="library-grid"></div>
+                </div>
+
+                <div class="card-footer text-secondary small d-none" id="library-footer"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== HISTORIA ==================== -->
+      <div id="view-history" class="view">
+        <div class="container-fluid">
+          <div class="card">
+            <div class="card-header"><h3 class="card-title">Historia eksportów</h3></div>
+            <div class="table-responsive">
+              <table class="table table-vcenter card-table">
+                <thead><tr><th class="w-1">Podgląd</th><th>Grafika</th><th>Mecz / typ</th><th>Data</th><th>Format</th><th>Użytkownik</th></tr></thead>
+                <tbody id="history-body"></tbody>
+              </table>
+            </div>
+            <div class="card-body text-secondary d-none" id="history-empty">
+              Nie wyeksportowano jeszcze żadnej grafiki.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== MONITORING SOCIAL ==================== -->
+      <div id="view-social" class="view">
+        <div class="container-fluid">
+          <div class="row row-cards">
+            <div class="col-12">
+              <div class="card">
+                <div class="card-body d-flex flex-wrap align-items-center gap-2">
+                  <div class="flex-fill">
+                    <div class="d-flex align-items-center" id="social-connection" data-state="loading">
+                      <span class="status-dot me-2 social-connection-dot"></span>
+                      <b class="me-2">Sprawdzam połączenia</b>
+                      <span class="text-secondary small" id="social-last-sync">Facebook i OpenAI</span>
+                    </div>
+                  </div>
+                  <div class="btn-list">
+                    <button class="btn btn-sm" id="social-refresh" type="button">Odśwież dane</button>
+                    <button class="btn btn-primary btn-sm" id="social-analyze" type="button">Analizuj teraz</button>
+                  </div>
+                </div>
+                <div class="card-body border-top">
+                  <div class="datagrid">
+                    <div class="datagrid-item"><div class="datagrid-title">Obserwujący</div><div class="datagrid-content" id="social-followers">—</div></div>
+                    <div class="datagrid-item"><div class="datagrid-title">Publikacje</div><div class="datagrid-content" id="social-post-count">—</div></div>
+                    <div class="datagrid-item"><div class="datagrid-title">Śr. interakcji</div><div class="datagrid-content" id="social-average">—</div></div>
+                    <div class="datagrid-item"><div class="datagrid-title">Zaangażowanie</div><div class="datagrid-content" id="social-engagement">—</div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-7">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Aktywność profilu</h3>
+                  <div class="card-actions text-secondary small" id="social-feed-range">Ostatnie 12 postów</div>
+                </div>
+                <div class="list-group list-group-flush" id="social-posts">
+                  <div class="list-group-item text-secondary">Sprawdzam połączenie z profilem klubowym…</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-5">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Co publikujemy dalej?</h3>
+                  <div class="card-actions text-secondary small" id="social-analysis-model">OpenAI</div>
+                </div>
+                <div class="card-body" id="social-advice">
+                  <p class="text-secondary mb-0">Po połączeniu usług wybierz „Analizuj teraz”.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== USTAWIENIA ==================== -->
+      <div id="view-settings" class="view">
+        <div class="container-fluid">
+          <div class="row row-cards">
+            <div class="col-lg-6">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h3 class="card-title">Branding klubu</h3>
+                    <div class="text-secondary small">Logo pojawia się na ekranie logowania i w panelu bocznym.</div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="row align-items-center g-3">
+                    <div class="col-auto">
+                      <div class="border rounded d-flex align-items-center justify-content-center p-2"
+                           id="brand-preview" style="width:150px;height:100px;overflow:hidden">
+                        <% if (branding && branding.logoUrl) { %>
+                          <img src="<%= branding.logoUrl %>" alt="Aktualne logo klubu" style="max-width:100%;max-height:100%;object-fit:contain">
+                        <% } else { %>
+                          <span class="text-secondary small">Brak logo</span>
+                        <% } %>
+                      </div>
+                    </div>
+                    <div class="col">
+                      <div class="mb-2">PNG, JPG, WEBP lub SVG — najlepiej plik z przezroczystym tłem, maks. 5 MB.</div>
+                      <div class="btn-list">
+                        <label class="btn btn-primary mb-0">
+                          <input id="brand-logo-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>
+                          Wybierz plik
+                        </label>
+                        <% if (branding && branding.logoUrl) { %>
+                          <button class="btn" id="brand-logo-remove" type="button">Usuń logo</button>
+                        <% } %>
+                      </div>
+                      <div class="small mt-2" id="branding-status"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h3 class="card-title">Magazyn zdjęć</h3>
+                    <div class="text-secondary small">MEGA S4 (API zgodne z S3). Zdjęcia idą przez serwer aplikacji — MEGA nie pozwala ustawić CORS, więc przeglądarka nie może wysyłać ich wprost do bucketa. Klucze dostępu zostają na serwerze.</div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="datagrid">
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Endpoint</div>
+                      <div class="datagrid-content"><code><%= st.endpoint || '—' %></code></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Bucket</div>
+                      <div class="datagrid-content"><code><%= st.bucket || '—' %></code></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Region</div>
+                      <div class="datagrid-content"><code><%= st.region %></code></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Adresowanie</div>
+                      <div class="datagrid-content"><%= st.forcePathStyle ? 'path-style' : 'virtual-hosted' %></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Access key</div>
+                      <div class="datagrid-content"><code><%= st.accessKey || '—' %></code></div>
+                    </div>
+                    <div class="datagrid-item">
+                      <div class="datagrid-title">Ważność podglądów</div>
+                      <div class="datagrid-content"><%= Math.round(st.downloadUrlTtl / 60) %> min</div>
+                    </div>
+                  </div>
+                  <% if (st.missing.length) { %>
+                    <div class="alert alert-warning mt-3 mb-0">
+                      Brakuje w <code>.env</code>: <% st.missing.forEach((name, i) => { %><code><%= name %></code><%= i < st.missing.length - 1 ? ', ' : '' %><% }) %>.
+                    </div>
+                  <% } %>
+                  <div class="mt-3 d-none" id="storage-test-result"></div>
+                </div>
+                <div class="card-footer d-flex align-items-center">
+                  <span class="text-secondary small">Konfiguracja pochodzi z pliku <code>.env</code> na serwerze — nie z tego panelu.</span>
+                  <% if (role === 'admin') { %>
+                    <div class="ms-auto">
+                      <button class="btn btn-primary btn-sm" type="button" id="storage-test-btn" <%= st.configured ? '' : 'disabled' %>>
+                        Testuj połączenie
+                      </button>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h3 class="card-title">Sezony</h3>
+                    <div class="text-secondary small">Aktywny sezon decyduje, które mecze widać w aplikacji.</div>
+                  </div>
+                  <div class="card-actions">
+                    <button class="btn btn-primary btn-sm" type="button" data-season-new data-bs-toggle="modal" data-bs-target="#season-modal">
+                      <svg class="icon"><use href="#i-plus"></use></svg>Nowy sezon
+                    </button>
+                  </div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-vcenter card-table">
+                    <thead>
+                      <tr><th>Sezon</th><th>Okres</th><th>Mecze</th><th>Status</th><th class="w-1"></th></tr>
+                    </thead>
+                    <tbody id="seasons-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h3 class="card-title">Integracje zewnętrzne</h3>
+                    <div class="text-secondary small">Moduły, które wymagają kluczy dostępu wpisanych w pliku .env na serwerze.</div>
+                  </div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-vcenter card-table">
+                    <thead>
+                      <tr><th>Integracja</th><th>Status</th><th>Wymagane w .env</th><th>Do czego służy</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Facebook (Meta Graph API)</td>
+                        <td>
+                          <% if (integrations.facebook.configured) { %>
+                            <span class="badge bg-green-lt">Połączony</span>
+                            <span class="text-secondary small ms-2">strona <%= integrations.facebook.pageId %></span>
+                          <% } else { %>
+                            <span class="badge bg-secondary-lt">Nieskonfigurowany</span>
+                          <% } %>
+                        </td>
+                        <td class="text-secondary"><code>META_PAGE_ID</code>, <code>META_PAGE_ACCESS_TOKEN</code></td>
+                        <td class="text-secondary">Monitoring publikacji i reakcji na profilu klubu. Bez tokenu pozycja „Monitoring social” jest ukryta w menu.</td>
+                      </tr>
+                      <tr>
+                        <td>OpenAI</td>
+                        <td>
+                          <% if (integrations.openai.configured) { %>
+                            <span class="badge bg-green-lt">Połączony</span>
+                            <span class="text-secondary small ms-2"><%= integrations.openai.model %></span>
+                          <% } else { %>
+                            <span class="badge bg-secondary-lt">Nieskonfigurowany</span>
+                          <% } %>
+                        </td>
+                        <td class="text-secondary"><code>OPENAI_API_KEY</code></td>
+                        <td class="text-secondary">Rekomendacje treści na podstawie danych z Facebooka. Bez danych z FB nie ma czego analizować.</td>
+                      </tr>
+                      <tr>
+                        <td>Magazyn zdjęć (MEGA S4)</td>
+                        <td>
+                          <% if (st.configured) { %>
+                            <span class="badge bg-green-lt">Skonfigurowany</span>
+                            <span class="text-secondary small ms-2">bucket <%= st.bucket %></span>
+                          <% } else { %>
+                            <span class="badge bg-secondary-lt">Nieskonfigurowany</span>
+                          <% } %>
+                        </td>
+                        <td class="text-secondary"><code>S3_ENDPOINT</code>, <code>S3_BUCKET</code>, <code>S3_ACCESS_KEY</code>, <code>S3_SECRET_KEY</code></td>
+                        <td class="text-secondary">Zdjęcia meczowe w buckecie. Wysyłka z przeglądarki idzie prosto do magazynu podpisanym adresem — klucze nie opuszczają serwera.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="card-footer text-secondary small">
+                  <div>
+                    Po uzupełnieniu pliku <code>.env</code> wymagany jest restart procesu:
+                    <code>pm2 restart zastal-marketing-center</code>. Kluczy nie trzymamy w repozytorium.
+                  </div>
+                  <div class="mt-2">
+                    Wersja panelu: <code id="app-build">—</code> ·
+                    skrypt wczytany przez przeglądarkę: <code id="app-script">—</code>
+                    <span class="d-block" id="app-build-hint"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ==================== MODALE ==================== -->
+<div class="modal modal-blur fade" id="match-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="match-modal-title">Nowy mecz</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+      <form id="match-form" novalidate>
+        <div class="modal-body">
+          <div class="alert alert-danger d-none" id="match-form-error" role="alert"></div>
+          <input type="hidden" name="id">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label required" for="match-home">Gospodarz</label>
+              <input class="form-control" id="match-home" name="home_team" maxlength="160" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label required" for="match-away">Gość</label>
+              <input class="form-control" id="match-away" name="away_team" maxlength="160" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label required" for="match-date">Data i godzina</label>
+              <input class="form-control" id="match-date" name="match_date" type="datetime-local" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label required" for="match-season">Sezon</label>
+              <select class="form-select" id="match-season" name="season_id" required>
+                <% d.seasons.forEach(season => { %>
+                  <option value="<%= season.id %>" <%= d.season && season.id === d.season.id ? 'selected' : '' %>>
+                    <%= season.name %>
+                  </option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="match-competition">Rozgrywki</label>
+              <input class="form-control" id="match-competition" name="competition" maxlength="160" placeholder="ORLEN Basket Liga">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="match-round">Kolejka</label>
+              <input class="form-control" id="match-round" name="round_name" maxlength="80" placeholder="Kolejka 4">
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="match-venue">Hala</label>
+              <input class="form-control" id="match-venue" name="venue" maxlength="255" placeholder="Hala CRS, Zielona Góra">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="match-status">Status</label>
+              <select class="form-select" id="match-status" name="status">
+                <option value="planned">Zaplanowany</option>
+                <option value="live">Na żywo</option>
+                <option value="finished">Rozegrany</option>
+                <option value="cancelled">Odwołany</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="match-home-score">Wynik gospodarza</label>
+              <input class="form-control" id="match-home-score" name="home_score" type="number" min="0" max="300" placeholder="—">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="match-away-score">Wynik gościa</label>
+              <input class="form-control" id="match-away-score" name="away_score" type="number" min="0" max="300" placeholder="—">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Anuluj</button>
+          <button type="submit" class="btn btn-primary ms-auto" id="match-submit">Zapisz mecz</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal modal-blur fade" id="season-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="season-modal-title">Nowy sezon</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+      <form id="season-form" novalidate>
+        <div class="modal-body">
+          <div class="alert alert-danger d-none" id="season-form-error" role="alert"></div>
+          <input type="hidden" name="id">
+          <div class="mb-3">
+            <label class="form-label required" for="season-name">Nazwa sezonu</label>
+            <input class="form-control" id="season-name" name="name" maxlength="64" placeholder="2026 / 27" required>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="season-start">Początek</label>
+              <input class="form-control" id="season-start" name="starts_on" type="date">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="season-end">Koniec</label>
+              <input class="form-control" id="season-end" name="ends_on" type="date">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Anuluj</button>
+          <button type="submit" class="btn btn-primary ms-auto">Zapisz sezon</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/vendor/tabler/js/tabler.min.js" defer></script>
+<script src="<%= asset('/club/renderer.js') %>" defer></script>
+<script src="<%= asset('/club/app.js') %>" defer></script>
+<script src="<%= asset('/club/branding.js') %>" defer></script>
+</body>
+</html>

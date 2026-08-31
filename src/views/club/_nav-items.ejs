@@ -1,0 +1,24 @@
+<%# Pozycje menu w pasku górnym, filtrowane rolą użytkownika.
+    Wszystkie sekcje są na jednym poziomie: kliknięcie w nazwę zawsze przenosi
+    do widoku. Rozwijane menu tylko chowało funkcje i myliło — nazwa grupy nie
+    prowadziła nigdzie. %>
+<%
+  const navItems = [
+    { view: 'dashboard', icon: 'i-dashboard', label: 'Dashboard', roles: null },
+    { view: 'matches', icon: 'i-match', label: 'Mecze', roles: null },
+    { view: 'other', icon: 'i-other', label: 'Inne grafiki', roles: ['admin', 'designer', 'social'] },
+    { view: 'templates', icon: 'i-template', label: 'Szablony', roles: ['admin', 'designer'] },
+    { view: 'library', icon: 'i-photos', label: 'Zdjęcia', roles: null },
+    { view: 'history', icon: 'i-history', label: 'Historia', roles: ['admin', 'designer', 'social'] },
+    { view: 'social', icon: 'i-social', label: 'Monitoring', roles: ['admin', 'social'], requires: integrations.facebook.configured },
+    { view: 'settings', icon: 'i-settings', label: 'Ustawienia', roles: ['admin'] }
+  ].filter(item => (!item.roles || can(...item.roles)) && item.requires !== false);
+%>
+<% navItems.forEach((item, index) => { %>
+  <li class="nav-item <%= index === 0 ? 'active' : '' %>">
+    <a class="nav-link" href="#" data-view="<%= item.view %>">
+      <span class="nav-link-icon"><svg class="icon"><use href="#<%= item.icon %>"></use></svg></span>
+      <span class="nav-link-title"><%= item.label %></span>
+    </a>
+  </li>
+<% }) %>
