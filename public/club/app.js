@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-sciezki-1';
+const APP_BUILD = '2026-08-31-psd-1';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -1850,6 +1850,58 @@ document.addEventListener('click', (event) => {
     matchId: insideMatch ? currentMatch?.id || null : null,
     title: button.dataset.materialTitle
   });
+});
+
+/* ---- import szablonu z PSD ----
+   Grafik pracuje w Photoshopie; przepisywanie układu ręcznie byłoby mozolne
+   i zawodne. Plik idzie na serwer, a wraca gotowy szablon z polami. */
+
+const psdButton = document.getElementById('template-psd');
+const psdInput = document.getElementById('template-psd-file');
+const psdStatus = document.getElementById('template-psd-status');
+
+function showPsdStatus(kind, html) {
+  if (!psdStatus) return;
+  psdStatus.className = `card-body py-2 alert alert-${kind} mb-0`;
+  psdStatus.innerHTML = html;
+  psdStatus.classList.remove('d-none');
+}
+
+psdButton?.addEventListener('click', () => psdInput?.click());
+
+psdInput?.addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  psdButton.disabled = true;
+  showPsdStatus('info', `Czytam <strong>${escapeHTML(file.name)}</strong>…`);
+  try {
+    const form = new FormData();
+    form.append('file', file, file.name);
+
+    const response = await fetch('/api/templates/import-psd', { method: 'POST', body: form });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.success === false) {
+      const hint = payload.hint ? `<div class="mt-1 small">${escapeHTML(payload.hint)}</div>` : '';
+      throw Object.assign(new Error(payload.error || 'Nie udało się wczytać pliku.'), { html: hint });
+    }
+
+    const warnings = (payload.warnings || [])
+      .map((text) => `<li>${escapeHTML(text)}</li>`).join('');
+    showPsdStatus(warnings ? 'warning' : 'success',
+      `Szablon <strong>${escapeHTML(payload.template.name)}</strong> gotowy — `
+      + `${payload.summary.size}, ${payload.summary.fields} `
+      + `${plural(payload.summary.fields, 'pole do wypełnienia', 'pola do wypełnienia', 'pól do wypełnienia')}.`
+      + (warnings ? `<ul class="mt-2 mb-0 ps-3">${warnings}</ul>` : ''));
+
+    await loadTemplates();
+    showTemplateEditor(payload.template);
+  } catch (error) {
+    showPsdStatus('danger', escapeHTML(error.message) + (error.html || ''));
+  } finally {
+    psdButton.disabled = false;
+    psdInput.value = '';
+  }
 });
 
 /* ================= Edytor grafiki (social media) ================= */

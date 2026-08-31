@@ -22,6 +22,46 @@ Wymagane ustawienia:
 Widok „Monitoring social” pobiera ostatnie posty, liczy reakcje, komentarze i udostępnienia, a następnie generuje ustrukturyzowane rekomendacje przez OpenAI Responses API.
 Serwer odświeża dane w tle zgodnie z `SOCIAL_MONITOR_INTERVAL_MS`. Ustawienie `SOCIAL_AUTO_ANALYZE=true` uruchamia nową analizę automatycznie po wykryciu nowego posta.
 
+### Szablon z pliku PSD
+
+Grafik pracuje w Photoshopie, więc szablon powstaje z pliku, a nie z przepisywania
+układu ręcznie. Aplikacja czyta z PSD pozycje warstw, rozmiary, treść tekstów,
+stopień pisma, kolor i wyrównanie, a całą nieedytowalną grafikę składa w jeden
+obraz nakładki.
+
+**Jak przygotować plik**
+
+1. Dokument w docelowym rozmiarze grafiki (np. 1080 × 1350 px, RGB, 72 dpi).
+2. Nazwy warstw, które ma wypełniać social media, zacznij od `#`:
+   `#Zdjęcie zawodnika`, `#Logo rywala`, `#Wynik gospodarza`, `#Nagłówek`.
+   Nazwa warstwy staje się etykietą pola w formularzu.
+3. **Pod warstwą zdjęcia nie może być nic** — w tym miejscu kanwa ma być
+   przezroczysta, bo tam trafi zdjęcie z magazynu. Jeśli coś tam zostanie,
+   import to wykryje i powie o tym wprost.
+4. Warstwy z `#` **ukryj przed zapisem** (kliknij oczko). Widoczne wtopiłyby się
+   w grafikę na stałe; import ostrzega, gdy o tym zapomnisz.
+5. Efekty warstw (cień, obrys, poświata) i tryby mieszania inne niż „zwykły"
+   zrasteryzuj albo scal — składanie ich odtwarza tylko krycie i tryb zwykły.
+   Import wypisuje, których warstw to dotyczy.
+6. Zapisz jako `.psd` i wczytaj w Szablonach przyciskiem **Z PSD**.
+
+**Co powstaje z czego**
+
+| Warstwa w PSD | Pole w formularzu | Zachowanie |
+| --- | --- | --- |
+| tekstowa, sama treść cyfrowa | liczba | pole liczbowe (wyniki) |
+| tekstowa, dowolna treść | tekst | krój, stopień, kolor i wyrównanie z PSD |
+| obrazowa z `logo`/`herb` w nazwie | zdjęcie | mieści się w całości (contain) |
+| pozostałe obrazowe | zdjęcie | wypełnia obszar (cover), wymagane |
+| bez `#` | — | trafia do wspólnej nakładki |
+
+Kolejność rysowania: zdjęcia na spodzie, nad nimi nakładka z PSD, a na wierzchu
+teksty i logo. Dzięki temu grafika obramowuje zdjęcie, a napisy zostają czytelne.
+
+Krój pisma bierze się z aplikacji (ZT Talk), nie z pliku — nazwa czcionki z PSD
+nie jest przenoszona. Jeśli w projekcie użyto innego kroju, tekst wyjdzie
+w firmowym; wtedy lepiej zostawić taki napis jako część grafiki, bez `#`.
+
 ### Edytor grafiki (social media)
 
 Grafiki meczowe mają stały układ — GAMEDAY, zapowiedź dzień przed meczem, porównanie,

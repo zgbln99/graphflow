@@ -561,12 +561,17 @@
                   <h3 class="card-title">Szablony</h3>
                   <div class="card-actions">
                     <% if (can('admin','designer')) { %>
+                      <button class="btn btn-sm" id="template-psd" type="button" title="Zbuduj szablon z pliku Photoshopa">
+                        <svg class="icon"><use href="#i-upload"></use></svg>Z PSD
+                      </button>
+                      <input type="file" id="template-psd-file" accept=".psd" hidden>
                       <button class="btn btn-primary btn-sm" id="template-new" type="button">
                         <svg class="icon"><use href="#i-plus"></use></svg>Nowy
                       </button>
                     <% } %>
                   </div>
                 </div>
+                <div class="card-body py-2 d-none" id="template-psd-status"></div>
                 <div class="list-group list-group-flush" id="template-list"></div>
                 <div class="card-body text-secondary d-none" id="template-list-empty">
                   Nie ma jeszcze żadnego szablonu.

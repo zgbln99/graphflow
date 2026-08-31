@@ -14,6 +14,7 @@ const {
 } = require('../services/social-intelligence');
 const repo = require('../services/club-repository');
 const storage = require('../services/storage');
+const psdImport = require('../services/psd-import');
 
 const router = express.Router();
 const db = Database.getInstance();
@@ -408,6 +409,85 @@ router.delete('/api/materials/:id', requireAuth, requireRole('admin', 'designer'
   } catch (err) { handleRepoError(res, next, err); }
 });
 
+async function createTemplateWithFreeName(payload, userId) {
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    const name = attempt === 1 ? payload.name : `${payload.name} (${attempt})`;
+    try {
+      return await repo.createTemplate({ ...payload, name: name.slice(0, 160) }, userId);
+    } catch (error) {
+      const taken = error instanceof repo.ValidationError && error.field === 'name';
+      if (!taken || attempt === 20) throw error;
+    }
+  }
+}
+
+/**
+ * Import szablonu z PSD. Układ, pozycje i kroje czytamy prosto z pliku grafika,
+ * a spłaszczoną grafikę zapisujemy jako jeden obraz nakładki. Warstwy oznaczone
+ * „#" stają się polami formularza dla social mediów.
+ */
+router.post('/api/templates/import-psd', requireAuth, requireRole('admin', 'designer'),
+  receivePsd, async (req, res, next) => {
+    const file = req.file;
+    let assetPath = null;
+    try {
+      if (!file) return res.status(400).json({ success: false, error: 'Nie wybrano pliku PSD.' });
+
+      const parsed = psdImport.importTemplate(fs.readFileSync(file.path), {
+        name: req.body.name || path.basename(file.originalname, path.extname(file.originalname))
+      });
+
+      // Nakładka leży lokalnie obok pozostałych plików szablonów: płótno musi
+      // pobrać ją z naszej domeny, żeby dało się wyeksportować gotową grafikę.
+      const assetFile = `psd-${Date.now().toString(36)}.png`;
+      assetPath = path.join(templateDir, assetFile);
+      fs.writeFileSync(assetPath, parsed.composite);
+
+      // Nazwę bierzemy z pliku, więc kolizja nie jest winą użytkownika —
+      // dokładamy numer zamiast odsyłać go z błędem.
+      const template = await createTemplateWithFreeName({
+        name: parsed.name,
+        category: req.body.category === 'other' ? 'other' : 'match',
+        width: parsed.width,
+        height: parsed.height,
+        definition: parsed.definition
+      }, req.session.user.id);
+
+      const asset = await repo.addTemplateAsset(template.id, {
+        kind: 'overlay',
+        objectKey: `/uploads/templates/${assetFile}`,
+        metadata: { source: 'psd', originalName: file.originalname }
+      });
+
+      // Warstwa nakładki wskazuje na dopiero co utworzony plik.
+      const definition = {
+        ...parsed.definition,
+        layers: parsed.definition.layers.map((layer) => (layer.id === 'psd_grafika'
+          ? { ...layer, asset_id: asset.id }
+          : layer))
+      };
+      const saved = await repo.updateTemplate(template.id, { definition });
+
+      res.status(201).json({
+        success: true,
+        template: saved,
+        warnings: parsed.warnings,
+        summary: {
+          fields: parsed.definition.fields.length,
+          size: `${parsed.width}×${parsed.height}`
+        }
+      });
+    } catch (err) {
+      if (assetPath) fs.unlink(assetPath, () => {});
+      if (err instanceof psdImport.PsdImportError) {
+        return res.status(err.status).json({ success: false, error: err.message, hint: err.hint });
+      }
+      handleRepoError(res, next, err);
+    } finally {
+      if (file) fs.unlink(file.path, () => {});
+    }
+  });
+
 router.post('/api/templates/:id/assets', requireAuth, requireRole('admin', 'designer'),
   uploadTemplateAsset.single('file'), async (req, res, next) => {
     try {
@@ -445,6 +525,34 @@ const MAX_PHOTO_SIZE = 60 * 1024 * 1024;
 // Katalog przelotowy: plik leży tu tylko na czas strumieniowania do bucketa.
 const photoTmpDir = path.join(os.tmpdir(), 'zmc-uploads');
 fs.mkdirSync(photoTmpDir, { recursive: true });
+
+// Pliki PSD bywają duże — czytamy je z dysku, nigdy do pamięci procesu naraz.
+const MAX_PSD_SIZE = 300 * 1024 * 1024;
+
+const uploadPsd = multer({
+  storage: multer.diskStorage({ destination: photoTmpDir }),
+  limits: { fileSize: MAX_PSD_SIZE, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (!/\.psd$/i.test(file.originalname)) {
+      return cb(new repo.ValidationError('Wybierz plik z rozszerzeniem .psd.', 'file'));
+    }
+    cb(null, true);
+  }
+});
+
+function receivePsd(req, res, next) {
+  uploadPsd.single('file')(req, res, (error) => {
+    if (!error) return next();
+    if (req.file) fs.unlink(req.file.path, () => {});
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        error: `Plik PSD jest większy niż ${Math.round(MAX_PSD_SIZE / 1024 / 1024)} MB.`
+      });
+    }
+    return handleRepoError(res, next, error);
+  });
+}
 
 // Eksporty leżą w magazynie obok zdjęć, w osobnym katalogu.
 const EXPORT_PREFIX = 'eksporty/';
