@@ -4,7 +4,7 @@
    przestawała reagować bez śladu. Teraz błąd jest widoczny na ekranie, a wersja
    wykonywanego kodu jest zawsze do sprawdzenia w Ustawieniach. */
 
-const APP_BUILD = '2026-08-31-psd-duze';
+const APP_BUILD = '2026-08-31-czcionki';
 
 function showFatal(message, where) {
   let box = document.getElementById('app-fatal');
@@ -167,8 +167,10 @@ async function api(url, options = {}) {
       : `Operacja nie powiodła się (HTTP ${response.status}).`;
     const error = new Error(payload.error || fallback);
     error.field = payload.field;
-    // Podpowiedź, co poprawić — przy imporcie PSD to często najważniejsza część.
+    // Podpowiedź, co poprawić — bywa ważniejsza od samego komunikatu.
     error.hint = payload.hint;
+    error.usage = payload.usage;
+    error.status = response.status;
     throw error;
   }
   return payload;
@@ -467,6 +469,15 @@ const FIELD_TYPE_LABELS = {
   text: 'Tekst', textarea: 'Tekst wielolinijkowy', number: 'Liczba',
   select: 'Lista wyboru', date: 'Data', photo: 'Zdjęcie'
 };
+// Kroje pisma do wyboru — te same, które rozpoznaje silnik rysujący.
+const FONT_FAMILIES = [
+  { key: 'talk', label: 'ZT Talk (klubowy)' },
+  { key: 'talk-expanded', label: 'ZT Talk Expanded (klubowy, szeroki)' },
+  { key: 'sans', label: 'Bezszeryfowa systemowa' },
+  { key: 'serif', label: 'Szeryfowa systemowa' },
+  { key: 'mono', label: 'O stałej szerokości' }
+];
+
 const LAYER_TYPE_LABELS = {
   background: 'Tło', photo: 'Zdjęcie', text: 'Tekst',
   overlay: 'Overlay', logo: 'Logo', shape: 'Kształt'
@@ -670,6 +681,13 @@ function renderLayerProps() {
         ${layerInput('Zaokrąglenie', 'radius', layer.radius, 'type="number" min="0"')}` : ''}
 
       ${layer.type === 'text' ? `
+        <div class="col-12">
+          <label class="form-label small mb-1">Krój pisma</label>
+          <select class="form-select form-select-sm" data-l="fontFamily">
+            ${FONT_FAMILIES.map((font) => `<option value="${font.key}"
+              ${(layer.fontFamily || 'talk') === font.key ? 'selected' : ''}>${escapeHTML(font.label)}</option>`).join('')}
+          </select>
+        </div>
         ${layerInput('Rozmiar', 'fontSize', layer.fontSize, 'type="number" min="6" max="800"')}
         <div class="col-6 col-md-4">
           <label class="form-label small mb-1">Grubość</label>
@@ -765,7 +783,7 @@ document.getElementById('layer-add')?.addEventListener('click', () => {
     x: 0, y: 0, w: width, h: height, rotation: 0, field: null, asset_id: null
   };
   if (type === 'photo') Object.assign(layer, { fit: 'cover', mask: 'rect', radius: 0 });
-  if (type === 'text') Object.assign(layer, { color: '#ffffff', fontSize: 96, fontWeight: 700, align: 'left', lineHeight: 1.1, letterSpacing: 0, uppercase: false, text: '' });
+  if (type === 'text') Object.assign(layer, { color: '#ffffff', fontFamily: 'talk', fontSize: 96, fontWeight: 700, align: 'left', lineHeight: 1.1, letterSpacing: 0, uppercase: false, text: '' });
   if (type === 'background' || type === 'shape') Object.assign(layer, { color: type === 'background' ? '#0b0d0d' : '#0d8f4f', radius: 0 });
 
   workingLayers.push(layer);
@@ -923,7 +941,37 @@ function showTemplateEditor(template) {
       await api('/api/templates/' + template.id, { method: 'DELETE' });
       await loadTemplates();
       hideTemplateEditor();
-    } catch (error) { setFormError(templateFormError, error.message); }
+      return;
+    } catch (error) {
+      // Szablon w użyciu nie znika po cichu — pytamy wprost, co zniknie razem z nim.
+      if (!error.usage) {
+        setFormError(templateFormError, error.message);
+        alert(error.message);
+        return;
+      }
+
+      const parts = [];
+      if (error.usage.matches) {
+        parts.push(`${error.usage.matches} ${plural(error.usage.matches, 'mecz', 'mecze', 'meczów')}`);
+      }
+      if (error.usage.designs) {
+        parts.push(`${error.usage.designs} ${plural(error.usage.designs, 'grafikę', 'grafiki', 'grafik')}`);
+      }
+      const confirmed = confirm(
+        `Szablon „${template.name}" jest w użyciu: ${parts.join(' i ')}.\n\n`
+        + 'Usunąć razem z nimi? Grafik i ich eksportów nie da się przywrócić.'
+      );
+      if (!confirmed) return;
+
+      try {
+        await api(`/api/templates/${template.id}?force=1`, { method: 'DELETE' });
+        await loadTemplates();
+        hideTemplateEditor();
+      } catch (forced) {
+        setFormError(templateFormError, forced.message);
+        alert(forced.message);
+      }
+    }
   });
 
   renderTemplateList();
@@ -1781,236 +1829,6 @@ document.addEventListener('click', (event) => {
   });
 });
 
-/* ---- import szablonu z PSD ----
-   Grafik pracuje w Photoshopie; przepisywanie układu ręcznie byłoby mozolne
-   i zawodne. Plik idzie na serwer, a wraca gotowy szablon z polami. */
-
-const psdInput = document.getElementById('template-psd-file');
-const psdStatus = document.getElementById('template-psd-status');
-const psdModalEl = document.getElementById('psd-modal');
-const psdFilesList = document.getElementById('psd-files');
-const psdFilesEmpty = document.getElementById('psd-files-empty');
-const psdModalError = document.getElementById('psd-modal-error');
-const psdModalProgress = document.getElementById('psd-modal-progress');
-const psdModalLabel = document.getElementById('psd-modal-label');
-
-function showPsdStatus(kind, html) {
-  if (!psdStatus) return;
-  psdStatus.className = `card-body py-2 alert alert-${kind} mb-0`;
-  psdStatus.innerHTML = html;
-  psdStatus.classList.remove('d-none');
-}
-
-document.getElementById('psd-from-browser')?.addEventListener('click', () => psdInput?.click());
-
-/* ---- lista plików PSD leżących w magazynie ---- */
-
-let psdFiles = [];
-let psdMaxSize = Infinity;
-let psdBusy = false;
-
-function setPsdModalBusy(busy, label = '') {
-  psdBusy = busy;
-  setPsdProgress(busy ? { percent: null, label } : { hide: true });
-  psdFilesList?.querySelectorAll('button').forEach((button) => { button.disabled = busy; });
-}
-
-function renderPsdFiles() {
-  if (!psdFilesList) return;
-  psdFilesEmpty?.classList.toggle('d-none', psdFiles.length > 0);
-
-  psdFilesList.innerHTML = psdFiles.map((file) => {
-    const tooBig = file.size > psdMaxSize;
-    return `
-    <div class="list-group-item d-flex align-items-center">
-      <span class="me-2 text-secondary">${icon('template')}</span>
-      <div class="flex-fill min-w-0">
-        <div class="text-truncate">${escapeHTML(file.fileName)}</div>
-        <div class="${tooBig ? 'text-warning' : 'text-secondary'} small">
-          ${fileSize(file.size)}${file.lastModified
-            ? ' · ' + new Date(file.lastModified).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })
-            : ''}${tooBig ? ` · za duży, próg to ${fileSize(psdMaxSize)}` : ''}
-        </div>
-      </div>
-      <button class="btn btn-primary btn-sm ms-2" type="button"
-              data-psd-key="${escapeHTML(file.key)}" ${tooBig ? 'disabled' : ''}>
-        Zbuduj szablon
-      </button>
-    </div>`;
-  }).join('');
-}
-
-async function loadPsdFiles() {
-  setFormError(psdModalError, '');
-  setPsdModalBusy(true, 'Czytam zawartość magazynu…');
-  try {
-    const payload = await api('/api/psd/files');
-    psdFiles = payload.files;
-    psdMaxSize = payload.maxFileSize || Infinity;
-    document.getElementById('psd-prefix').textContent = payload.prefix;
-    renderPsdFiles();
-  } catch (error) {
-    setFormError(psdModalError, error.message);
-  } finally {
-    setPsdModalBusy(false);
-  }
-}
-
-psdModalEl?.addEventListener('show.bs.modal', loadPsdFiles);
-document.getElementById('psd-refresh')?.addEventListener('click', loadPsdFiles);
-
-psdFilesList?.addEventListener('click', async (event) => {
-  const button = event.target.closest('[data-psd-key]');
-  if (!button || psdBusy) return;
-
-  setFormError(psdModalError, '');
-  setPsdModalBusy(true, 'Czytam warstwy i składam grafikę…');
-  try {
-    const payload = await api('/api/psd/import-from-storage', {
-      method: 'POST',
-      body: JSON.stringify({ key: button.dataset.psdKey })
-    });
-    hideModal(psdModalEl);
-    showImportResult(payload);
-    await loadTemplates();
-    showTemplateEditor(payload.template);
-  } catch (error) {
-    setFormError(psdModalError, error.message + (error.hint ? ` ${error.hint}` : ''));
-  } finally {
-    setPsdModalBusy(false);
-  }
-});
-
-/** Wynik importu wygląda tak samo niezależnie od tego, skąd przyszedł plik. */
-function showImportResult(payload) {
-  const warnings = (payload.warnings || []).map((text) => `<li>${escapeHTML(text)}</li>`).join('');
-  showPsdStatus(warnings ? 'warning' : 'success',
-    `Szablon <strong>${escapeHTML(payload.template.name)}</strong> gotowy — `
-    + `${payload.summary.size}, ${payload.summary.fields} `
-    + `${plural(payload.summary.fields, 'pole do wypełnienia', 'pola do wypełnienia', 'pól do wypełnienia')}.`
-    + (warnings ? `<ul class="mt-2 mb-0 ps-3">${warnings}</ul>` : ''));
-}
-
-const psdProgress = {
-  panel: document.getElementById('template-psd-progress'),
-  label: document.getElementById('psd-label'),
-  percent: document.getElementById('psd-percent'),
-  bar: document.getElementById('psd-bar')
-};
-
-const psdModalProgressUi = {
-  panel: document.getElementById('psd-modal-progress'),
-  label: document.getElementById('psd-modal-label'),
-  percent: document.getElementById('psd-modal-percent'),
-  bar: document.getElementById('psd-modal-bar')
-};
-
-/**
- * Postęp pokazujemy tam, gdzie użytkownik patrzy: w oknie wyboru, gdy jest
- * otwarte, a poza nim na karcie szablonów. Nigdy w obu naraz.
- */
-function setPsdProgress({ percent = 0, label = '', hide = false } = {}) {
-  const inModal = psdModalEl?.classList.contains('show');
-  const ui = inModal ? psdModalProgressUi : psdProgress;
-  psdProgress.panel?.classList.add('d-none');
-  psdModalProgressUi.panel?.classList.add('d-none');
-  if (hide || !ui.panel) return;
-
-  ui.panel.classList.remove('d-none');
-  ui.label.textContent = label;
-  ui.percent.textContent = percent === null ? '' : `${Math.round(percent)}%`;
-  ui.bar.style.width = `${percent === null ? 100 : percent}%`;
-  ui.bar.classList.toggle('progress-bar-indeterminate', percent === null);
-}
-
-/**
- * Wysyłka PSD z dysku, kawałek po kawałku.
- *
- * Pliki PSD ważą setki megabajtów, a pośrednik przed aplikacją tnie żądania
- * powyżej stu. Dzielimy więc plik na części i składamy go w magazynie —
- * pojedyncze żądanie nigdy nie zbliża się do limitu, więc rozmiar całości
- * przestaje mieć znaczenie.
- */
-async function sendPsdInChunks(file) {
-  const started = await api('/api/psd/upload/start', {
-    method: 'POST',
-    body: JSON.stringify({ fileName: file.name })
-  });
-
-  const partSize = started.partSize;
-  const parts = Math.ceil(file.size / partSize);
-
-  try {
-    for (let index = 0; index < parts; index += 1) {
-      const chunk = file.slice(index * partSize, Math.min((index + 1) * partSize, file.size));
-      const form = new FormData();
-      form.append('id', started.id);
-      form.append('partNumber', String(index + 1));
-      form.append('chunk', chunk, 'part');
-
-      await new Promise((resolve, reject) => {
-        const request = new XMLHttpRequest();
-        request.open('POST', '/api/psd/upload/part');
-        request.upload.addEventListener('progress', (progress) => {
-          if (!progress.lengthComputable) return;
-          const done = index * partSize + progress.loaded;
-          setPsdProgress({
-            percent: Math.min(100, done / file.size * 100),
-            label: `Wysyłam do magazynu — część ${index + 1} z ${parts}`
-          });
-        });
-        request.addEventListener('load', () => {
-          let body = {};
-          try { body = JSON.parse(request.responseText); } catch { /* pusta odpowiedź */ }
-          if (request.status >= 200 && request.status < 300 && body.success !== false) return resolve(body);
-          if (request.status === 413) {
-            return reject(new Error('Pośrednik odrzucił nawet pojedynczą część pliku. '
-              + 'Wrzuć PSD do katalogu psd/ w magazynie klientem S3.'));
-          }
-          reject(new Error(body.error || `Serwer odrzucił część ${index + 1} (HTTP ${request.status}).`));
-        });
-        request.addEventListener('error', () => reject(new Error('Połączenie przerwane w trakcie wysyłki.')));
-        request.send(form);
-      });
-    }
-
-    setPsdProgress({ percent: null, label: 'Składam plik w magazynie' });
-    return await api('/api/psd/upload/finish', { method: 'POST', body: JSON.stringify({ id: started.id }) });
-  } catch (error) {
-    // Przerwana wysyłka zostawiłaby w buckecie niedokończone części.
-    await api('/api/psd/upload/abort', { method: 'POST', body: JSON.stringify({ id: started.id }) }).catch(() => {});
-    throw error;
-  }
-}
-
-psdInput?.addEventListener('change', async (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  showPsdStatus('info', `<strong>${escapeHTML(file.name)}</strong> · ${fileSize(file.size)}`);
-  setPsdProgress({ percent: 0, label: 'Zaczynam wysyłkę' });
-
-  try {
-    const uploaded = await sendPsdInChunks(file);
-
-    setPsdProgress({ percent: null, label: 'Czytam warstwy i składam grafikę' });
-    const payload = await api('/api/psd/import-from-storage', {
-      method: 'POST',
-      body: JSON.stringify({ key: uploaded.key })
-    });
-
-    setPsdProgress({ hide: true });
-    hideModal(psdModalEl);
-    showImportResult(payload);
-    await loadTemplates();
-    showTemplateEditor(payload.template);
-  } catch (error) {
-    setPsdProgress({ hide: true });
-    showPsdStatus('danger', escapeHTML(error.message) + (error.hint ? ` ${escapeHTML(error.hint)}` : ''));
-  } finally {
-    psdInput.value = '';
-  }
-});
 
 /* ================= Edytor grafiki (social media) ================= */
 

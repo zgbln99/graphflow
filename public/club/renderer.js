@@ -107,13 +107,27 @@
     };
   }
 
+  // Kroje pisma muszą być te same w podglądzie i w eksporcie, więc lista
+  // mieszka tutaj, obok rysowania, a nie w warstwie interfejsu.
+  const FONT_STACKS = {
+    talk: '"ZT Talk", sans-serif',
+    'talk-expanded': '"ZT Talk Expanded", "ZT Talk", sans-serif',
+    sans: 'system-ui, "Segoe UI", Roboto, Arial, sans-serif',
+    serif: 'Georgia, "Times New Roman", serif',
+    mono: 'ui-monospace, "Courier New", monospace'
+  };
+
+  function fontStack(key) {
+    return FONT_STACKS[key] || FONT_STACKS.talk;
+  }
+
   function drawText(ctx, layer, rawValue) {
     const text = String(rawValue ?? layer.text ?? '');
     if (!text) return;
     const content = layer.uppercase ? text.toUpperCase() : text;
 
     ctx.fillStyle = layer.color || '#ffffff';
-    ctx.font = `${layer.fontWeight || 700} ${layer.fontSize || 64}px "ZT Talk Expanded", "ZT Talk", sans-serif`;
+    ctx.font = `${layer.fontWeight || 700} ${layer.fontSize || 64}px ${fontStack(layer.fontFamily)}`;
     ctx.textBaseline = 'top';
     ctx.textAlign = layer.align === 'center' ? 'center' : (layer.align === 'right' ? 'right' : 'left');
     if ('letterSpacing' in ctx) ctx.letterSpacing = `${layer.letterSpacing || 0}px`;

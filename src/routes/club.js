@@ -3,7 +3,6 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const os = require('os');
-const { pipeline } = require('stream/promises');
 const fs = require('fs');
 const Database = require('../config/database');
 const {
@@ -15,7 +14,6 @@ const {
 } = require('../services/social-intelligence');
 const repo = require('../services/club-repository');
 const storage = require('../services/storage');
-const psdImport = require('../services/psd-import');
 
 const router = express.Router();
 const db = Database.getInstance();
@@ -73,7 +71,13 @@ function requireRole(...roles) {
 // mógł podświetlić konkretny input; reszta idzie do globalnej obsługi błędów.
 function handleRepoError(res, next, error) {
   if (error instanceof repo.ValidationError) {
-    return res.status(error.status || 400).json({ success: false, error: error.message, field: error.field });
+    return res.status(error.status || 400).json({
+      success: false,
+      error: error.message,
+      field: error.field,
+      // Przy zablokowanym usuwaniu panel pyta, czy usunąć razem z powiązaniami.
+      usage: error.usage
+    });
   }
   // Błędy magazynu niosą własny status (503 = brak konfiguracji, 502 = problem po stronie S3).
   if (error instanceof storage.StorageError) {
@@ -422,8 +426,8 @@ router.patch('/api/templates/:id', requireAuth, requireRole('admin', 'designer')
 
 router.delete('/api/templates/:id', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
   try {
-    await repo.deleteTemplate(req.params.id);
-    res.json({ success: true });
+    const removed = await repo.deleteTemplate(req.params.id, { force: req.query.force === '1' });
+    res.json({ success: true, removed });
   } catch (err) { handleRepoError(res, next, err); }
 });
 
@@ -457,270 +461,12 @@ router.delete('/api/materials/:id', requireAuth, requireRole('admin', 'designer'
   } catch (err) { handleRepoError(res, next, err); }
 });
 
-/**
- * Buduje szablon z zawartości pliku PSD.
- *
- * @param buffer      zawartość pliku
- * @param fileName    nazwa źródłowa (do nazwy szablonu i etykiet)
- * @param sourceKey   klucz pliku PSD w magazynie, jeśli już tam leży
- * @param sourceStream funkcja zwracająca strumień do zapisania pliku w magazynie
- */
-async function buildTemplateFromPsd({ buffer, fileName, category, userId, sourceKey = null, sourceStream = null }) {
-  const parsed = psdImport.importTemplate(buffer, {
-    name: path.basename(fileName, path.extname(fileName))
-  });
-
-  const uploadedKeys = [];
-  try {
-    // Nazwę bierzemy z pliku, więc kolizja nie jest winą użytkownika —
-    // dokładamy numer zamiast odsyłać go z błędem.
-    const template = await createTemplateWithFreeName({
-      name: parsed.name,
-      category: category === 'other' ? 'other' : 'match',
-      width: parsed.width,
-      height: parsed.height,
-      definition: parsed.definition
-    }, userId);
-
-    const stamp = Date.now().toString(36);
-    const overlayKey = `${storage.PREFIXES.templates}${template.id}/${stamp}-grafika.png`;
-    await storage.putObject(overlayKey, parsed.composite, {
-      contentType: 'image/png',
-      contentLength: parsed.composite.length
-    });
-    uploadedKeys.push(overlayKey);
-
-    // Plik źródłowy zostaje w magazynie — bez niego powrót do oryginału
-    // znaczyłby szukanie po dyskach grafika. Gdy już tam leży, nie kopiujemy go.
-    let psdKey = sourceKey;
-    if (!psdKey && sourceStream) {
-      psdKey = `${storage.PREFIXES.templates}${template.id}/${stamp}-${storage.safeFileName(fileName)}`;
-      const { stream, size } = sourceStream();
-      await storage.putObject(psdKey, stream, {
-        contentType: 'image/vnd.adobe.photoshop',
-        contentLength: size
-      });
-      uploadedKeys.push(psdKey);
-    }
-    if (psdKey) {
-      await repo.addTemplateAsset(template.id, {
-        kind: 'source',
-        objectKey: psdKey,
-        metadata: { originalName: fileName }
-      });
-    }
-
-    const asset = await repo.addTemplateAsset(template.id, {
-      kind: 'overlay',
-      objectKey: overlayKey,
-      metadata: { source: 'psd', originalName: fileName }
-    });
-
-    // Warstwa nakładki wskazuje na dopiero co utworzony plik.
-    await repo.updateTemplate(template.id, {
-      definition: {
-        ...parsed.definition,
-        layers: parsed.definition.layers.map((layer) => (layer.id === 'psd_grafika'
-          ? { ...layer, asset_id: asset.id }
-          : layer))
-      }
-    });
-
-    return {
-      // Z zasobami, żeby podgląd zaraz po imporcie pokazał grafikę, a nie ramkę „brak pliku".
-      template: await repo.getTemplate(template.id, { withAssets: true }),
-      warnings: parsed.warnings,
-      summary: { fields: parsed.definition.fields.length, size: `${parsed.width}×${parsed.height}` }
-    };
-  } catch (error) {
-    // Nieudany import nie ma zostawiać śmieci w magazynie.
-    uploadedKeys.forEach((key) => storage.deleteObject(key).catch(() => {}));
-    throw error;
-  }
-}
-
-function psdErrorResponse(res, next, error) {
-  if (error instanceof psdImport.PsdImportError) {
-    return res.status(error.status).json({ success: false, error: error.message, hint: error.hint });
-  }
-  return handleRepoError(res, next, error);
-}
-
-async function createTemplateWithFreeName(payload, userId) {
-  for (let attempt = 1; attempt <= 20; attempt += 1) {
-    const name = attempt === 1 ? payload.name : `${payload.name} (${attempt})`;
-    try {
-      return await repo.createTemplate({ ...payload, name: name.slice(0, 160) }, userId);
-    } catch (error) {
-      const taken = error instanceof repo.ValidationError && error.field === 'name';
-      if (!taken || attempt === 20) throw error;
-    }
-  }
-}
+/* ------------------------------------------------- pliki szablonów */
 
 /**
- * Import szablonu z PSD. Układ, pozycje i kroje czytamy prosto z pliku grafika,
- * a spłaszczoną grafikę zapisujemy jako jeden obraz nakładki. Warstwy oznaczone
- * „#" stają się polami formularza dla social mediów.
+ * Gotowa grafika od grafika: nakładka z przezroczystością, tło albo maska.
+ * Plik trafia do magazynu, a szablon zapamiętuje tylko klucz.
  */
-/**
- * Import z magazynu — droga podstawowa.
- *
- * Pliki PSD ważą setki megabajtów, a strona stoi za pośrednikiem, który tnie
- * duże żądania. Grafik wrzuca więc plik do katalogu „psd/" klientem S3
- * z pulpitu, a tutaj tylko wybiera, który zamienić w szablon.
- */
-router.get('/api/psd/files', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
-  try {
-    res.json({
-      success: true,
-      prefix: storage.PREFIXES.psd,
-      // Próg podajemy razem z listą, żeby za duży plik dało się rozpoznać
-      // przed kliknięciem, a nie dopiero po nieudanej próbie.
-      maxFileSize: psdImport.maxFileSize(),
-      files: await storage.listPsdFiles()
-    });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
-router.post('/api/psd/import-from-storage', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
-  let tmpPath = null;
-  try {
-    const key = storage.normalizeKey(req.body?.key || '');
-    if (!key.startsWith(storage.PREFIXES.psd) || !/\.psd$/i.test(key)) {
-      return res.status(400).json({ success: false, error: 'Wskaż plik PSD z katalogu magazynu.' });
-    }
-
-    // Rozmiar sprawdzamy przed pobraniem, żeby nie ściągać na próżno pliku,
-    // którego i tak nie przetworzymy.
-    const head = await storage.headObject(key);
-    psdImport.checkFileSize(head.size);
-
-    // Plik zapisujemy najpierw na dysk, a dopiero potem wczytujemy w całości.
-    // Zbieranie kawałków w tablicy i sklejanie ich zajmowałoby w szczycie
-    // dwukrotność rozmiaru pliku — przy PSD rzędu kilkuset megabajtów to
-    // wystarczało, żeby zabrakło pamięci.
-    tmpPath = path.join(tmpDir, `psd-${Date.now().toString(36)}`);
-    const object = await storage.getObjectStream(key);
-    await pipeline(object.body, fs.createWriteStream(tmpPath));
-
-    const result = await buildTemplateFromPsd({
-      buffer: fs.readFileSync(tmpPath),
-      fileName: key.split('/').pop(),
-      category: req.body?.category,
-      userId: req.session.user.id,
-      sourceKey: key
-    });
-    res.status(201).json({ success: true, ...result });
-  } catch (err) {
-    psdErrorResponse(res, next, err);
-  } finally {
-    if (tmpPath) fs.unlink(tmpPath, () => {});
-  }
-});
-
-/* ---- wysyłka PSD z przeglądarki, kawałek po kawałku ----
-   Plik dzielimy po stronie przeglądarki i składamy w buckecie, więc rozmiar
-   przestaje mieć znaczenie: żadne pojedyncze żądanie nie zbliża się do limitu
-   pośrednika, a serwer nie odkłada całego pliku na dysk.
-*/
-
-// Trwające wysyłki, żeby nikt nie dopisał części do cudzego pliku.
-const psdUploads = new Map();
-const UPLOAD_TTL_MS = 60 * 60 * 1000;
-
-function forgetStaleUploads() {
-  const now = Date.now();
-  psdUploads.forEach((upload, id) => {
-    if (now - upload.startedAt <= UPLOAD_TTL_MS) return;
-    storage.abortMultipart(upload.key, upload.uploadId);
-    psdUploads.delete(id);
-  });
-}
-
-router.post('/api/psd/upload/start', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
-  try {
-    forgetStaleUploads();
-
-    const fileName = String(req.body?.fileName || '');
-    if (!/\.psd$/i.test(fileName)) {
-      return res.status(400).json({ success: false, error: 'Wybierz plik z rozszerzeniem .psd.' });
-    }
-
-    const key = `${storage.PREFIXES.psd}${storage.safeFileName(fileName)}`;
-    const started = await storage.startMultipart(key, { contentType: 'image/vnd.adobe.photoshop' });
-
-    const id = `${req.session.user.id}-${Date.now().toString(36)}`;
-    psdUploads.set(id, {
-      userId: req.session.user.id,
-      key: started.key,
-      uploadId: started.uploadId,
-      parts: [],
-      startedAt: Date.now()
-    });
-
-    res.json({ success: true, id, partSize: started.partSize });
-  } catch (err) { handleRepoError(res, next, err); }
-});
-
-router.post('/api/psd/upload/part', requireAuth, requireRole('admin', 'designer'),
-  receivePsdPart, async (req, res, next) => {
-    const upload = psdUploads.get(String(req.body?.id));
-    try {
-      if (!upload || upload.userId !== req.session.user.id) {
-        return res.status(404).json({ success: false, error: 'Wysyłka wygasła — zacznij od nowa.' });
-      }
-      if (!req.file) return res.status(400).json({ success: false, error: 'Brak części pliku.' });
-
-      const partNumber = Number(req.body.partNumber);
-      if (!Number.isInteger(partNumber) || partNumber < 1) {
-        return res.status(400).json({ success: false, error: 'Nieprawidłowy numer części.' });
-      }
-
-      const part = await storage.uploadPart(
-        upload.key, upload.uploadId, partNumber, fs.readFileSync(req.file.path)
-      );
-      upload.parts = upload.parts.filter((item) => item.PartNumber !== partNumber).concat(part);
-      res.json({ success: true, partNumber });
-    } catch (err) {
-      handleRepoError(res, next, err);
-    } finally {
-      if (req.file) fs.unlink(req.file.path, () => {});
-    }
-  });
-
-router.post('/api/psd/upload/finish', requireAuth, requireRole('admin', 'designer'), async (req, res, next) => {
-  const upload = psdUploads.get(String(req.body?.id));
-  try {
-    if (!upload || upload.userId !== req.session.user.id) {
-      return res.status(404).json({ success: false, error: 'Wysyłka wygasła — zacznij od nowa.' });
-    }
-    if (!upload.parts.length) {
-      return res.status(400).json({ success: false, error: 'Nie wysłano żadnej części pliku.' });
-    }
-
-    const key = await storage.completeMultipart(upload.key, upload.uploadId, upload.parts);
-    psdUploads.delete(String(req.body.id));
-    res.json({ success: true, key, fileName: key.split('/').pop() });
-  } catch (err) {
-    if (upload) {
-      await storage.abortMultipart(upload.key, upload.uploadId);
-      psdUploads.delete(String(req.body.id));
-    }
-    handleRepoError(res, next, err);
-  }
-});
-
-router.post('/api/psd/upload/abort', requireAuth, requireRole('admin', 'designer'), async (req, res) => {
-  const id = String(req.body?.id);
-  const upload = psdUploads.get(id);
-  if (upload && upload.userId === req.session.user.id) {
-    await storage.abortMultipart(upload.key, upload.uploadId);
-    psdUploads.delete(id);
-  }
-  res.json({ success: true });
-});
-
 router.post('/api/templates/:id/assets', requireAuth, requireRole('admin', 'designer'),
   uploadTemplateAsset.single('file'), async (req, res, next) => {
     const file = req.file;
@@ -784,47 +530,13 @@ router.delete('/api/assets/:id', requireAuth, requireRole('admin', 'designer'), 
   } catch (err) { handleRepoError(res, next, err); }
 });
 
-/* ============================ MAGAZYN ZDJĘĆ (S3 / MEGA S4) ============================ */
+/* ---------------------------------------------- odbieranie plików */
 
-// Ile plików naraz przyjmujemy w jednym żądaniu. Fotograf zrzuca całą kartę,
+// Ile zdjęć naraz przyjmujemy w jednym żądaniu. Fotograf zrzuca całą kartę,
 // ale przeglądarka wysyła to partiami — dzięki temu pasek postępu ma sens,
 // a jedno zerwane połączenie nie unieważnia całej wysyłki.
 const MAX_UPLOAD_BATCH = 20;
 const MAX_PHOTO_SIZE = 60 * 1024 * 1024;
-
-const uploadPsdPart = multer({
-  storage: multer.diskStorage({ destination: tmpDir }),
-  // Część jest z definicji mała; zapas na wypadek innego rozmiaru po stronie przeglądarki.
-  limits: { fileSize: 32 * 1024 * 1024, files: 1 }
-});
-
-function receivePsdPart(req, res, next) {
-  uploadPsdPart.single('chunk')(req, res, (error) => {
-    if (!error) return next();
-    if (req.file) fs.unlink(req.file.path, () => {});
-    return handleRepoError(res, next, error);
-  });
-}
-
-// Eksporty leżą w magazynie obok zdjęć, w osobnym katalogu.
-const EXPORT_PREFIX = 'eksporty/';
-const MAX_EXPORT_SIZE = 40 * 1024 * 1024;
-
-const uploadExport = multer({
-  storage: multer.diskStorage({ destination: tmpDir }),
-  limits: { fileSize: MAX_EXPORT_SIZE, files: 1 }
-});
-
-function receiveExport(req, res, next) {
-  uploadExport.single('file')(req, res, (error) => {
-    if (!error) return next();
-    if (req.file) fs.unlink(req.file.path, () => {});
-    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ success: false, error: 'Wyeksportowany plik jest za duży.' });
-    }
-    return handleRepoError(res, next, error);
-  });
-}
 
 const uploadPhotos = multer({
   storage: multer.diskStorage({ destination: tmpDir }),
@@ -854,6 +566,26 @@ function receivePhotos(req, res, next) {
         LIMIT_FILE_COUNT: `Maksymalnie ${MAX_UPLOAD_BATCH} zdjęć w jednej partii.`
       };
       return res.status(400).json({ success: false, error: messages[error.code] || 'Nie udało się odebrać plików.' });
+    }
+    return handleRepoError(res, next, error);
+  });
+}
+
+// Eksporty leżą w magazynie obok zdjęć, w osobnym katalogu.
+const EXPORT_PREFIX = 'eksporty/';
+const MAX_EXPORT_SIZE = 40 * 1024 * 1024;
+
+const uploadExport = multer({
+  storage: multer.diskStorage({ destination: tmpDir }),
+  limits: { fileSize: MAX_EXPORT_SIZE, files: 1 }
+});
+
+function receiveExport(req, res, next) {
+  uploadExport.single('file')(req, res, (error) => {
+    if (!error) return next();
+    if (req.file) fs.unlink(req.file.path, () => {});
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ success: false, error: 'Wyeksportowany plik jest za duży.' });
     }
     return handleRepoError(res, next, error);
   });

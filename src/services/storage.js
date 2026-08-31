@@ -10,10 +10,6 @@
 
 const {
   S3Client,
-  CreateMultipartUploadCommand,
-  UploadPartCommand,
-  CompleteMultipartUploadCommand,
-  AbortMultipartUploadCommand,
   HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
@@ -264,14 +260,6 @@ async function listObjects(prefix, { limit = 1000, imagesOnly = false } = {}) {
   }
 }
 
-/** Pliki PSD leżące w magazynie — do wyboru przy imporcie szablonu. */
-async function listPsdFiles({ limit = 200 } = {}) {
-  const listing = await listObjects(PREFIXES.psd, { limit });
-  return listing.objects
-    .filter((object) => /\.psd$/i.test(object.key))
-    .sort((a, b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
-}
-
 async function headObject(key) {
   try {
     const result = await getClient().send(new HeadObjectCommand({ Bucket: getBucket(), Key: normalizeKey(key) }));
@@ -338,77 +326,6 @@ async function putObject(key, body, { contentType = null, contentLength = null }
   }
 }
 
-/* ------------------------------------------------- wysyłka w kawałkach */
-
-/**
- * Duży plik nie przejdzie przez przeglądarkę w jednym żądaniu: pośrednik przed
- * aplikacją tnie żądania powyżej stu megabajtów. Dzielimy go więc na części
- * i składamy bezpośrednio w buckecie, korzystając z wieloczęściowej wysyłki S3.
- * Serwer nie odkłada przy tym całego pliku na dysk — każda część leci dalej,
- * gdy tylko przyjdzie.
- *
- * MEGA S4 wymaga, żeby wszystkie części poza ostatnią miały ten sam rozmiar,
- * dlatego rozmiar części jest stały i podajemy go przeglądarce.
- */
-const PART_SIZE = 8 * 1024 * 1024;
-
-async function startMultipart(key, { contentType = null } = {}) {
-  const normalized = normalizeKey(key);
-  try {
-    const result = await getClient().send(new CreateMultipartUploadCommand({
-      Bucket: getBucket(),
-      Key: normalized,
-      ContentType: contentType || contentTypeFor(normalized)
-    }));
-    return { key: normalized, uploadId: result.UploadId, partSize: PART_SIZE };
-  } catch (error) {
-    throw wrap(error, 'Nie udało się rozpocząć wysyłki');
-  }
-}
-
-async function uploadPart(key, uploadId, partNumber, body) {
-  try {
-    const result = await getClient().send(new UploadPartCommand({
-      Bucket: getBucket(),
-      Key: normalizeKey(key),
-      UploadId: uploadId,
-      PartNumber: partNumber,
-      Body: body,
-      ContentLength: body.length
-    }));
-    return { PartNumber: partNumber, ETag: result.ETag };
-  } catch (error) {
-    throw wrap(error, `Nie udało się wysłać części ${partNumber}`);
-  }
-}
-
-async function completeMultipart(key, uploadId, parts) {
-  try {
-    await getClient().send(new CompleteMultipartUploadCommand({
-      Bucket: getBucket(),
-      Key: normalizeKey(key),
-      UploadId: uploadId,
-      MultipartUpload: { Parts: [...parts].sort((a, b) => a.PartNumber - b.PartNumber) }
-    }));
-    return normalizeKey(key);
-  } catch (error) {
-    throw wrap(error, 'Nie udało się złożyć pliku w magazynie');
-  }
-}
-
-/** Przerwana wysyłka zostawiłaby w buckecie niedokończone części — sprzątamy. */
-async function abortMultipart(key, uploadId) {
-  try {
-    await getClient().send(new AbortMultipartUploadCommand({
-      Bucket: getBucket(),
-      Key: normalizeKey(key),
-      UploadId: uploadId
-    }));
-  } catch {
-    // Sprzątanie nie może przesłonić błędu, przez który do niego doszło.
-  }
-}
-
 /** Presigned GET — podgląd zdjęcia w panelu bez publicznego udostępniania bucketa. */
 async function presignDownload(key, { expiresIn = DOWNLOAD_URL_TTL, download = false } = {}) {
   const normalized = normalizeKey(key);
@@ -428,10 +345,7 @@ const PREFIXES = {
   photos: '',            // zdjęcia meczowe mają własną ścieżkę z sezonu i meczu
   templates: 'szablony/',
   exports: 'eksporty/',
-  branding: 'branding/',
-  // Katalog, do którego grafik wrzuca pliki PSD klientem S3 z pulpitu.
-  // Duże pliki nie przechodzą przez przeglądarkę, więc to jedyna sensowna droga.
-  psd: 'psd/'
+  branding: 'branding/'
 };
 
 module.exports = {
@@ -444,14 +358,8 @@ module.exports = {
   listObjects,
   headObject,
   getObjectStream,
-  listPsdFiles,
   deleteObject,
   putObject,
-  PART_SIZE,
-  startMultipart,
-  uploadPart,
-  completeMultipart,
-  abortMultipart,
   presignDownload,
   normalizeKey,
   normalizePrefix,

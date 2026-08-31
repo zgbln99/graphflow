@@ -22,66 +22,32 @@ Wymagane ustawienia:
 Widok „Monitoring social” pobiera ostatnie posty, liczy reakcje, komentarze i udostępnienia, a następnie generuje ustrukturyzowane rekomendacje przez OpenAI Responses API.
 Serwer odświeża dane w tle zgodnie z `SOCIAL_MONITOR_INTERVAL_MS`. Ustawienie `SOCIAL_AUTO_ANALYZE=true` uruchamia nową analizę automatycznie po wykryciu nowego posta.
 
-### Szablon z pliku PSD
+### Szablony: gotowa grafika plus pola
 
-Grafik pracuje w Photoshopie, więc szablon powstaje z pliku, a nie z przepisywania
-układu ręcznie. Aplikacja czyta z PSD pozycje warstw, rozmiary, treść tekstów,
-stopień pisma, kolor i wyrównanie, a całą nieedytowalną grafikę składa w jeden
-obraz nakładki.
+Szablon składa się z gotowej grafiki przygotowanej przez grafika i z pól, które
+wypełnia social media. Grafik przygotowuje plik PNG z przezroczystością w docelowym
+rozmiarze (np. 1080 × 1350) — ramkę, pasek, elementy identyfikacji — zostawiając puste
+miejsce tam, gdzie ma wejść zdjęcie.
 
-**Jak przygotować plik**
+Praca w panelu (**Szablony → Nowy**):
 
-1. Dokument w docelowym rozmiarze grafiki (np. 1080 × 1350 px, RGB, 72 dpi).
-2. Nazwy warstw, które ma wypełniać social media, zacznij od `#`:
-   `#Zdjęcie zawodnika`, `#Logo rywala`, `#Wynik gospodarza`, `#Nagłówek`.
-   Nazwa warstwy staje się etykietą pola w formularzu.
-3. **Pod warstwą zdjęcia nie może być nic** — w tym miejscu kanwa ma być
-   przezroczysta, bo tam trafi zdjęcie z magazynu. Jeśli coś tam zostanie,
-   import to wykryje i powie o tym wprost.
-4. Warstwy z `#` **ukryj przed zapisem** (kliknij oczko). Widoczne wtopiłyby się
-   w grafikę na stałe; import ostrzega, gdy o tym zapomnisz.
-5. Efekty warstw (cień, obrys, poświata) i tryby mieszania inne niż „zwykły"
-   zrasteryzuj albo scal — składanie ich odtwarza tylko krycie i tryb zwykły.
-   Import wypisuje, których warstw to dotyczy.
-6. Zapisz jako `.psd` i wczytaj w Szablonach przyciskiem **Z PSD**.
+1. Nazwa, rodzaj (meczowy albo inny) i rozmiar dokumentu.
+2. **Pola** — co zobaczy osoba przygotowująca grafikę: teksty, liczby (wyniki),
+   listy wyboru, daty i zdjęcia. Aplikacja nie ma żadnych pól wpisanych na stałe.
+3. **Warstwy** — z czego składa się obraz i w jakiej kolejności:
+   - `zdjęcie` — miejsce na kadr z magazynu, z maską i kadrowaniem,
+   - `nakładka` / `tło` — gotowa grafika wgrana w zakładce **Pliki**,
+   - `tekst` — związany z polem, z wyborem kroju pisma, stopnia, koloru,
+     wyrównania i wersalików,
+   - `logo` — jak zdjęcie, ale mieści się w całości; może brać obraz z pola,
+     bo herb rywala zmienia się co mecz,
+   - `kształt` — jednolity prostokąt, przydatny jako podkład pod tekst.
+4. **Pliki** — gotowe grafiki, tła i maski. Trafiają do magazynu, szablon zapamiętuje
+   tylko klucz.
 
-Plik można podać na dwa sposoby, oba kończą się w tym samym miejscu — katalogu `psd/`
-w magazynie:
-
-- **Wyślij z dysku…** — przeglądarka dzieli plik na części po 8 MB i składa go
-  bezpośrednio w buckecie. Rozmiar całości nie ma znaczenia: pojedyncze żądanie nigdy
-  nie zbliża się do limitu pośrednika (Cloudflare przepuszcza 100 MB), a serwer nie
-  odkłada całego pliku na dysk. Przerwana wysyłka sprząta po sobie niedokończone części.
-- **Klientem S3 z pulpitu** (Cyberduck, WinSCP, S3 Browser) prosto do katalogu `psd/` —
-  wtedy w oknie wystarczy wybrać plik z listy.
-
-Plik źródłowy zostaje w `psd/` — aplikacja go nie kopiuje, tylko zapamiętuje jako zasób
-szablonu.
-
-**Rozmiar pliku a pamięć serwera.** Odczyt PSD wymaga całego pliku w pamięci, więc próg
-zależy od maszyny: aplikacja liczy go jako połowę pamięci serwera podzieloną przez 2,5
-(przy 2 GB wychodzi ok. 400 MB) i pokazuje przy każdym pliku na liście. Plik powyżej progu
-jest odrzucany z komunikatem — zamiast doprowadzić do śmierci procesu, czyli błędu 502 dla
-wszystkich korzystających z panelu. Gdy plik nie mieści się w progu, scal w Photoshopie
-warstwy dekoracyjne w jedną (osobno zostaw tylko te z `#`); przy grafice na social media
-zbija to rozmiar kilkukrotnie.
-
-**Co powstaje z czego**
-
-| Warstwa w PSD | Pole w formularzu | Zachowanie |
-| --- | --- | --- |
-| tekstowa, sama treść cyfrowa | liczba | pole liczbowe (wyniki) |
-| tekstowa, dowolna treść | tekst | krój, stopień, kolor i wyrównanie z PSD |
-| obrazowa z `logo`/`herb` w nazwie | zdjęcie | mieści się w całości (contain) |
-| pozostałe obrazowe | zdjęcie | wypełnia obszar (cover), wymagane |
-| bez `#` | — | trafia do wspólnej nakładki |
-
-Kolejność rysowania: zdjęcia na spodzie, nad nimi nakładka z PSD, a na wierzchu
-teksty i logo. Dzięki temu grafika obramowuje zdjęcie, a napisy zostają czytelne.
-
-Krój pisma bierze się z aplikacji (ZT Talk), nie z pliku — nazwa czcionki z PSD
-nie jest przenoszona. Jeśli w projekcie użyto innego kroju, tekst wyjdzie
-w firmowym; wtedy lepiej zostawić taki napis jako część grafiki, bez `#`.
+Kroje pisma do wyboru przy warstwie tekstowej: klubowy **ZT Talk**, **ZT Talk Expanded**
+oraz trzy kroje systemowe (bezszeryfowy, szeryfowy, o stałej szerokości). Podgląd i eksport
+rysuje ten sam silnik, więc krój w podglądzie jest tym, który wyjdzie w pliku.
 
 ### Edytor grafiki (social media)
 
@@ -137,16 +103,15 @@ Ustawienia w `.env` (na VPS: `/opt/club-graphics/.env`, nigdy w repozytorium):
 Po zmianie `.env` konieczny jest restart procesu: `pm2 restart zastal-marketing-center`.
 Poprawność konfiguracji sprawdza przycisk **Testuj połączenie** w Ustawieniach.
 
-**Wszystko leży w buckecie**: zdjęcia meczowe, nakładki szablonów, pliki źródłowe PSD,
-eksporty i logo klubu. Serwer aplikacji nie trzyma żadnych plików użytkownika — poza
+**Wszystko leży w buckecie**: zdjęcia meczowe, gotowe grafiki szablonów, eksporty
+i logo klubu. Serwer aplikacji nie trzyma żadnych plików użytkownika — poza
 katalogiem przelotowym, z którego plik znika po wysłaniu do magazynu.
 
 | Co | Gdzie w buckecie |
 | --- | --- |
 | zdjęcia meczowe | `2026-27/kolejka-1/2026-10-04-dziki-zastal/` |
 | zdjęcia spoza kalendarza | `2026-27/poza-meczem/` |
-| nakładki i pliki źródłowe szablonów | `szablony/{id}/` |
-| pliki źródłowe PSD do importu | `psd/` |
+| gotowe grafiki szablonów | `szablony/{id}/` |
 | eksporty grafik | `eksporty/{data}/` |
 | logo klubu | `branding/` |
 

@@ -256,6 +256,17 @@ const FIT_MODES = ['cover', 'contain'];
 const ALIGNMENTS = ['left', 'center', 'right'];
 const MASK_SHAPES = ['rect', 'circle'];
 
+// Kroje pisma dostępne w panelu. Klubowy ZT Talk jest domyślny; reszta to
+// bezpieczne kroje systemowe, na wypadek grafik spoza identyfikacji wizualnej.
+const FONT_FAMILIES = [
+  { key: 'talk', label: 'ZT Talk', stack: '"ZT Talk", sans-serif' },
+  { key: 'talk-expanded', label: 'ZT Talk Expanded', stack: '"ZT Talk Expanded", "ZT Talk", sans-serif' },
+  { key: 'sans', label: 'Bezszeryfowa systemowa', stack: 'system-ui, "Segoe UI", Roboto, Arial, sans-serif' },
+  { key: 'serif', label: 'Szeryfowa systemowa', stack: 'Georgia, "Times New Roman", serif' },
+  { key: 'mono', label: 'O stałej szerokości', stack: 'ui-monospace, "Courier New", monospace' }
+];
+const FONT_KEYS = FONT_FAMILIES.map((font) => font.key);
+
 /**
  * Warstwy szablonu. Kolejność rysowania wynika z pola z (rosnąco), więc overlay
  * z przezroczystością można położyć nad zdjęciem — to główny przypadek użycia.
@@ -318,6 +329,7 @@ function normalizeLayers(rawLayers, { width, height, fieldKeys }) {
     if (type === 'text') {
       base.color = /^#[0-9a-f]{3,8}$/i.test(layer.color || '') ? layer.color : '#ffffff';
       base.fontSize = Math.round(number(layer.fontSize, 64, 6, 800));
+      base.fontFamily = FONT_KEYS.includes(layer.fontFamily) ? layer.fontFamily : 'talk';
       base.fontWeight = [400, 500, 600, 700].includes(Number(layer.fontWeight)) ? Number(layer.fontWeight) : 700;
       base.align = ALIGNMENTS.includes(layer.align) ? layer.align : 'left';
       base.lineHeight = number(layer.lineHeight, 1.1, 0.6, 3);
@@ -462,24 +474,41 @@ async function updateTemplate(id, payload) {
   return getTemplate(id);
 }
 
-async function deleteTemplate(id) {
-  const template = await getTemplate(id);
-  if (!template) throw new ValidationError('Nie znaleziono szablonu.');
-
-  const used = await db.fetch(
+async function templateUsage(id) {
+  const row = await db.fetch(
     'SELECT (SELECT COUNT(*) FROM cg_match_templates WHERE template_id = ?) AS matches,'
     + ' (SELECT COUNT(*) FROM cg_designs WHERE template_id = ?) AS designs',
     [Number(id), Number(id)]
   );
-  if (Number(used.matches) > 0 || Number(used.designs) > 0) {
-    throw new ValidationError(
-      `Szablon jest w użyciu (mecze: ${used.matches}, projekty: ${used.designs}). `
-      + 'Odepnij go od meczów albo oznacz jako nieaktywny.'
-    );
+  return { matches: Number(row?.matches) || 0, designs: Number(row?.designs) || 0 };
+}
+
+/**
+ * Usunięcie szablonu w użyciu jest zablokowane, ale nie na głucho: zwracamy
+ * liczby, żeby panel mógł zapytać wprost, czy usunąć razem z materiałami
+ * i grafikami. Wcześniej zostawał tylko komunikat, którego nie było gdzie
+ * pokazać — i wyglądało to jak przycisk, który nie działa.
+ */
+async function deleteTemplate(id, { force = false } = {}) {
+  const template = await getTemplate(id);
+  if (!template) throw new ValidationError('Nie znaleziono szablonu.');
+
+  const used = await templateUsage(id);
+  if ((used.matches || used.designs) && !force) {
+    const error = new ValidationError('Szablon jest w użyciu.');
+    error.usage = used;
+    error.status = 409;
+    throw error;
+  }
+
+  if (force) {
+    // Eksporty i materiały znikają razem z grafikami dzięki kluczom obcym.
+    await db.delete('cg_designs', 'template_id = ?', [Number(id)]);
+    await db.delete('cg_match_templates', 'template_id = ?', [Number(id)]);
   }
 
   await db.delete('cg_templates', 'id = ?', [Number(id)]);
-  return true;
+  return used;
 }
 
 
@@ -1253,6 +1282,7 @@ module.exports = {
   OWNER_ROLES,
   listExports,
   LAYER_TYPES,
+  FONT_FAMILIES,
   ASSET_KINDS,
   listTemplateAssets,
   addTemplateAsset,
@@ -1263,6 +1293,7 @@ module.exports = {
   createTemplate,
   updateTemplate,
   deleteTemplate,
+  templateUsage,
   getMatchMaterials,
   getMatchMaterial,
   addMatchMaterial,
